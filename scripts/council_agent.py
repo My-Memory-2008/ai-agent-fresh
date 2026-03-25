@@ -62,6 +62,6 @@ with open("final_plan.txt", "w") as f:
     f.write(final_output)
 print("✅ Plan saved")
 
-# 4. Trigger Video Generation (Optional - Comment out if just testing text)
+# 4. Trigger Video Generation
 print("🎬 Starting video generation...")
 subprocess.run(["python", "scripts/video_generator.py"])
