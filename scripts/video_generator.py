@@ -1,36 +1,36 @@
 import os
 import subprocess
-from groq import Groq
+import time
 
-# Get the plan
+print("🎬 Starting Video Generation...")
+
+# Read the plan
 with open("final_plan.txt", "r") as f:
     plan = f.read()
 
-print("🎬 Generating Voiceover...")
-
-# 1. Generate Voiceover (Free Edge-TTS)
+# 1. Generate Voiceover
+print("🎤 Generating voiceover...")
 subprocess.run([
     "edge-tts",
     "--voice", "en-US-Mike",
     "--text", plan,
     "--write-media", "voiceover.mp3"
 ])
+print("✅ Voiceover created: voiceover.mp3")
 
-print("✅ Voiceover generated")
+# 2. Create a simple video with black background + voice
+# (We'll add AI images in the next iteration)
+print("🎥 Creating video...")
+subprocess.run([
+    "ffmpeg", "-y",
+    "-f", "lavfi",
+    "-i", "color=c=black:s=1920x1080:d=60",
+    "-i", "voiceover.mp3",
+    "-c:v", "libx264",
+    "-c:a", "aac",
+    "-shortest",
+    "output_video.mp4"
+])
+print("✅ Video created: output_video.mp4")
 
-# 2. Generate Script for Images
-client = Groq(api_key=os.environ["GROQ_API_KEY"])
-image_prompts = client.chat.completions.create(
-    model="llama-3.1-8b-instant",
-    messages=[{"role": "user", "content": f"Create 5 detailed image generation prompts for this video plan: {plan}"}],
-    max_tokens=300
-)
-
-prompts = image_prompts.choices[0].message.content.split("\n")
-print(f"🎨 Generated {len(prompts)} image prompts")
-
-# 3. Save prompts for next step
-with open("image_prompts.txt", "w") as f:
-    f.write(prompts[0] if prompts else "Tokyo travel scenery")
-
-print("✅ Video assets prepared")
+print("🎬 Video generation complete!")
