@@ -1,5 +1,6 @@
 import os
 import subprocess
+from gtts import gTTS
 
 print("🎬 Starting Video Generation...")
 
@@ -9,72 +10,55 @@ with open("final_plan.txt", "r") as f:
 
 print("📄 Plan loaded")
 
-# 1. Generate Voiceover using Edge-TTS (Fixed voice name)
-print("🎤 Generating voiceover...")
+# 1. Generate Voiceover using Google TTS (Free, no blocking)
+print("🎤 Generating voiceover with Google TTS...")
 try:
-    subprocess.run([
-        "edge-tts",
-        "--voice", "en-US-AriaNeural",  # ✅ Fixed: Valid voice
-        "--text", plan,
-        "--write-media", "voiceover.mp3"
-    ], check=True)
+    tts = gTTS(text=plan, lang='en', slow=False)
+    tts.save("voiceover.mp3")
     print("✅ Voiceover created: voiceover.mp3")
 except Exception as e:
-    print(f"❌ Voiceover failed: {e}")
-    print("⚠️ Creating silent audio fallback...")
-    # Create 60 seconds of silence
+    print(f"❌ gTTS failed: {e}")
+    # Create silent fallback
     subprocess.run([
         "ffmpeg", "-y", "-f", "lavfi",
         "-i", "anullsrc=r=44100:cl=stereo",
         "-t", "60",
         "voiceover.mp3"
     ])
-    print("⚠️ Created 60s silent audio")
 
 # 2. Get audio duration
 print("⏱️ Calculating duration...")
-try:
-    result = subprocess.run([
-        "ffprobe", "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        "voiceover.mp3"
-    ], capture_output=True, text=True)
-    
-    duration = float(result.stdout.strip()) if result.stdout.strip() else 60
-except:
-    duration = 60
-    
+result = subprocess.run([
+    "ffprobe", "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    "voiceover.mp3"
+], capture_output=True, text=True)
+
+duration = float(result.stdout.strip()) if result.stdout.strip() else 60
 print(f"📊 Audio duration: {duration:.2f} seconds")
 
-# 3. Create video with black background + voiceover
-print("🎥 Assembling video...")
-try:
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-f", "lavfi",
-        "-i", f"color=c=black:s=1920x1080:d={duration}",
-        "-i", "voiceover.mp3",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-shortest",
-        "output_video.mp4"
-    ], check=True)
-    print("✅ Video created: output_video.mp4")
-except Exception as e:
-    print(f"❌ Video assembly failed: {e}")
-    # Create a dummy video file
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-f", "lavfi",
-        "-i", f"color=c=black:s=1920x1080:d=60",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-pix_fmt", "yuv420p",
-        "output_video.mp4"
-    ])
-    print("⚠️ Created dummy 60s black video")
+# 3. Create text overlay file
+print("📝 Creating text overlay...")
+title = "AI Generated Video"
+with open("title.txt", "w") as f:
+    f.write(title)
 
+# 4. Create video with text overlay + voiceover
+print("🎥 Assembling video with text...")
+subprocess.run([
+    "ffmpeg", "-y",
+    "-f", "lavfi",
+    "-i", f"color=c=blue:s=1920x1080:d={duration}",
+    "-i", "voiceover.mp3",
+    "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='{title}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=48:fontcolor=white",
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-shortest",
+    "output_video.mp4"
+], check=True)
+
+print("✅ Video created: output_video.mp4")
 print("🎬 Video generation complete!")
