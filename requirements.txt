@@ -1,4 +1,3 @@
 groq
 requests
-gTTS
-pillow
+gTTS==6.1.0
