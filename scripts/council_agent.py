@@ -8,10 +8,11 @@ prompt = f"{os.environ['ISSUE_TITLE']}: {os.environ['ISSUE_BODY']}"
 
 # Reliable Models (All Currently Working on Groq)
 # ✅ Working Models Only (Groq)
+# ✅ Working Models Only (Groq)
 models = [
     "llama-3.1-8b-instant",
     "llama-3.3-70b-versatile",
-    "llama-3.2-11b-vision-preview"  # Try this one
+    "llama-3.2-11b-vision-preview"
 ]
 
 results = []
