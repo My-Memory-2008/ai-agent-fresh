@@ -30,6 +30,8 @@ jobs:
         run: python scripts/council_agent.py
 
       - name: Generate Video
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python scripts/video_generator.py
 
       - name: Upload Video Artifact
