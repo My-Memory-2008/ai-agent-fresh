@@ -93,11 +93,15 @@ print(f"✅ Template built with {len(scenes)} scenes")
 
 # 3. Send to JSON2Video API
 print("📤 Sending to JSON2Video API...")
+# 3. Send to JSON2Video API
+print("📤 Sending to JSON2Video API...")
 
 api_key = os.environ["JSON2VIDEO_API_KEY"]
+
+# JSON2Video uses simple API key header (not Bearer)
 headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
+    "X-API-KEY": api_key  # ✅ Correct header format
 }
 
 try:
@@ -109,23 +113,29 @@ try:
         timeout=30
     )
     
+    print(f"📡 Response status: {response.status_code}")
+    print(f"📡 Response body: {response.text[:200]}")
+    
     if response.status_code == 201:
         job_id = response.json()["id"]
         print(f"✅ Job started: {job_id}")
         
         # Poll for completion
         print("⏳ Waiting for render (up to 3 minutes)...")
-        for attempt in range(30):  # 30 attempts × 6 seconds = 3 minutes
+        for attempt in range(30):
             time.sleep(6)
             status_resp = requests.get(
                 f"https://api.json2video.com/v1/videos/{job_id}",
                 headers=headers,
                 timeout=10
             )
-            status = status_resp.json().get("status")
+            status_data = status_resp.json()
+            status = status_data.get("status")
+            
+            print(f"  Attempt {attempt+1}: Status = {status}")
             
             if status == "done":
-                video_url = status_resp.json()["url"]
+                video_url = status_data["url"]
                 print(f"✅ Video ready: {video_url}")
                 
                 # Download the video
@@ -136,26 +146,16 @@ try:
                 print("✅ Video saved: output_video.mp4")
                 break
             elif status == "failed":
-                print("❌ Render failed")
+                print(f"❌ Render failed: {status_data.get('error')}")
                 break
-            else:
-                print(f"  Status: {status} (attempt {attempt+1}/30)")
         else:
-            print("⚠️ Timeout - video may still be rendering")
+            print("⚠️ Timeout - video still rendering")
     else:
-        print(f"❌ API error: {response.status_code} - {response.text}")
+        print(f"❌ API error {response.status_code}: {response.text}")
         
 except Exception as e:
     print(f"❌ Request failed: {e}")
-    # Fallback: Create simple video with FFmpeg
-    print("⚠️ Creating fallback video with FFmpeg...")
-    import subprocess
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "lavfi",
-        "-i", "color=c=blue:s=1920x1080:d=30",
-        "-vf", "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Video':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=72:fontcolor=white",
-        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-        "output_video.mp4"
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    import traceback
+    traceback.print_exc()
 
-print("🎬 Video generation complete!")
+print("🎬 Complete!")
