@@ -30,7 +30,7 @@ jobs:
         run: python scripts/council_agent.py
 
       - name: Generate Video
-        env:
+        env:  # ✅ ADD THIS BLOCK
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
         run: python scripts/video_generator.py
