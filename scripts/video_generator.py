@@ -1,10 +1,10 @@
 import os
-import subprocess
 import json
-from gtts import gTTS
+import requests
+import time
 from groq import Groq
 
-print("🎬 Starting Reliable Video Generation...")
+print("🎬 Starting JSON2Video Generation...")
 
 # Read the master plan
 with open("final_plan.txt", "r") as f:
@@ -16,16 +16,16 @@ print("📄 Plan loaded")
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 scene_prompt = f"""
-Extract 3-5 scenes from this video plan. Return JSON array:
+Extract 4-6 scenes from this video plan. Return JSON array:
 [
-  {{"scene": 1, "text": "Short title", "color": "blue", "duration": 5}}
+  {{"text": "Short scene title", "duration": 5, "bg_color": "#3498db"}}
 ]
 
 Video Plan:
 {plan}
 
-Use these colors only: blue, purple, teal, orange, red, green, pink, yellow
-Keep titles short (max 20 chars).
+Use these colors: #3498db (blue), #9b59b6 (purple), #1abc9c (teal), #e67e22 (orange), #e74c3c (red)
+Keep text under 30 characters. Duration: 4-7 seconds each.
 """
 
 print("🧠 Parsing scenes...")
@@ -33,94 +33,129 @@ try:
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": scene_prompt}],
-        max_tokens=500
+        max_tokens=600
     )
     scenes = json.loads(response.choices[0].message.content)
     print(f"✅ Parsed {len(scenes)} scenes")
 except Exception as e:
     print(f"⚠️ Using fallback: {e}")
     scenes = [
-        {"scene": 1, "text": "Intro", "color": "blue", "duration": 5},
-        {"scene": 2, "text": "Content", "color": "purple", "duration": 5},
-        {"scene": 3, "text": "Details", "color": "teal", "duration": 5},
+        {"text": "Introduction", "duration": 5, "bg_color": "#3498db"},
+        {"text": "Main Content", "duration": 6, "bg_color": "#9b59b6"},
+        {"text": "Key Points", "duration": 5, "bg_color": "#1abc9c"},
+        {"text": "Conclusion", "duration": 4, "bg_color": "#e67e22"},
     ]
 
-# 2. Generate gradient scenes with FFmpeg (100% reliable, no API)
-print("🎨 Generating scenes with FFmpeg...")
-os.makedirs("scenes", exist_ok=True)
+# 2. Build JSON2Video template
+print("📝 Building video template...")
 
-colors = ["blue", "purple", "teal", "orange", "red", "green", "pink", "yellow"]
+# Convert plan to short voiceover text (first 500 chars)
+voiceover_text = plan[:500].replace("\n", " ").strip() + "..."
 
+template = {
+    "template": {
+        "resolution": "1920x1080",
+        "fps": 30,
+        "clips": []
+    }
+}
+
+# Add scene clips
 for i, scene in enumerate(scenes):
-    text = scene.get("text", f"Scene {i+1}")[:20]  # Max 20 chars
-    color = scene.get("color", colors[i % len(colors)])
-    duration = scene.get("duration", 5)
+    clip = {
+        "duration": scene.get("duration", 5),
+        "background": {"color": scene.get("bg_color", "#3498db")},
+        "texts": [
+            {
+                "text": scene.get("text", f"Scene {i+1}"),
+                "font": "Montserrat-Bold",
+                "size": 72,
+                "color": "#FFFFFF",
+                "x": "center",
+                "y": "center",
+                "shadow": {"color": "#000000", "blur": 4, "x": 2, "y": 2}
+            }
+        ],
+        "transitions": [
+            {"type": "fade", "duration": 0.5}
+        ] if i > 0 else []
+    }
+    template["template"]["clips"].append(clip)
+
+# Add voiceover (text-to-speech via JSON2Video)
+template["template"]["voiceover"] = {
+    "text": voiceover_text,
+    "voice": "en-US-Mike",
+    "speed": 1.0
+}
+
+print(f"✅ Template built with {len(scenes)} scenes")
+
+# 3. Send to JSON2Video API
+print("📤 Sending to JSON2Video API...")
+
+api_key = os.environ["JSON2VIDEO_API_KEY"]
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {api_key}"
+}
+
+try:
+    # Start rendering job
+    response = requests.post(
+        "https://api.json2video.com/v1/videos",
+        headers=headers,
+        json=template,
+        timeout=30
+    )
     
-    print(f"  Scene {i+1}: {text} ({color})")
-    
-    # Create gradient background + text with FFmpeg
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-f", "lavfi",
-        "-i", f"color=c={color}@0.8:s=1920x1080:d=1",
-        "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=72:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2",
-        "-frames:v", "1",
-        f"scenes/scene_{i+1}.png"
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    print(f"    ✅ Scene created")
-
-# 3. Generate voiceover
-print("🎤 Generating voiceover...")
-tts = gTTS(text=plan, lang='en', slow=False)
-tts.save("voiceover.mp3")
-
-# Get duration
-result = subprocess.run([
-    "ffprobe", "-v", "error",
-    "-show_entries", "format=duration",
-    "-of", "default=noprint_wrappers=1:nokey=1",
-    "voiceover.mp3"
-], capture_output=True, text=True)
-voice_duration = float(result.stdout.strip()) if result.stdout.strip() else 60
-
-# 4. Create video with Ken Burns effect
-print("🎥 Creating video...")
-
-total_duration = sum(scene.get("duration", 5) for scene in scenes)
-scale_factor = voice_duration / total_duration if total_duration > 0 else 1
-
-with open("scenes_list.txt", "w") as f:
-    for i, scene in enumerate(scenes):
-        duration = scene.get("duration", 5) * scale_factor
-        f.write(f"file 'scenes/scene_{i+1}.mp4'\n")
+    if response.status_code == 201:
+        job_id = response.json()["id"]
+        print(f"✅ Job started: {job_id}")
         
-        # Ken Burns pan/zoom effect
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-loop", "1",
-            "-i", f"scenes/scene_{i+1}.png",
-            "-t", str(duration),
-            "-vf", "zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080",
-            "-c:v", "libx264", "-preset", "ultrafast",
-            f"scenes/scene_{i+1}.mp4"
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Poll for completion
+        print("⏳ Waiting for render (up to 3 minutes)...")
+        for attempt in range(30):  # 30 attempts × 6 seconds = 3 minutes
+            time.sleep(6)
+            status_resp = requests.get(
+                f"https://api.json2video.com/v1/videos/{job_id}",
+                headers=headers,
+                timeout=10
+            )
+            status = status_resp.json().get("status")
+            
+            if status == "done":
+                video_url = status_resp.json()["url"]
+                print(f"✅ Video ready: {video_url}")
+                
+                # Download the video
+                print("⬇️ Downloading video...")
+                video_resp = requests.get(video_url, timeout=60)
+                with open("output_video.mp4", "wb") as f:
+                    f.write(video_resp.content)
+                print("✅ Video saved: output_video.mp4")
+                break
+            elif status == "failed":
+                print("❌ Render failed")
+                break
+            else:
+                print(f"  Status: {status} (attempt {attempt+1}/30)")
+        else:
+            print("⚠️ Timeout - video may still be rendering")
+    else:
+        print(f"❌ API error: {response.status_code} - {response.text}")
+        
+except Exception as e:
+    print(f"❌ Request failed: {e}")
+    # Fallback: Create simple video with FFmpeg
+    print("⚠️ Creating fallback video with FFmpeg...")
+    import subprocess
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "lavfi",
+        "-i", "color=c=blue:s=1920x1080:d=30",
+        "-vf", "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Video':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=72:fontcolor=white",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+        "output_video.mp4"
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-# Concatenate
-subprocess.run([
-    "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-    "-i", "scenes_list.txt", "-c", "copy", "temp_concat.mp4"
-], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-# Add voiceover
-subprocess.run([
-    "ffmpeg", "-y",
-    "-i", "temp_concat.mp4", "-i", "voiceover.mp3",
-    "-c:v", "libx264", "-preset", "medium", "-r", "30",
-    "-c:a", "aac", "-b:a", "128k", "-shortest",
-    "-pix_fmt", "yuv420p", "output_video.mp4"
-], check=True)
-
-print("✅ Video created: output_video.mp4")
-print("🎬 Complete!")
-print(f"📊 Specs: 30fps, 1920x1080, Gradient scenes, Ken Burns, AAC audio")
+print("🎬 Video generation complete!")
