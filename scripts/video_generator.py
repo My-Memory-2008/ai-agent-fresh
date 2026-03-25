@@ -1,10 +1,11 @@
 import os
 import subprocess
 import json
+import requests
 from gtts import gTTS
 from groq import Groq
 
-print("🎬 Starting Advanced Video Generation...")
+print("🎬 Starting AI Video Generation with Real Images...")
 
 # Read the master plan
 with open("final_plan.txt", "r") as f:
@@ -12,19 +13,19 @@ with open("final_plan.txt", "r") as f:
 
 print("📄 Plan loaded")
 
-# 1. Parse the plan into scenes
+# 1. Parse scenes using Groq
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 scene_prompt = f"""
-Extract scenes from this video plan. Return JSON array with format:
+Extract 5 scenes from this video plan. Return JSON array:
 [
-  {{"scene": 1, "text": "Scene title", "prompt": "Detailed image generation prompt", "duration": 5}}
+  {{"scene": 1, "text": "Title", "prompt": "Detailed image prompt for AI generation", "duration": 5}}
 ]
 
 Video Plan:
 {plan}
 
-Create 5-7 scenes, each 5-10 seconds.
+Make each scene 5 seconds. Be specific with image prompts.
 """
 
 print("🧠 Parsing scenes...")
@@ -36,50 +37,61 @@ response = client.chat.completions.create(
 
 try:
     scenes = json.loads(response.choices[0].message.content)
-    print(f"✅ Parsed {len(scenes)} scenes")
 except:
-    # Fallback scenes
     scenes = [
-        {"scene": 1, "text": "Introduction", "prompt": "Cinematic intro scene", "duration": 5},
-        {"scene": 2, "text": "Main Content", "prompt": "Professional tutorial scene", "duration": 5},
-        {"scene": 3, "text": "Details", "prompt": "Detailed explanation visual", "duration": 5},
+        {"scene": 1, "text": "Introduction", "prompt": "Cinematic space scene with stars and planets", "duration": 5},
+        {"scene": 2, "text": "Main Content", "prompt": "Professional tutorial setup with equipment", "duration": 5},
+        {"scene": 3, "text": "Details", "prompt": "Close-up detailed view of subject", "duration": 5},
     ]
 
-# 2. Generate AI images for each scene
+print(f"✅ Parsed {len(scenes)} scenes")
+
+# 2. Generate AI images using Hugging Face Stable Diffusion
 print("🎨 Generating AI images...")
 os.makedirs("scenes", exist_ok=True)
 
+HF_TOKEN = os.environ.get("HF_TOKEN", "")  # Optional, works without it too
+
 for i, scene in enumerate(scenes):
-    print(f"  Generating scene {i+1}...")
-    # Use Hugging Face free inference API for image generation
-    # We'll create a simple colored scene with text for now
-    # (Real SD API would go here)
+    print(f"  Generating scene {i+1}: {scene.get('text')}...")
     
-    # Create scene with FFmpeg (colored background + text)
-    colors = ["blue", "purple", "teal", "orange", "red", "green"]
-    color = colors[i % len(colors)]
-    
+    prompt = scene.get("prompt", "Beautiful cinematic scene")
     duration = scene.get("duration", 5)
     text = scene.get("text", f"Scene {i+1}")
     
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-f", "lavfi",
-        "-i", f"color=c={color}:s=1920x1080:d={duration}",
-        "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='{text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=48:fontcolor=white",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        f"scenes/scene_{i+1}.mp4"
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-print(f"✅ Generated {len(scenes)} scenes")
+    # Try to generate AI image from Hugging Face
+    try:
+        response = requests.post(
+            "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+            headers={"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {},
+            json={"inputs": prompt, "options": {"wait_for_model": True}}
+        )
+        
+        if response.status_code == 200:
+            with open(f"scenes/scene_{i+1}.png", "wb") as f:
+                f.write(response.content)
+            print(f"    ✅ AI image generated")
+        else:
+            raise Exception("API error")
+    except:
+        # Fallback: Create colored scene
+        colors = ["blue", "purple", "teal", "orange", "red"]
+        color = colors[i % len(colors)]
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", f"color=c={color}:s=1920x1080:d=1",
+            "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='{text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=48:fontcolor=white",
+            "-frames:v", "1",
+            f"scenes/scene_{i+1}.png"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"    ⚠️ Using fallback image")
 
 # 3. Generate voiceover
 print("🎤 Generating voiceover...")
 tts = gTTS(text=plan, lang='en', slow=False)
 tts.save("voiceover.mp3")
 
-# Get voiceover duration
+# Get duration
 result = subprocess.run([
     "ffprobe", "-v", "error",
     "-show_entries", "format=duration",
@@ -88,13 +100,31 @@ result = subprocess.run([
 ], capture_output=True, text=True)
 voice_duration = float(result.stdout.strip())
 
-# 4. Create video list file for FFmpeg concat
-print("🎥 Assembling video with motion effects...")
-with open("scenes_list.txt", "w") as f:
-    for i in range(len(scenes)):
-        f.write(f"file 'scenes/scene_{i+1}.mp4'\n")
+# 4. Create video from images with Ken Burns effect (pan/zoom)
+print("🎥 Creating video with motion effects...")
 
-# 5. Concatenate all scenes with smooth transitions
+# Calculate total duration
+total_duration = sum(scene.get("duration", 5) for scene in scenes)
+scale_factor = voice_duration / total_duration if total_duration > 0 else 1
+
+with open("scenes_list.txt", "w") as f:
+    for i, scene in enumerate(scenes):
+        duration = scene.get("duration", 5) * scale_factor
+        f.write(f"file 'scenes/scene_{i+1}.mp4'\n")
+        
+        # Create video from image with Ken Burns effect
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-loop", "1",
+            "-i", f"scenes/scene_{i+1}.png",
+            "-t", str(duration),
+            "-vf", "zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            f"scenes/scene_{i+1}.mp4"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# Concatenate scenes
 subprocess.run([
     "ffmpeg", "-y",
     "-f", "concat",
@@ -104,14 +134,14 @@ subprocess.run([
     "temp_concat.mp4"
 ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-# 6. Add voiceover and create final 30fps video
+# Add voiceover
 subprocess.run([
     "ffmpeg", "-y",
     "-i", "temp_concat.mp4",
     "-i", "voiceover.mp3",
     "-c:v", "libx264",
     "-preset", "medium",
-    "-r", "30",  # 30 FPS!
+    "-r", "30",
     "-c:a", "aac",
     "-b:a", "128k",
     "-shortest",
@@ -121,4 +151,4 @@ subprocess.run([
 
 print("✅ Final video created: output_video.mp4")
 print("🎬 Video generation complete!")
-print(f"📊 Specs: 30fps, 1920x1080, AAC audio")
+print(f"📊 Specs: 30fps, 1920x1080, Ken Burns effects, AAC audio")
