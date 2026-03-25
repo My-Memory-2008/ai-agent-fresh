@@ -60,3 +60,7 @@ except Exception as e:
 with open("final_plan.txt", "w") as f:
     f.write(final_output)
 print("✅ Done")
+
+# 4. Trigger Video Generation
+print("🎬 Starting video generation...")
+subprocess.run(["python", "scripts/video_generator.py"])
