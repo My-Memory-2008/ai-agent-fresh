@@ -1,15 +1,16 @@
 import os
+import subprocess  # ✅ Added this import!
 from groq import Groq
 
 # Setup
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 prompt = f"{os.environ['ISSUE_TITLE']}: {os.environ['ISSUE_BODY']}"
 
-# Reliable Models (Text-only)
+# Reliable Models (All Currently Working on Groq)
 models = [
     "llama-3.1-8b-instant",
     "llama-3.3-70b-versatile",
-    "gemma2-9b-it"  # Often comes back online
+    "llama-3.2-90b-vision-preview"  # Alternative to gemma2
 ]
 
 results = []
@@ -48,7 +49,7 @@ Output Format:
 **Tags:** [5 tags]
 """
     synthesis = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # Use strongest model as Judge
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": judge_prompt}],
         max_tokens=600
     )
@@ -56,11 +57,11 @@ Output Format:
 except Exception as e:
     final_output = "## ❌ Synthesis Failed\n\n" + "\n\n".join(results)
 
-# 3. Save
+# 3. Save Plan
 with open("final_plan.txt", "w") as f:
     f.write(final_output)
-print("✅ Done")
+print("✅ Plan saved")
 
-# 4. Trigger Video Generation
-print("🎬 Starting video generation...")
-subprocess.run(["python", "scripts/video_generator.py"])
+# 4. Trigger Video Generation (Optional - Comment out if just testing text)
+# print("🎬 Starting video generation...")
+# subprocess.run(["python", "scripts/video_generator.py"])
