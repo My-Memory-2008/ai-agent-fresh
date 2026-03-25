@@ -10,7 +10,7 @@ prompt = f"{os.environ['ISSUE_TITLE']}: {os.environ['ISSUE_BODY']}"
 models = [
     "llama-3.1-8b-instant",
     "llama-3.3-70b-versatile",
-    "llama-3.2-90b-vision-preview"  # Alternative to gemma2
+    "mixtral-8x7b-32768"  # ✅ Changed from vision model
 ]
 
 results = []
