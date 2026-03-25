@@ -7,10 +7,11 @@ client = Groq(api_key=os.environ["GROQ_API_KEY"])
 prompt = f"{os.environ['ISSUE_TITLE']}: {os.environ['ISSUE_BODY']}"
 
 # Reliable Models (All Currently Working on Groq)
+# ✅ Working Models Only (Groq)
 models = [
     "llama-3.1-8b-instant",
     "llama-3.3-70b-versatile",
-    "mixtral-8x7b-32768"  # ✅ Changed from vision model
+    "llama-3.2-11b-vision-preview"  # Try this one
 ]
 
 results = []
