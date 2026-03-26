@@ -2,11 +2,10 @@ import os
 import json
 import requests
 import subprocess
-import time
 from gtts import gTTS
 from groq import Groq
 
-print("🎬 Starting Unsplash + FFmpeg Video Generation...")
+print("🎬 Starting Pexels Stock Photo Video Generation...")
 
 # Read the master plan
 with open("final_plan.txt", "r") as f:
@@ -18,11 +17,12 @@ client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 scene_prompt = f"""
 Extract 4 scenes from this video plan. Return JSON array:
-[{{"text": "Short title", "keyword": "unsplash search term", "duration": 5}}]
+[{{"text": "Short title", "keyword": "search term", "duration": 5}}]
 
 Video Plan: {plan}
 
-Keywords should be simple: nature, technology, food, travel, business, etc.
+Keywords should be single words or simple phrases like:
+nature, technology, food, travel, business, ocean, mountain, city, etc.
 Keep text under 25 characters.
 """
 
@@ -39,46 +39,60 @@ except Exception as e:
     print(f"⚠️ Using fallback: {e}")
     scenes = [
         {"text": "Intro", "keyword": "nature landscape", "duration": 5},
-        {"text": "Content", "keyword": "technology digital", "duration": 6},
-        {"text": "Details", "keyword": "business professional", "duration": 5},
-        {"text": "Outro", "keyword": "success achievement", "duration": 4},
+        {"text": "Content", "keyword": "technology computer", "duration": 6},
+        {"text": "Details", "keyword": "business office", "duration": 5},
+        {"text": "Outro", "keyword": "success celebration", "duration": 4},
     ]
 
-# 2. Download images from Unsplash (FREE, no API key needed!)
-print("🎨 Downloading stock photos from Unsplash...")
+# 2. Download images from Pexels (FREE API)
+print("🎨 Downloading stock photos from Pexels...")
 os.makedirs("scenes", exist_ok=True)
+
+pexels_api_key = os.environ.get("PEXELS_API_KEY", "")
+headers = {"Authorization": pexels_api_key} if pexels_api_key else {}
 
 for i, scene in enumerate(scenes):
     text = scene.get("text", f"Scene {i+1}")[:25]
-    keyword = scene.get("keyword", "nature").replace(" ", ",")
+    keyword = scene.get("keyword", "nature")
     duration = scene.get("duration", 5)
     
-    print(f"  Scene {i+1}: {text} (keyword: {keyword})")
-    
-    # Unsplash Source API (free, no auth)
-    image_url = f"https://source.unsplash.com/1920x1080/?{keyword}"
+    print(f"  Scene {i+1}: {text} (searching: {keyword})")
     
     try:
-        # Download image
-        response = requests.get(image_url, timeout=30)
-        if response.status_code == 200 and len(response.content) > 10000:
-            with open(f"scenes/scene_{i+1}.jpg", "wb") as f:
-                f.write(response.content)
-            print(f"    ✅ Image downloaded")
+        # Search Pexels API
+        search_url = f"https://api.pexels.com/v1/search?query={keyword}&per_page=1&orientation=landscape"
+        response = requests.get(search_url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("photos"):
+                photo_url = data["photos"][0]["src"]["landscape"]
+                
+                # Download the image
+                img_response = requests.get(photo_url, timeout=15)
+                if img_response.status_code == 200:
+                    with open(f"scenes/scene_{i+1}.jpg", "wb") as f:
+                        f.write(img_response.content)
+                    print(f"    ✅ Downloaded: {data['photos'][0]['photographer']}")
+                else:
+                    raise Exception("Download failed")
+            else:
+                raise Exception("No photos found")
         else:
-            raise Exception("Invalid image")
-    except:
-        # Fallback: colored background
-        colors = ["blue", "purple", "teal", "orange"]
+            raise Exception(f"API error: {response.status_code}")
+            
+    except Exception as e:
+        print(f"    ⚠️ Fallback: {str(e)[:50]}")
+        # Create colored fallback
+        colors = ["#3498db", "#9b59b6", "#1abc9c", "#e67e22"]
         color = colors[i % len(colors)]
         subprocess.run([
             "ffmpeg", "-y", "-f", "lavfi",
             "-i", f"color=c={color}:s=1920x1080:d=1",
-            "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=white",
+            "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2",
             "-frames:v", "1",
             f"scenes/scene_{i+1}.jpg"
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print(f"    ⚠️ Using fallback background")
 
 # 3. Generate voiceover
 print("🎤 Generating voiceover...")
@@ -133,4 +147,3 @@ subprocess.run([
 
 print("✅ Video created: output_video.mp4")
 print("🎬 Complete!")
-print("📊 Specs: 30fps, 1080p, Unsplash photos, Ken Burns, AAC audio")
