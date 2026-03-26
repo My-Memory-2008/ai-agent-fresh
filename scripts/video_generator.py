@@ -1,23 +1,29 @@
 import os
 import json
 import requests
+import subprocess
 import time
+from gtts import gTTS
 from groq import Groq
 
-print("🎬 Starting JSON2Video Generation...")
+print("🎬 Starting Unsplash + FFmpeg Video Generation...")
 
 # Read the master plan
 with open("final_plan.txt", "r") as f:
     plan = f.read()
 print("📄 Plan loaded")
 
-# 1. Parse scenes
+# 1. Parse scenes using Groq
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
+
 scene_prompt = f"""
-Extract 4 scenes from this plan. Return JSON:
-[{{"text": "Title", "duration": 5, "bg_color": "#3498db"}}]
-Plan: {plan}
-Colors: #3498db, #9b59b6, #1abc9c, #e67e22
+Extract 4 scenes from this video plan. Return JSON array:
+[{{"text": "Short title", "keyword": "unsplash search term", "duration": 5}}]
+
+Video Plan: {plan}
+
+Keywords should be simple: nature, technology, food, travel, business, etc.
+Keep text under 25 characters.
 """
 
 print("🧠 Parsing scenes...")
@@ -32,124 +38,99 @@ try:
 except Exception as e:
     print(f"⚠️ Using fallback: {e}")
     scenes = [
-        {"text": "Intro", "duration": 5, "bg_color": "#3498db"},
-        {"text": "Content", "duration": 6, "bg_color": "#9b59b6"},
-        {"text": "Details", "duration": 5, "bg_color": "#1abc9c"},
-        {"text": "Outro", "duration": 4, "bg_color": "#e67e22"},
+        {"text": "Intro", "keyword": "nature landscape", "duration": 5},
+        {"text": "Content", "keyword": "technology digital", "duration": 6},
+        {"text": "Details", "keyword": "business professional", "duration": 5},
+        {"text": "Outro", "keyword": "success achievement", "duration": 4},
     ]
 
-# 2. Build template
-print("📝 Building template...")
-voiceover_text = plan[:400].replace("\n", " ").strip() + "..."
-
-template = {
-    "template": {
-        "resolution": "1920x1080",
-        "fps": 30,
-        "clips": []
-    }
-}
+# 2. Download images from Unsplash (FREE, no API key needed!)
+print("🎨 Downloading stock photos from Unsplash...")
+os.makedirs("scenes", exist_ok=True)
 
 for i, scene in enumerate(scenes):
-    clip = {
-        "duration": scene.get("duration", 5),
-        "background": {"color": scene.get("bg_color", "#3498db")},
-        "texts": [{
-            "text": scene.get("text", f"Scene {i+1}")[:25],
-            "font": "Montserrat-Bold",
-            "size": 64,
-            "color": "#FFFFFF",
-            "x": "center",
-            "y": "center",
-            "shadow": {"color": "#000000", "blur": 3, "x": 2, "y": 2}
-        }],
-        "transitions": [{"type": "fade", "duration": 0.5}] if i > 0 else []
-    }
-    template["template"]["clips"].append(clip)
-
-template["template"]["voiceover"] = {
-    "text": voiceover_text,
-    "voice": "en-US-Mike",
-    "speed": 1.0
-}
-
-# 3. Send to JSON2Video with ROBUST auth
-print("📤 Sending to JSON2Video API...")
-
-api_key = os.environ.get("JSON2VIDEO_API_KEY", "")
-print(f"🔑 Key length: {len(api_key)}, starts with: {api_key[:5] if api_key else 'NONE'}")
-
-if not api_key or not api_key.startswith("sk_"):
-    print("⚠️ Warning: API key may be invalid (should start with 'sk_')")
-
-# Try multiple auth formats
-auth_methods = [
-    {"Authorization": f"Bearer {api_key}"},
-    {"X-API-KEY": api_key},
-    {"api_key": api_key},
-]
-
-success = False
-for headers in auth_methods:
-    headers["Content-Type"] = "application/json"
+    text = scene.get("text", f"Scene {i+1}")[:25]
+    keyword = scene.get("keyword", "nature").replace(" ", ",")
+    duration = scene.get("duration", 5)
+    
+    print(f"  Scene {i+1}: {text} (keyword: {keyword})")
+    
+    # Unsplash Source API (free, no auth)
+    image_url = f"https://source.unsplash.com/1920x1080/?{keyword}"
     
     try:
-        print(f"🔐 Trying auth: {list(headers.keys())[0]}")
-        response = requests.post(
-            "https://api.json2video.com/v1/videos",
-            headers=headers,
-            json=template,
-            timeout=30
-        )
-        
-        print(f"📡 Status: {response.status_code}")
-        
-        if response.status_code == 201:
-            job_id = response.json()["id"]
-            print(f"✅ Job started: {job_id}")
-            success = True
-            
-            # Poll for completion
-            for attempt in range(25):
-                time.sleep(8)
-                status_resp = requests.get(
-                    f"https://api.json2video.com/v1/videos/{job_id}",
-                    headers=headers,
-                    timeout=10
-                )
-                status_data = status_resp.json()
-                status = status_data.get("status")
-                
-                if status == "done":
-                    video_url = status_data.get("url")
-                    if video_url:
-                        print(f"✅ Downloading video...")
-                        video_resp = requests.get(video_url, timeout=60)
-                        with open("output_video.mp4", "wb") as f:
-                            f.write(video_resp.content)
-                        print("✅ Video saved!")
-                        break
-                elif status == "failed":
-                    print(f"❌ Render failed: {status_data}")
-                    break
-            break
+        # Download image
+        response = requests.get(image_url, timeout=30)
+        if response.status_code == 200 and len(response.content) > 10000:
+            with open(f"scenes/scene_{i+1}.jpg", "wb") as f:
+                f.write(response.content)
+            print(f"    ✅ Image downloaded")
         else:
-            print(f"⚠️ Auth failed: {response.text[:100]}")
-            
-    except Exception as e:
-        print(f"⚠️ Request error: {e}")
+            raise Exception("Invalid image")
+    except:
+        # Fallback: colored background
+        colors = ["blue", "purple", "teal", "orange"]
+        color = colors[i % len(colors)]
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", f"color=c={color}:s=1920x1080:d=1",
+            "-vf", f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=white",
+            "-frames:v", "1",
+            f"scenes/scene_{i+1}.jpg"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"    ⚠️ Using fallback background")
 
-if not success:
-    print("❌ All auth methods failed - creating fallback video")
-    # Fallback with FFmpeg
-    import subprocess
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "lavfi",
-        "-i", "color=c=#3498db:s=1920x1080:d=20",
-        "-vf", "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='Video':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=white",
-        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-        "output_video.mp4"
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("✅ Fallback video created")
+# 3. Generate voiceover
+print("🎤 Generating voiceover...")
+tts = gTTS(text=plan, lang='en', slow=False)
+tts.save("voiceover.mp3")
 
+# Get duration
+result = subprocess.run([
+    "ffprobe", "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    "voiceover.mp3"
+], capture_output=True, text=True)
+voice_duration = float(result.stdout.strip()) if result.stdout.strip() else 60
+
+# 4. Create video with Ken Burns effect
+print("🎥 Creating video with motion...")
+
+total_duration = sum(scene.get("duration", 5) for scene in scenes)
+scale_factor = voice_duration / total_duration if total_duration > 0 else 1
+
+with open("scenes_list.txt", "w") as f:
+    for i, scene in enumerate(scenes):
+        duration = scene.get("duration", 5) * scale_factor
+        f.write(f"file 'scenes/scene_{i+1}.mp4'\n")
+        
+        # Ken Burns pan/zoom effect
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-loop", "1",
+            "-i", f"scenes/scene_{i+1}.jpg",
+            "-t", str(duration),
+            "-vf", "zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080",
+            "-c:v", "libx264", "-preset", "ultrafast",
+            f"scenes/scene_{i+1}.mp4"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# Concatenate scenes
+subprocess.run([
+    "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+    "-i", "scenes_list.txt", "-c", "copy", "temp_concat.mp4"
+], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# Add voiceover
+subprocess.run([
+    "ffmpeg", "-y",
+    "-i", "temp_concat.mp4", "-i", "voiceover.mp3",
+    "-c:v", "libx264", "-preset", "medium", "-r", "30",
+    "-c:a", "aac", "-b:a", "128k", "-shortest",
+    "-pix_fmt", "yuv420p", "output_video.mp4"
+], check=True)
+
+print("✅ Video created: output_video.mp4")
 print("🎬 Complete!")
+print("📊 Specs: 30fps, 1080p, Unsplash photos, Ken Burns, AAC audio")
