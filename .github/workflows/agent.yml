@@ -1,66 +1,41 @@
-name: AI Council Agent
+name: Uncensored AI Council (Cloud)
 
 on:
   issues:
     types: [opened]
 
 jobs:
-  run-agent:
+  ai-chat:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4  # ✅ Updated to v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5  # ✅ Updated to v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
       - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+        run: pip install -r requirements.txt
 
-      - name: Run The Council
+      - name: Consult AI Council
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: python scripts/council_agent.py
 
-      - name: Generate Video
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}  # ✅ Add this
-        run: python scripts/video_generator.py
-        
-      - name: Upload Video Artifact
-        uses: actions/upload-artifact@v4  # ✅ NEW STEP
-        with:
-          name: generated-video
-          path: output_video.mp4
-          retention-days: 7
-
-      - name: Post Result
-        uses: actions/github-script@v7  # ✅ Updated to v7
+      - name: Post Response
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            try {
-              const result = fs.readFileSync('final_plan.txt', 'utf8');
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `✅ **AI Council Report:**\n\n${result}`
-              });
-            } catch (e) {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `❌ **Error:** Check logs.`
-              });
-            }
+            const comment = fs.readFileSync('final_answer.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
