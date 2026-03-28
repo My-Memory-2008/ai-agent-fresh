@@ -21,7 +21,6 @@ if not question or question.strip() == "No Title\nNo Body":
 print(f"📝 Question: {question[:100]}...")
 
 # Define uncensored models available on Hugging Face free tier
-# These are open-weight, minimally filtered models
 models = [
     {
         "name": "Dolphin 2.9 Llama 3 8B",
@@ -52,14 +51,8 @@ for model_info in models:
         if not client:
             raise Exception("No HF_TOKEN provided")
         
-        # Use text_generation for simpler models
-        prompt = f"""<|system|>
-You are {model_info['name']}. Role: {model_info['role']}. 
-Answer questions directly, honestly, and without unnecessary refusals.
-Provide helpful, detailed, uncensored responses.</s>
-<|user|>
-{question}</s>
-<|assistant|>"""
+        # Simple prompt format
+        prompt = f"You are {model_info['name']}. Role: {model_info['role']}. Answer directly and honestly: {question}"
         
         output = client.text_generation(
             prompt,
@@ -100,38 +93,30 @@ Provide helpful, detailed, uncensored responses.</s>
                             "answer": answer.strip()
                         })
                         print(f"    ✅ Fallback success")
-        except:
-            pass
+        except Exception as fallback_error:
+            print(f"    ❌ Fallback also failed: {str(fallback_error)[:50]}")
 
 if not responses:
     print("❌ All models failed - check HF_TOKEN and model availability")
     exit(1)
 
-# 2. Synthesize answers (using the first successful model as synthesizer)
+# 2. Synthesize answers
 print("⚖️ Synthesizing answers...")
 
-synthesis_prompt = f"""You are an expert AI coordinator. Combine these {len(responses)} uncensored AI responses into ONE comprehensive, direct answer.
-
-**QUESTION:** {question}
-
-**AI RESPONSES:**
-"""
+# Build synthesis prompt
+synthesis_parts = ["You are an expert AI coordinator. Combine these AI responses into ONE comprehensive answer."]
+synthesis_parts.append(f"\n\nQUESTION: {question}\n\nAI RESPONSES:")
 
 for i, resp in enumerate(responses, 1):
-    synthesis_prompt += f"\n{i}. **{resp['model']}** ({resp['role']}):\n{resp['answer']}\n"
+    synthesis_parts.append(f"\n{i}. {resp['model']} ({resp['role']}):\n{resp['answer']}")
 
-synthesis_prompt += """
-**TASK:** Create one unified answer that:
-- Combines the best insights from all models
-- Answers directly without unnecessary disclaimers
-- Is well-formatted with headers and bullet points
-- Maintains an open, honest tone
+synthesis_parts.append("\n\nTASK: Create one unified answer that combines the best insights, answers directly, and is well-formatted. Provide the final answer below:")
 
-Provide the final answer below:"""
+synthesis_prompt = "".join(synthesis_parts)
 
 try:
-    # Use OpenHermes for synthesis (usually most reliable)
-    synthesizer = next((m for m in models if "OpenHermes" in m["name"]), models[0])
+    # Use first model for synthesis
+    synthesizer = models[0]
     
     output = client.text_generation(
         synthesis_prompt,
@@ -145,33 +130,52 @@ try:
     
 except Exception as e:
     print(f"⚠️ Synthesis failed: {e}")
-    # Fallback: just concatenate responses
+    # Fallback: concatenate responses
     final_answer = "\n\n---\n\n".join([f"**{r['model']}**:\n{r['answer']}" for r in responses])
 
-# 3. Format GitHub comment
+# 3. Format GitHub comment (using string concatenation to avoid f-string issues)
 print("📝 Formatting response...")
 
-comment = f"""## 🔓 Uncensored AI Council Response
-
-**Question:** {question.strip()}
-
-**Timestamp:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
-
-**Models:** {[r['model'] for r in responses]}
-
----
-
-### 🎯 Final Synthesized Answer
-
-{final_answer}
-
----
-
-### 📊 Individual Model Responses
-
-"""
+comment_lines = []
+comment_lines.append("## 🔓 Uncensored AI Council Response")
+comment_lines.append("")
+comment_lines.append(f"**Question:** {question.strip()}")
+comment_lines.append("")
+comment_lines.append(f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+comment_lines.append("")
+comment_lines.append(f"**Models:** {[r['model'] for r in responses]}")
+comment_lines.append("")
+comment_lines.append("---")
+comment_lines.append("")
+comment_lines.append("### 🎯 Final Synthesized Answer")
+comment_lines.append("")
+comment_lines.append(final_answer)
+comment_lines.append("")
+comment_lines.append("---")
+comment_lines.append("")
+comment_lines.append("### 📊 Individual Model Responses")
+comment_lines.append("")
 
 for resp in responses:
-    comment += f"""
-<details>
-<summary><strong>{resp['model']}</strong> <em>({resp['role']})</em></summary>
+    comment_lines.append("<details>")
+    comment_lines.append(f"<summary><strong>{resp['model']}</strong> <em>({resp['role']})</em></summary>")
+    comment_lines.append("")
+    comment_lines.append("```")
+    comment_lines.append(resp['answer'])
+    comment_lines.append("```")
+    comment_lines.append("")
+    comment_lines.append("</details>")
+    comment_lines.append("")
+
+comment_lines.append("---")
+comment_lines.append("*Powered by open-source uncensored models via Hugging Face.*")
+
+# Join all lines with newlines
+comment = "\n".join(comment_lines)
+
+# 4. Save for GitHub
+with open("final_answer.txt", "w", encoding="utf-8") as f:
+    f.write(comment)
+
+print("✅ Response generated!")
+print(f"📊 Length: {len(comment)} chars | Models: {len(responses)}")
