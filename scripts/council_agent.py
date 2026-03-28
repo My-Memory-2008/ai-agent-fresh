@@ -5,22 +5,50 @@ import time
 from datetime import datetime
 from huggingface_hub import InferenceClient
 
-print("🔓 Uncensored AI Council (Cloud) Activated...")
+print("🔓 Uncensored AI Council (Cloud) - DEBUG MODE")
+print("=" * 60)
 
-# Initialize Hugging Face client
+# Check HF_TOKEN first
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
+print(f"🔑 HF_TOKEN present: {bool(HF_TOKEN)}")
+if HF_TOKEN:
+    print(f"🔑 HF_TOKEN starts with: {HF_TOKEN[:10]}...")
+    print(f"🔑 HF_TOKEN length: {len(HF_TOKEN)}")
+
+# Initialize client
 client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
 
-# Get question from GitHub issue
+# Get question
 question = os.environ.get("ISSUE_TITLE", "") + "\n" + os.environ.get("ISSUE_BODY", "")
+print(f"📝 Question: {question[:100]}...")
+print("=" * 60)
 
-if not question or question.strip() == "No Title\nNo Body":
-    print("❌ No question provided")
+# Test with ONE simple model first
+test_model = "microsoft/DialoGPT-medium"  # Always available, no acceptance needed
+print(f"🧪 Testing connection with: {test_model}")
+
+try:
+    if not client:
+        raise Exception("Client not initialized - check HF_TOKEN")
+    
+    output = client.text_generation(
+        "Hello, how are you?",
+        model=test_model,
+        max_new_tokens=50,
+        return_full_text=False
+    )
+    print(f"✅ Test successful! Response: {output[:50]}...")
+except Exception as e:
+    print(f"❌ Test FAILED: {type(e).__name__}: {str(e)}")
+    print("💡 This means your HF_TOKEN or connection has issues.")
+    print("💡 Fix: 1) Verify token at https://huggingface.co/settings/tokens")
+    print("💡 Fix: 2) Ensure token has 'Read' permission")
+    print("💡 Fix: 3) Visit model pages and click 'Agree' if prompted")
     exit(1)
 
-print(f"📝 Question: {question[:100]}...")
+print("=" * 60)
 
-# Define uncensored models available on Hugging Face free tier
+# Now try the uncensored models
 models = [
     {
         "name": "Dolphin 2.9 Llama 3 8B",
@@ -40,121 +68,102 @@ models = [
 ]
 
 print(f"🧠 Consulting {len(models)} uncensored models...")
+print("-" * 60)
 
-# 1. Query each model via Hugging Face Inference API
 responses = []
 
 for model_info in models:
+    print(f"\n🔍 Trying: {model_info['name']}")
+    print(f"   Model ID: {model_info['id']}")
+    
     try:
-        print(f"  Asking {model_info['name']}...")
+        # Add delay to avoid rate limits
+        time.sleep(3)
         
-        if not client:
-            raise Exception("No HF_TOKEN provided")
+        prompt = f"Answer directly and honestly: {question}"
         
-        # Simple prompt format
-        prompt = f"You are {model_info['name']}. Role: {model_info['role']}. Answer directly and honestly: {question}"
-        
+        print("   📡 Sending request...")
         output = client.text_generation(
             prompt,
             model=model_info["id"],
-            max_new_tokens=800,
+            max_new_tokens=600,
             temperature=0.7,
-            return_full_text=False
+            return_full_text=False,
+            timeout=90  # Longer timeout for cold starts
         )
         
-        if output and len(output.strip()) > 50:
+        if output and len(output.strip()) > 30:
             responses.append({
                 "model": model_info["name"],
                 "role": model_info["role"],
                 "answer": output.strip()
             })
-            print(f"    ✅ Response received ({len(output)} chars)")
+            print(f"   ✅ SUCCESS! ({len(output)} chars)")
         else:
-            raise Exception("Empty or invalid response")
+            print(f"   ⚠️ Response too short or empty")
             
     except Exception as e:
-        print(f"    ❌ Error: {str(e)[:100]}")
-        # Try fallback via direct API call
-        try:
-            response = requests.post(
-                f"https://api-inference.huggingface.co/models/{model_info['id']}",
-                headers={"Authorization": f"Bearer {HF_TOKEN}"},
-                json={"inputs": question, "parameters": {"max_new_tokens": 800}},
-                timeout=60
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    answer = data[0].get("generated_text", "")
-                    if len(answer) > 50:
-                        responses.append({
-                            "model": model_info["name"],
-                            "role": model_info["role"],
-                            "answer": answer.strip()
-                        })
-                        print(f"    ✅ Fallback success")
-        except Exception as fallback_error:
-            print(f"    ❌ Fallback also failed: {str(fallback_error)[:50]}")
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"   ❌ FAILED: {error_type}")
+        print(f"   💬 Error details: {error_msg[:200]}")
+        
+        # Check for common issues
+        if "401" in error_msg or "Unauthorized" in error_msg:
+            print("   💡 Fix: Your HF_TOKEN may be invalid or lack permissions")
+        elif "403" in error_msg or "forbidden" in error_msg.lower():
+            print("   💡 Fix: Visit the model page and click 'Agree and access repository'")
+        elif "429" in error_msg or "rate limit" in error_msg.lower():
+            print("   💡 Fix: Hugging Face free tier rate limited. Wait 1 hour or try later")
+        elif "loading" in error_msg.lower() or "timeout" in error_msg.lower():
+            print("   💡 Fix: Model is loading (cold start). Try again in 1-2 minutes")
+        elif "not supported" in error_msg.lower():
+            print("   💡 Fix: This model may not support text_generation API")
+
+print("\n" + "=" * 60)
+print(f"📊 Results: {len(responses)}/{len(models)} models succeeded")
 
 if not responses:
-    print("❌ All models failed - check HF_TOKEN and model availability")
+    print("\n❌ ALL MODELS FAILED")
+    print("\n🔧 TROUBLESHOOTING STEPS:")
+    print("1️⃣  Go to https://huggingface.co/settings/tokens")
+    print("    - Verify your token exists and has 'Read' permission")
+    print("2️⃣  Visit EACH model page and click 'Agree':")
+    for m in models:
+        print(f"    - https://huggingface.co/{m['id']}")
+    print("3️⃣  Wait 1 hour if you hit rate limits (free tier)")
+    print("4️⃣  Try a simpler model first: microsoft/DialoGPT-medium")
+    print("\n💡 Alternative: Use OpenRouter API instead of Hugging Face")
     exit(1)
 
-# 2. Synthesize answers
-print("⚖️ Synthesizing answers...")
+# If we have responses, synthesize them
+print("\n⚖️ Synthesizing answers...")
 
-# Build synthesis prompt
-synthesis_parts = ["You are an expert AI coordinator. Combine these AI responses into ONE comprehensive answer."]
-synthesis_parts.append(f"\n\nQUESTION: {question}\n\nAI RESPONSES:")
+# Simple synthesis: pick the longest response as "best"
+best_response = max(responses, key=lambda x: len(x["answer"]))
+final_answer = best_response["answer"]
 
-for i, resp in enumerate(responses, 1):
-    synthesis_parts.append(f"\n{i}. {resp['model']} ({resp['role']}):\n{resp['answer']}")
-
-synthesis_parts.append("\n\nTASK: Create one unified answer that combines the best insights, answers directly, and is well-formatted. Provide the final answer below:")
-
-synthesis_prompt = "".join(synthesis_parts)
-
-try:
-    # Use first model for synthesis
-    synthesizer = models[0]
-    
-    output = client.text_generation(
-        synthesis_prompt,
-        model=synthesizer["id"],
-        max_new_tokens=1200,
-        temperature=0.5,
-        return_full_text=False
-    )
-    
-    final_answer = output.strip() if output else responses[0]["answer"]
-    
-except Exception as e:
-    print(f"⚠️ Synthesis failed: {e}")
-    # Fallback: concatenate responses
-    final_answer = "\n\n---\n\n".join([f"**{r['model']}**:\n{r['answer']}" for r in responses])
-
-# 3. Format GitHub comment (using string concatenation to avoid f-string issues)
-print("📝 Formatting response...")
-
-comment_lines = []
-comment_lines.append("## 🔓 Uncensored AI Council Response")
-comment_lines.append("")
-comment_lines.append(f"**Question:** {question.strip()}")
-comment_lines.append("")
-comment_lines.append(f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
-comment_lines.append("")
-comment_lines.append(f"**Models:** {[r['model'] for r in responses]}")
-comment_lines.append("")
-comment_lines.append("---")
-comment_lines.append("")
-comment_lines.append("### 🎯 Final Synthesized Answer")
-comment_lines.append("")
-comment_lines.append(final_answer)
-comment_lines.append("")
-comment_lines.append("---")
-comment_lines.append("")
-comment_lines.append("### 📊 Individual Model Responses")
-comment_lines.append("")
+# Format comment
+comment_lines = [
+    "## 🔓 Uncensored AI Council Response",
+    "",
+    f"**Question:** {question.strip()}",
+    "",
+    f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+    "",
+    f"**Successful Models:** {[r['model'] for r in responses]}",
+    "",
+    "---",
+    "",
+    "### 🎯 Final Answer",
+    "",
+    final_answer,
+    "",
+    "---",
+    "",
+    "### 📊 All Model Responses",
+    ""
+]
 
 for resp in responses:
     comment_lines.append("<details>")
@@ -168,14 +177,13 @@ for resp in responses:
     comment_lines.append("")
 
 comment_lines.append("---")
-comment_lines.append("*Powered by open-source uncensored models via Hugging Face.*")
+comment_lines.append("*Powered by open-source models via Hugging Face free tier.*")
 
-# Join all lines with newlines
 comment = "\n".join(comment_lines)
 
-# 4. Save for GitHub
+# Save
 with open("final_answer.txt", "w", encoding="utf-8") as f:
     f.write(comment)
 
-print("✅ Response generated!")
-print(f"📊 Length: {len(comment)} chars | Models: {len(responses)}")
+print("✅ Response saved to final_answer.txt")
+print(f"📊 Final length: {len(comment)} characters")
