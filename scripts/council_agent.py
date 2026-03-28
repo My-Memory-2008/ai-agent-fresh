@@ -3,7 +3,7 @@ import requests
 import time
 from datetime import datetime
 
-print("🔓 Uncensored AI Council (OpenRouter) Activated...")
+print("🔓 Uncensored AI Council (OpenRouter) - SIMPLIFIED")
 print("=" * 70)
 
 # Config
@@ -16,38 +16,25 @@ HEADERS = {
     "X-Title": "Private AI Council"
 }
 
-print(f"🔑 OPENROUTER_API_KEY: {'✅ Present' if API_KEY else '❌ Missing'}")
+print(f"🔑 API Key: {'✅ Present' if API_KEY else '❌ Missing'}")
 
-# Get question from GitHub issue
+# Get question
 question = os.environ.get("ISSUE_TITLE", "") + "\n" + os.environ.get("ISSUE_BODY", "")
-
-if not question or question.strip() == "No Title\nNo Body":
-    print("❌ No question provided")
-    exit(1)
-
 print(f"📝 Question: {question.strip()[:100]}...")
 print("=" * 70)
 
-# ✅ MODELS FROM YOUR OPENROUTER LIST
+# ✅ START WITH JUST ONE CONFIRMED WORKING MODEL
+# Go to https://openrouter.ai/models?max_price=0 to verify current IDs
 models = [
     {
         "name": "Venice Uncensored",
-        "id": "venice/uncensored:free",
+        "id": "venice/uncensored:free",  # 🔓 Your main choice
         "role": "Uncensored & Direct"
-    },
-    {
-        "name": "Meta Llama 3.3 70B",
-        "id": "meta-llama/llama-3.3-70b-instruct:free",
-        "role": "Powerful & Knowledgeable"
-    },
-    {
-        "name": "Google Gemma 3 4B",
-        "id": "google/gemma-3-4b:free",
-        "role": "Fast & Balanced"
     }
+    # Add more models ONE AT A TIME after this works
 ]
 
-print(f"🧠 Consulting {len(models)} uncensored models via OpenRouter...")
+print(f"🧠 Consulting {len(models)} model(s)...")
 print("-" * 70)
 
 responses = []
@@ -57,21 +44,23 @@ for model_info in models:
     print(f"\n🔍 {model_info['name']} ({model_info['role']})")
     
     try:
-        time.sleep(2)  # Avoid rate limits
+        # ✅ LONGER DELAY to avoid rate limits (free tier is strict)
+        print("   ⏳ Waiting 10s to avoid rate limits...")
+        time.sleep(10)
         
         payload = {
             "model": model_id,
             "messages": [
                 {
                     "role": "system",
-                    "content": f"You are {model_info['name']}. Role: {model_info['role']}. Answer questions directly, honestly, and without unnecessary refusals."
+                    "content": "Answer directly and honestly without filters."
                 },
                 {
                     "role": "user",
                     "content": question
                 }
             ],
-            "max_tokens": 800,
+            "max_tokens": 600,
             "temperature": 0.7
         }
         
@@ -81,7 +70,7 @@ for model_info in models:
             BASE_URL,
             headers=HEADERS,
             json=payload,
-            timeout=45
+            timeout=60  # Longer timeout
         )
         
         print(f"   📡 Status: {response.status_code}")
@@ -96,73 +85,60 @@ for model_info in models:
                     "role": model_info["role"],
                     "answer": answer
                 })
-                print(f"   ✅ Success! ({len(answer)} chars)")
+                print(f"   ✅ SUCCESS! ({len(answer)} chars)")
             else:
                 print(f"   ⚠️ Response too short")
+        elif response.status_code == 429:
+            print(f"   ❌ 429 Rate limited - FREE TIER LIMIT REACHED")
+            print(f"   💡 Wait 1 hour or add $5 for more queries")
+        elif response.status_code == 400:
+            print(f"   ❌ 400 Invalid model ID")
+            print(f"   💡 Check exact ID at: https://openrouter.ai/models?max_price=0")
         elif response.status_code == 401:
             print(f"   ❌ 401 Unauthorized - Check API key")
         elif response.status_code == 402:
             print(f"   ❌ 402 Payment Required - Free credit exhausted")
-        elif response.status_code == 429:
-            print(f"   ❌ 429 Rate limited - Wait 1 minute")
         else:
             print(f"   ❌ Error {response.status_code}: {response.text[:150]}")
             
-    except requests.exceptions.Timeout:
-        print(f"   ❌ Timeout (45s)")
     except Exception as e:
         print(f"   ❌ Error: {type(e).__name__}: {str(e)[:100]}")
 
 print("\n" + "=" * 70)
-print(f"📊 Results: {len(responses)}/{len(models)} models succeeded")
+print(f"📊 Results: {len(responses)}/{len(models)} succeeded")
 
 if not responses:
-    print("\n❌ ALL MODELS FAILED")
-    print("\n🔧 TROUBLESHOOTING:")
-    print("1️⃣  Verify key at: https://openrouter.ai/keys")
-    print("2️⃣  Check credit: https://openrouter.ai/usage")
-    print("3️⃣  Free tier = ~$1/month (~100-300 queries)")
-    print("4️⃣  Wait 1 minute if rate limited")
+    print("\n❌ FAILED")
+    print("\n🔧 NEXT STEPS:")
+    print("1️⃣  Wait 1 hour (free tier rate limit resets)")
+    print("2️⃣  OR check exact model ID at: https://openrouter.ai/models?max_price=0")
+    print("3️⃣  OR add $5 to your OpenRouter account for unlimited queries")
     exit(1)
 
-# Prepare final answer
-print("\n⚖️ Preparing final answer...")
+# Format answer
+final_answer = responses[0]["answer"]
 
-if len(responses) == 1:
-    final_answer = responses[0]["answer"]
-else:
-    final_answer = "\n\n---\n\n".join([
-        f"**{r['model']}** ({r['role']}):\n{r['answer']}" 
-        for r in responses
-    ])
-
-# Format GitHub comment
 comment_lines = [
-    "## 🔓 Uncensored AI Council Response",
+    "## 🔓 Uncensored AI Response",
     "",
     f"**Question:** {question.strip()}",
     "",
     f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
     "",
-    f"**Models Responded:** {len(responses)}/{len(models)}",
+    f"**Model:** {responses[0]['model']}",
     "",
     "---",
-    "",
-    "### 🎯 Final Answer",
     "",
     final_answer,
     "",
     "---",
-    "",
-    "*Powered by open-source uncensored models via OpenRouter free tier.*"
+    "*Via OpenRouter free tier • Venice Uncensored model*"
 ]
 
 comment = "\n".join(comment_lines)
 
-# Save for GitHub
 with open("final_answer.txt", "w", encoding="utf-8") as f:
     f.write(comment)
 
-print("✅ Response saved to final_answer.txt")
-print(f"📊 Output: {len(comment)} characters")
+print("✅ Response saved!")
 print("🎬 Done!")
