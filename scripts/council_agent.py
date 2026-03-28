@@ -12,7 +12,7 @@ BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://github.com/your-username/your-repo",  # Required by OpenRouter
+    "HTTP-Referer": "https://github.com/your-username/your-repo",
     "X-Title": "Private AI Council"
 }
 
@@ -28,22 +28,22 @@ if not question or question.strip() == "No Title\nNo Body":
 print(f"📝 Question: {question.strip()[:100]}...")
 print("=" * 70)
 
-# ✅ Uncensored/open models available on OpenRouter free tier
+# ✅ MODELS FROM YOUR OPENROUTER LIST
 models = [
     {
-        "name": "Dolphin 2.9 Llama 3 8B",
-        "id": "cognitivecomputations/dolphin-2.9-llama3-8b:free",
-        "role": "Direct & Uncensored"
+        "name": "Venice Uncensored",
+        "id": "venice/uncensored:free",
+        "role": "Uncensored & Direct"
     },
     {
-        "name": "Zephyr 7B Beta",
-        "id": "huggingfaceh4/zephyr-7b-beta:free",
-        "role": "Conversational & Helpful"
+        "name": "Meta Llama 3.3 70B",
+        "id": "meta-llama/llama-3.3-70b-instruct:free",
+        "role": "Powerful & Knowledgeable"
     },
     {
-        "name": "Mistral 7B Instruct",
-        "id": "mistralai/mistral-7b-instruct:free",
-        "role": "Fast & Reliable"
+        "name": "Google Gemma 3 4B",
+        "id": "google/gemma-3-4b:free",
+        "role": "Fast & Balanced"
     }
 ]
 
@@ -57,15 +57,14 @@ for model_info in models:
     print(f"\n🔍 {model_info['name']} ({model_info['role']})")
     
     try:
-        # Small delay to avoid rate limits
-        time.sleep(2)
+        time.sleep(2)  # Avoid rate limits
         
         payload = {
             "model": model_id,
             "messages": [
                 {
                     "role": "system",
-                    "content": f"You are {model_info['name']}. Role: {model_info['role']}. Answer questions directly, honestly, and without unnecessary refusals. Provide helpful, detailed responses."
+                    "content": f"You are {model_info['name']}. Role: {model_info['role']}. Answer questions directly, honestly, and without unnecessary refusals."
                 },
                 {
                     "role": "user",
@@ -101,7 +100,7 @@ for model_info in models:
             else:
                 print(f"   ⚠️ Response too short")
         elif response.status_code == 401:
-            print(f"   ❌ 401 Unauthorized - Check OPENROUTER_API_KEY")
+            print(f"   ❌ 401 Unauthorized - Check API key")
         elif response.status_code == 402:
             print(f"   ❌ 402 Payment Required - Free credit exhausted")
         elif response.status_code == 429:
@@ -120,19 +119,18 @@ print(f"📊 Results: {len(responses)}/{len(models)} models succeeded")
 if not responses:
     print("\n❌ ALL MODELS FAILED")
     print("\n🔧 TROUBLESHOOTING:")
-    print("1️⃣  Verify OPENROUTER_API_KEY at: https://openrouter.ai/keys")
-    print("2️⃣  Check credit balance: https://openrouter.ai/usage")
-    print("3️⃣  Free tier = ~$1/month credit (~100-300 queries)")
-    print("4️⃣  Wait 1 minute if rate limited (429)")
+    print("1️⃣  Verify key at: https://openrouter.ai/keys")
+    print("2️⃣  Check credit: https://openrouter.ai/usage")
+    print("3️⃣  Free tier = ~$1/month (~100-300 queries)")
+    print("4️⃣  Wait 1 minute if rate limited")
     exit(1)
 
-# Synthesize answers
+# Prepare final answer
 print("\n⚖️ Preparing final answer...")
 
 if len(responses) == 1:
     final_answer = responses[0]["answer"]
 else:
-    # Combine all responses with clear separators
     final_answer = "\n\n---\n\n".join([
         f"**{r['model']}** ({r['role']}):\n{r['answer']}" 
         for r in responses
@@ -156,8 +154,7 @@ comment_lines = [
     "",
     "---",
     "",
-    "*Powered by open-source uncensored models via OpenRouter free tier.*",
-    "*Answers are direct and minimally filtered. Free tier has usage limits.*"
+    "*Powered by open-source uncensored models via OpenRouter free tier.*"
 ]
 
 comment = "\n".join(comment_lines)
