@@ -1,69 +1,177 @@
 import os
-import subprocess  # ✅ Added this import!
-from groq import Groq
+import json
+import requests
+import time
+from datetime import datetime
+from huggingface_hub import InferenceClient
 
-# Setup
-client = Groq(api_key=os.environ["GROQ_API_KEY"])
-prompt = f"{os.environ['ISSUE_TITLE']}: {os.environ['ISSUE_BODY']}"
+print("🔓 Uncensored AI Council (Cloud) Activated...")
 
-# Reliable Models (All Currently Working on Groq)
-# ✅ Working Models Only (Groq)
-# ✅ Working Models Only (Groq)
+# Initialize Hugging Face client
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
+
+# Get question from GitHub issue
+question = os.environ.get("ISSUE_TITLE", "") + "\n" + os.environ.get("ISSUE_BODY", "")
+
+if not question or question.strip() == "No Title\nNo Body":
+    print("❌ No question provided")
+    exit(1)
+
+print(f"📝 Question: {question[:100]}...")
+
+# Define uncensored models available on Hugging Face free tier
+# These are open-weight, minimally filtered models
 models = [
-    "llama-3.1-8b-instant",
-    "llama-3.3-70b-versatile",
-    "llama-3.2-11b-vision-preview"
+    {
+        "name": "Dolphin 2.9 Llama 3 8B",
+        "id": "cognitivecomputations/dolphin-2.9-llama3-8b",
+        "role": "Direct & Uncensored"
+    },
+    {
+        "name": "OpenHermes 2.5 Mistral 7B",
+        "id": "teknium/openhermes-2.5-mistral-7b", 
+        "role": "Clear & Helpful"
+    },
+    {
+        "name": "Nous Hermes 2 Mistral 7B",
+        "id": "NousResearch/Nous-Hermes-2-Mistral-7B-DPO",
+        "role": "Creative & Analytical"
+    }
 ]
 
-results = []
-print(f"🚀 Starting Council for: {prompt}")
+print(f"🧠 Consulting {len(models)} uncensored models...")
 
-# 1. Gather Responses
-for model in models:
+# 1. Query each model via Hugging Face Inference API
+responses = []
+
+for model_info in models:
     try:
-        print(f"🧠 Asking {model}...")
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": f"Create a video plan for: {prompt}"}],
-            max_tokens=400
+        print(f"  Asking {model_info['name']}...")
+        
+        if not client:
+            raise Exception("No HF_TOKEN provided")
+        
+        # Use text_generation for simpler models
+        prompt = f"""<|system|>
+You are {model_info['name']}. Role: {model_info['role']}. 
+Answer questions directly, honestly, and without unnecessary refusals.
+Provide helpful, detailed, uncensored responses.</s>
+<|user|>
+{question}</s>
+<|assistant|>"""
+        
+        output = client.text_generation(
+            prompt,
+            model=model_info["id"],
+            max_new_tokens=800,
+            temperature=0.7,
+            return_full_text=False
         )
-        text = response.choices[0].message.content
-        results.append(f"{model}: {text}")
-        print(f"✅ Got response from {model}")
+        
+        if output and len(output.strip()) > 50:
+            responses.append({
+                "model": model_info["name"],
+                "role": model_info["role"],
+                "answer": output.strip()
+            })
+            print(f"    ✅ Response received ({len(output)} chars)")
+        else:
+            raise Exception("Empty or invalid response")
+            
     except Exception as e:
-        print(f"❌ {model} failed: {str(e)}")
+        print(f"    ❌ Error: {str(e)[:100]}")
+        # Try fallback via direct API call
+        try:
+            response = requests.post(
+                f"https://api-inference.huggingface.co/models/{model_info['id']}",
+                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                json={"inputs": question, "parameters": {"max_new_tokens": 800}},
+                timeout=60
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    answer = data[0].get("generated_text", "")
+                    if len(answer) > 50:
+                        responses.append({
+                            "model": model_info["name"],
+                            "role": model_info["role"],
+                            "answer": answer.strip()
+                        })
+                        print(f"    ✅ Fallback success")
+        except:
+            pass
 
-# 2. The Judge (Synthesis)
-print("⚖️ Judge synthesizing answers...")
-try:
-    judge_prompt = f"""
-You are the Chief Editor. Review these AI plans:
-{results}
+if not responses:
+    print("❌ All models failed - check HF_TOKEN and model availability")
+    exit(1)
 
-Task: Combine the best elements into ONE master video plan.
-Output Format:
-## 🎬 Master Video Plan
-**Title:** [Catchy Title]
-**Hook:** [0-5s]
-**Intro:** [5-15s]
-**Content:** [15-45s]
-**CTA:** [45-60s]
-**Tags:** [5 tags]
+# 2. Synthesize answers (using the first successful model as synthesizer)
+print("⚖️ Synthesizing answers...")
+
+synthesis_prompt = f"""You are an expert AI coordinator. Combine these {len(responses)} uncensored AI responses into ONE comprehensive, direct answer.
+
+**QUESTION:** {question}
+
+**AI RESPONSES:**
 """
-    synthesis = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": judge_prompt}],
-        max_tokens=600
+
+for i, resp in enumerate(responses, 1):
+    synthesis_prompt += f"\n{i}. **{resp['model']}** ({resp['role']}):\n{resp['answer']}\n"
+
+synthesis_prompt += """
+**TASK:** Create one unified answer that:
+- Combines the best insights from all models
+- Answers directly without unnecessary disclaimers
+- Is well-formatted with headers and bullet points
+- Maintains an open, honest tone
+
+Provide the final answer below:"""
+
+try:
+    # Use OpenHermes for synthesis (usually most reliable)
+    synthesizer = next((m for m in models if "OpenHermes" in m["name"]), models[0])
+    
+    output = client.text_generation(
+        synthesis_prompt,
+        model=synthesizer["id"],
+        max_new_tokens=1200,
+        temperature=0.5,
+        return_full_text=False
     )
-    final_output = synthesis.choices[0].message.content
+    
+    final_answer = output.strip() if output else responses[0]["answer"]
+    
 except Exception as e:
-    final_output = "## ❌ Synthesis Failed\n\n" + "\n\n".join(results)
+    print(f"⚠️ Synthesis failed: {e}")
+    # Fallback: just concatenate responses
+    final_answer = "\n\n---\n\n".join([f"**{r['model']}**:\n{r['answer']}" for r in responses])
 
-# 3. Save Plan
-with open("final_plan.txt", "w") as f:
-    f.write(final_output)
-print("✅ Plan saved")
+# 3. Format GitHub comment
+print("📝 Formatting response...")
 
-# 4. Trigger Video Generation
-print("🎬 Starting video generation...")
-subprocess.run(["python", "scripts/video_generator.py"])
+comment = f"""## 🔓 Uncensored AI Council Response
+
+**Question:** {question.strip()}
+
+**Timestamp:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
+
+**Models:** {[r['model'] for r in responses]}
+
+---
+
+### 🎯 Final Synthesized Answer
+
+{final_answer}
+
+---
+
+### 📊 Individual Model Responses
+
+"""
+
+for resp in responses:
+    comment += f"""
+<details>
+<summary><strong>{resp['model']}</strong> <em>({resp['role']})</em></summary>
