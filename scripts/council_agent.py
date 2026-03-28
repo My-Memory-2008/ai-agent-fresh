@@ -52,17 +52,17 @@ print("=" * 60)
 models = [
     {
         "name": "Dolphin 2.9 Llama 3 8B",
-        "id": "cognitivecomputations/dolphin-2.9-llama3-8b",
+        "id": "dphn/dolphin-2.9-llama3-8b",  # ✅ Correct path - PUBLIC
         "role": "Direct & Uncensored"
     },
     {
         "name": "OpenHermes 2.5 Mistral 7B",
-        "id": "teknium/openhermes-2.5-mistral-7b", 
+        "id": "teknium/OpenHermes-2.5-Mistral-7B",  # ✅ Correct path - PUBLIC
         "role": "Clear & Helpful"
     },
     {
         "name": "Nous Hermes 2 Mistral 7B",
-        "id": "NousResearch/Nous-Hermes-2-Mistral-7B-DPO",
+        "id": "NousResearch/Nous-Hermes-2-Mistral-7B-DPO",  # May need acceptance
         "role": "Creative & Analytical"
     }
 ]
