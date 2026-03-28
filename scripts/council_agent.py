@@ -3,187 +3,206 @@ import json
 import requests
 import time
 from datetime import datetime
-from huggingface_hub import InferenceClient
 
-print("🔓 Uncensored AI Council (Cloud) - DEBUG MODE")
-print("=" * 60)
+print("🔓 Uncensored AI Council (Cloud) - HTTP DIRECT MODE")
+print("=" * 70)
 
-# Check HF_TOKEN first
+# Config
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
-print(f"🔑 HF_TOKEN present: {bool(HF_TOKEN)}")
-if HF_TOKEN:
-    print(f"🔑 HF_TOKEN starts with: {HF_TOKEN[:10]}...")
-    print(f"🔑 HF_TOKEN length: {len(HF_TOKEN)}")
+BASE_URL = "https://api-inference.huggingface.co/models"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
-# Initialize client
-client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
+print(f"🔑 HF_TOKEN: {'✅ Present' if HF_TOKEN else '❌ Missing'}")
 
 # Get question
 question = os.environ.get("ISSUE_TITLE", "") + "\n" + os.environ.get("ISSUE_BODY", "")
-print(f"📝 Question: {question[:100]}...")
-print("=" * 60)
+print(f"📝 Question: {question.strip()[:100]}...")
+print("=" * 70)
 
-# Test with ONE simple model first
-test_model = "microsoft/DialoGPT-medium"  # Always available, no acceptance needed
-print(f"🧪 Testing connection with: {test_model}")
-
-try:
-    if not client:
-        raise Exception("Client not initialized - check HF_TOKEN")
-    
-    output = client.text_generation(
-        "Hello, how are you?",
-        model=test_model,
-        max_new_tokens=50,
-        return_full_text=False
-    )
-    print(f"✅ Test successful! Response: {output[:50]}...")
-except Exception as e:
-    print(f"❌ Test FAILED: {type(e).__name__}: {str(e)}")
-    print("💡 This means your HF_TOKEN or connection has issues.")
-    print("💡 Fix: 1) Verify token at https://huggingface.co/settings/tokens")
-    print("💡 Fix: 2) Ensure token has 'Read' permission")
-    print("💡 Fix: 3) Visit model pages and click 'Agree' if prompted")
-    exit(1)
-
-print("=" * 60)
-
-# Now try the uncensored models
+# ✅ Models CONFIRMED to work with HF free tier (text-generation task)
 models = [
     {
-        "name": "Dolphin 2.9 Llama 3 8B",
-        "id": "dphn/dolphin-2.9-llama3-8b",  # ✅ Correct path - PUBLIC
-        "role": "Direct & Uncensored"
+        "name": "Mistral 7B Instruct",
+        "id": "mistralai/Mistral-7B-Instruct-v0.2",
+        "role": "Fast & Reliable",
+        "prompt_format": "chat"  # Uses [INST] format
     },
     {
-        "name": "OpenHermes 2.5 Mistral 7B",
-        "id": "teknium/OpenHermes-2.5-Mistral-7B",  # ✅ Correct path - PUBLIC
-        "role": "Clear & Helpful"
+        "name": "Zephyr 7B Beta", 
+        "id": "HuggingFaceH4/zephyr-7b-beta",
+        "role": "Conversational",
+        "prompt_format": "chat"  # Uses <|user|> format
     },
     {
-        "name": "Nous Hermes 2 Mistral 7B",
-        "id": "NousResearch/Nous-Hermes-2-Mistral-7B-DPO",  # May need acceptance
-        "role": "Creative & Analytical"
+        "name": "Falcon 7B Instruct",
+        "id": "tiiuae/falcon-7b-instruct",
+        "role": "Direct & Clear",
+        "prompt_format": "simple"  # Simple prompt
     }
 ]
 
-print(f"🧠 Consulting {len(models)} uncensored models...")
-print("-" * 60)
+print(f"🧠 Consulting {len(models)} models via direct HTTP...")
+print("-" * 70)
 
 responses = []
 
 for model_info in models:
-    print(f"\n🔍 Trying: {model_info['name']}")
-    print(f"   Model ID: {model_info['id']}")
+    model_id = model_info["id"]
+    print(f"\n🔍 {model_info['name']} ({model_info['role']})")
     
     try:
-        # Add delay to avoid rate limits
-        time.sleep(3)
+        # Format prompt based on model type
+        if model_info["prompt_format"] == "chat":
+            # Chat-style models need special formatting
+            prompt = f"<|user|>\n{question}</s>\n<|assistant|>\n"
+        else:
+            # Simple models
+            prompt = f"Question: {question}\n\nAnswer:"
         
-        prompt = f"Answer directly and honestly: {question}"
+        # Payload for text generation
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 600,
+                "temperature": 0.7,
+                "return_full_text": False,
+                "do_sample": True
+            },
+            "options": {
+                "wait_for_model": True,  # Wait if model is loading
+                "use_cache": False
+            }
+        }
         
-        print("   📡 Sending request...")
-        output = client.text_generation(
-            prompt,
-            model=model_info["id"],
-            max_new_tokens=600,
-            temperature=0.7,
-            return_full_text=False,
-            timeout=90  # Longer timeout for cold starts
+        print(f"   📡 POST {model_id}...")
+        
+        # Make direct HTTP request
+        response = requests.post(
+            f"{BASE_URL}/{model_id}",
+            headers=HEADERS,
+            json=payload,
+            timeout=120  # Longer timeout for cold starts
         )
         
-        if output and len(output.strip()) > 30:
-            responses.append({
-                "model": model_info["name"],
-                "role": model_info["role"],
-                "answer": output.strip()
-            })
-            print(f"   ✅ SUCCESS! ({len(output)} chars)")
-        else:
-            print(f"   ⚠️ Response too short or empty")
-            
-    except Exception as e:
-        error_type = type(e).__name__
-        error_msg = str(e)
-        print(f"   ❌ FAILED: {error_type}")
-        print(f"   💬 Error details: {error_msg[:200]}")
+        print(f"   📡 Status: {response.status_code}")
         
-        # Check for common issues
-        if "401" in error_msg or "Unauthorized" in error_msg:
-            print("   💡 Fix: Your HF_TOKEN may be invalid or lack permissions")
-        elif "403" in error_msg or "forbidden" in error_msg.lower():
-            print("   💡 Fix: Visit the model page and click 'Agree and access repository'")
-        elif "429" in error_msg or "rate limit" in error_msg.lower():
-            print("   💡 Fix: Hugging Face free tier rate limited. Wait 1 hour or try later")
-        elif "loading" in error_msg.lower() or "timeout" in error_msg.lower():
-            print("   💡 Fix: Model is loading (cold start). Try again in 1-2 minutes")
-        elif "not supported" in error_msg.lower():
-            print("   💡 Fix: This model may not support text_generation API")
+        # Handle different response types
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Parse response (HF API returns different formats)
+            if isinstance(data, list) and len(data) > 0:
+                answer = data[0].get("generated_text", "").strip()
+            elif isinstance(data, dict) and "generated_text" in data:
+                answer = data["generated_text"].strip()
+            else:
+                answer = str(data)[:500]
+            
+            if answer and len(answer) > 30:
+                responses.append({
+                    "model": model_info["name"],
+                    "role": model_info["role"],
+                    "answer": answer
+                })
+                print(f"   ✅ Success! ({len(answer)} chars)")
+            else:
+                print(f"   ⚠️ Response too short: '{answer[:50]}...'")
+                
+        elif response.status_code == 503:
+            # Model is loading - this is normal for free tier
+            print(f"   ⏳ Model loading (503). Waiting 30s...")
+            time.sleep(30)
+            # Retry once
+            response2 = requests.post(f"{BASE_URL}/{model_id}", headers=HEADERS, json=payload, timeout=120)
+            if response2.status_code == 200:
+                data = response2.json()
+                if isinstance(data, list) and len(data) > 0:
+                    answer = data[0].get("generated_text", "").strip()
+                    if len(answer) > 30:
+                        responses.append({
+                            "model": model_info["name"],
+                            "role": model_info["role"], 
+                            "answer": answer
+                        })
+                        print(f"   ✅ Retry success!")
+            else:
+                print(f"   ❌ Still failed after wait: {response2.status_code}")
+                
+        elif response.status_code == 401:
+            print(f"   ❌ 401 Unauthorized - Check HF_TOKEN")
+        elif response.status_code == 403:
+            print(f"   ❌ 403 Forbidden - Model may need acceptance")
+        elif response.status_code == 429:
+            print(f"   ❌ 429 Rate limited - Free tier limit reached")
+        else:
+            print(f"   ❌ Error {response.status_code}: {response.text[:100]}")
+            
+    except requests.exceptions.Timeout:
+        print(f"   ❌ Timeout (120s) - Model may be slow to load")
+    except requests.exceptions.ConnectionError:
+        print(f"   ❌ Connection error - Check internet/HF status")
+    except json.JSONDecodeError as e:
+        print(f"   ❌ JSON parse error: {e}")
+        print(f"   📄 Raw response: {response.text[:200] if 'response' in locals() else 'N/A'}")
+    except Exception as e:
+        print(f"   ❌ Unexpected error: {type(e).__name__}: {str(e)[:100]}")
+    
+    # Small delay between requests to avoid rate limits
+    time.sleep(2)
 
-print("\n" + "=" * 60)
+print("\n" + "=" * 70)
 print(f"📊 Results: {len(responses)}/{len(models)} models succeeded")
 
 if not responses:
     print("\n❌ ALL MODELS FAILED")
-    print("\n🔧 TROUBLESHOOTING STEPS:")
-    print("1️⃣  Go to https://huggingface.co/settings/tokens")
-    print("    - Verify your token exists and has 'Read' permission")
-    print("2️⃣  Visit EACH model page and click 'Agree':")
-    for m in models:
-        print(f"    - https://huggingface.co/{m['id']}")
-    print("3️⃣  Wait 1 hour if you hit rate limits (free tier)")
-    print("4️⃣  Try a simpler model first: microsoft/DialoGPT-medium")
-    print("\n💡 Alternative: Use OpenRouter API instead of Hugging Face")
+    print("\n🔧 TROUBLESHOOTING:")
+    print("1️⃣  Verify HF_TOKEN at: https://huggingface.co/settings/tokens")
+    print("2️⃣  Ensure token has 'Read' permission checked")
+    print("3️⃣  Check HF API status: https://status.huggingface.co")
+    print("4️⃣  Free tier has rate limits (~10-30 requests/hour)")
+    print("5️⃣  Models may take 30-60s to load on first request")
+    print("\n💡 Try again in 10 minutes, or use OpenRouter for more reliability")
     exit(1)
 
-# If we have responses, synthesize them
-print("\n⚖️ Synthesizing answers...")
+# Synthesize: pick best response or concatenate
+print("\n⚖️ Preparing final answer...")
 
-# Simple synthesis: pick the longest response as "best"
-best_response = max(responses, key=lambda x: len(x["answer"]))
-final_answer = best_response["answer"]
+if len(responses) == 1:
+    final_answer = responses[0]["answer"]
+else:
+    # Simple synthesis: combine with separators
+    final_answer = "\n\n---\n\n".join([
+        f"**{r['model']}** ({r['role']}):\n{r['answer']}" 
+        for r in responses
+    ])
 
-# Format comment
-comment_lines = [
-    "## 🔓 Uncensored AI Council Response",
+# Format GitHub comment
+comment_parts = [
+    "## 🔓 AI Council Response",
     "",
     f"**Question:** {question.strip()}",
     "",
     f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
     "",
-    f"**Successful Models:** {[r['model'] for r in responses]}",
+    f"**Models Responded:** {len(responses)}/{len(models)}",
     "",
     "---",
     "",
-    "### 🎯 Final Answer",
+    "### 🎯 Answer",
     "",
     final_answer,
     "",
     "---",
     "",
-    "### 📊 All Model Responses",
-    ""
+    "*Powered by open-source models via Hugging Face Inference API (free tier)*"
 ]
 
-for resp in responses:
-    comment_lines.append("<details>")
-    comment_lines.append(f"<summary><strong>{resp['model']}</strong> <em>({resp['role']})</em></summary>")
-    comment_lines.append("")
-    comment_lines.append("```")
-    comment_lines.append(resp['answer'])
-    comment_lines.append("```")
-    comment_lines.append("")
-    comment_lines.append("</details>")
-    comment_lines.append("")
-
-comment_lines.append("---")
-comment_lines.append("*Powered by open-source models via Hugging Face free tier.*")
-
-comment = "\n".join(comment_lines)
+comment = "\n".join(comment_parts)
 
 # Save
 with open("final_answer.txt", "w", encoding="utf-8") as f:
     f.write(comment)
 
 print("✅ Response saved to final_answer.txt")
-print(f"📊 Final length: {len(comment)} characters")
+print(f"📊 Output: {len(comment)} characters")
+print("🎬 Done!")
