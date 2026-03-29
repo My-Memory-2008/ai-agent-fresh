@@ -22,17 +22,17 @@ print("=" * 70)
 models = [
     {
         "name": "Llama 3.1 8B",
-        "id": "llama-3.1-8b-instant",
+        "id": "llama-3.1-8b-instant",  # ✅ Correct
         "role": "Fast & Concise"
     },
     {
         "name": "Llama 3.3 70B",
-        "id": "llama-3.3-70b-versatile", 
+        "id": "llama-3.3-70b-versatile",  # ✅ Correct
         "role": "Powerful & Detailed"
     },
     {
         "name": "Llama 3.2 3B",
-        "id": "llama-3.2-3b-instruct",
+        "id": "llama-3.2-3b-preview",  # ✅ Fixed ID (was: llama-3.2-3b-instruct)
         "role": "Ultra-Fast & Lightweight"
     }
 ]
