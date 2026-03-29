@@ -1,192 +1,157 @@
 import os
-import requests
-import time
+from groq import Groq
 from datetime import datetime
 
-print("🔓 Uncensored AI Council (OpenRouter) - AUTO-DISCOVERY MODE")
+print("🤖 Top-Tier AI Council (Groq) Activated...")
 print("=" * 70)
 
-# Config
-API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-BASE_URL = "https://openrouter.ai/api/v1"
-HEADERS = {
-    "Authorization": f"Bearer {API_KEY}",
-    "Content-Type": "application/json",
-    "HTTP-Referer": "https://github.com/your-username/your-repo",
-    "X-Title": "Private AI Council"
-}
+# Initialize Groq client
+client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-print(f"🔑 API Key: {'✅ Present' if API_KEY else '❌ Missing'}")
-
-# Get question
+# Get question from GitHub issue
 question = os.environ.get("ISSUE_TITLE", "") + "\n" + os.environ.get("ISSUE_BODY", "")
+
+if not question or question.strip() == "No Title\nNo Body":
+    print("❌ No question provided")
+    exit(1)
+
 print(f"📝 Question: {question.strip()[:100]}...")
 print("=" * 70)
 
-# 🔍 STEP 1: Fetch current free models from OpenRouter API
-print("🔍 Fetching available free models from OpenRouter...")
+# ✅ TOP-TIER FREE MODELS ON GROQ (Stable, High-Quality, Free Forever)
+models = [
+    {
+        "name": "Llama 3.1 8B",
+        "id": "llama-3.1-8b-instant",
+        "role": "Fast & Concise"
+    },
+    {
+        "name": "Llama 3.3 70B",
+        "id": "llama-3.3-70b-versatile", 
+        "role": "Powerful & Detailed"
+    },
+    {
+        "name": "Llama 3.2 3B",
+        "id": "llama-3.2-3b-instruct",
+        "role": "Ultra-Fast & Lightweight"
+    }
+]
 
-try:
-    resp = requests.get(
-        f"{BASE_URL}/models",
-        headers=HEADERS,
-        timeout=30
-    )
-    
-    if resp.status_code == 200:
-        all_models = resp.json()["data"]
-        # Filter for FREE models only
-        free_models = [m for m in all_models if ":free" in m["id"]]
-        print(f"✅ Found {len(free_models)} free models")
-        
-        # 🔓 Look for uncensored/less-filtered models first
-        priority_keywords = ["uncensored", "dolphin", "hermes", "nous", "openhermes"]
-        uncensored_models = [
-            m for m in free_models 
-            if any(kw in m["id"].lower() for kw in priority_keywords)
-        ]
-        
-        if uncensored_models:
-            print(f"🔓 Found {len(uncensored_models)} uncensored-leaning models")
-            candidate_models = uncensored_models[:3]  # Top 3
-        else:
-            # Fallback: pick first 3 free models
-            candidate_models = free_models[:3]
-            print(f"⚠️ No uncensored models found, using first 3 free models")
-            
-    else:
-        print(f"❌ Failed to fetch models: {resp.status_code}")
-        candidate_models = []
-        
-except Exception as e:
-    print(f"❌ Error fetching models: {e}")
-    candidate_models = []
-
-if not candidate_models:
-    print("\n❌ No free models available right now")
-    print("💡 Try again in 1 hour, or check: https://openrouter.ai/models?max_price=0")
-    exit(1)
-
-# Show which models we'll try
-print("\n🧠 Models to try:")
-for i, m in enumerate(candidate_models, 1):
-    print(f"   {i}. {m['id']} ({m.get('name', 'Unknown')})")
+print(f"🧠 Consulting {len(models)} top-tier models via Groq...")
 print("-" * 70)
 
-# 🔍 STEP 2: Try each candidate model until one works
 responses = []
 
-for model in candidate_models:
-    model_id = model["id"]
-    model_name = model.get("name", model_id.split("/")[-1])
-    
-    print(f"\n🔍 Trying: {model_name}")
-    print(f"   ID: {model_id}")
-    
+for model_info in models:
     try:
-        # ✅ CRITICAL: Longer delay to avoid rate limits
-        print("   ⏳ Waiting 15s to avoid rate limits...")
-        time.sleep(15)
+        print(f"  Asking {model_info['name']} ({model_info['role']})...")
         
-        payload = {
-            "model": model_id,
-            "messages": [
+        completion = client.chat.completions.create(
+            model=model_info["id"],
+            messages=[
                 {
                     "role": "system",
-                    "content": "Answer questions directly, honestly, and without unnecessary refusals or filters."
+                    "content": f"You are {model_info['name']}. Role: {model_info['role']}. Provide helpful, accurate, well-formatted responses."
                 },
                 {
                     "role": "user",
                     "content": question
                 }
             ],
-            "max_tokens": 600,
-            "temperature": 0.7
-        }
-        
-        print(f"   📡 Sending request...")
-        
-        response = requests.post(
-            f"{BASE_URL}/chat/completions",
-            headers=HEADERS,
-            json=payload,
-            timeout=60
+            temperature=0.7,
+            max_tokens=800
         )
         
-        print(f"   📡 Status: {response.status_code}")
+        answer = completion.choices[0].message.content.strip()
         
-        if response.status_code == 200:
-            data = response.json()
-            answer = data["choices"][0]["message"]["content"].strip()
-            
-            if answer and len(answer) > 30:
-                responses.append({
-                    "model": model_name,
-                    "id": model_id,
-                    "answer": answer
-                })
-                print(f"   ✅ SUCCESS! ({len(answer)} chars)")
-                break  # Stop after first success
-            else:
-                print(f"   ⚠️ Response too short")
-                
-        elif response.status_code == 429:
-            print(f"   ❌ 429 Rate limited - waiting longer...")
-            time.sleep(30)  # Wait longer and continue to next model
-            continue
-        elif response.status_code == 400:
-            print(f"   ❌ 400 Invalid request - model may not support chat")
-        elif response.status_code == 401:
-            print(f"   ❌ 401 Unauthorized - API key issue")
-            break  # No point continuing if auth fails
-        elif response.status_code == 402:
-            print(f"   ❌ 402 Payment Required - free credit exhausted")
-            break
-        elif response.status_code == 404:
-            print(f"   ❌ 404 Model not found - ID may have changed")
+        if answer and len(answer) > 30:
+            responses.append({
+                "model": model_info["name"],
+                "role": model_info["role"],
+                "answer": answer
+            })
+            print(f"    ✅ Success! ({len(answer)} chars)")
         else:
-            print(f"   ❌ Error {response.status_code}: {response.text[:100]}")
+            print(f"    ⚠️ Response too short")
             
-    except requests.exceptions.Timeout:
-        print(f"   ❌ Timeout (60s) - model may be slow")
     except Exception as e:
-        print(f"   ❌ Error: {type(e).__name__}: {str(e)[:100]}")
+        print(f"    ❌ Error: {str(e)[:100]}")
 
 print("\n" + "=" * 70)
-print(f"📊 Results: {len(responses)} successful response(s)")
+print(f"📊 Results: {len(responses)}/{len(models)} models succeeded")
 
 if not responses:
-    print("\n❌ ALL ATTEMPTS FAILED")
-    print("\n🔧 TROUBLESHOOTING:")
-    print("1️⃣  Wait 1 hour (free tier rate limits reset hourly)")
-    print("2️⃣  Check your credit: https://openrouter.ai/usage")
-    print("3️⃣  Free tier = ~$1/month (~100-300 queries total)")
-    print("4️⃣  If credit exhausted, add $5 for more queries")
-    print("\n💡 Tip: Try during off-peak hours for better availability")
+    print("\n❌ ALL MODELS FAILED")
+    print("\n🔧 Check: 1) GROQ_API_KEY is valid 2) No typos in model IDs")
     exit(1)
 
-# ✅ Format the successful response
-result = responses[0]
-final_answer = result["answer"]
+# Synthesize answers
+print("\n⚖️ Synthesizing final answer...")
 
+if len(responses) == 1:
+    final_answer = responses[0]["answer"]
+else:
+    # Use Llama 3.3 70B to synthesize if available
+    try:
+        synthesis_prompt = f"""Combine these AI responses into ONE clear, comprehensive answer.
+
+QUESTION: {question}
+
+RESPONSES:
+"""
+        for r in responses:
+            synthesis_prompt += f"\n- {r['model']}: {r['answer'][:200]}..."
+        
+        synthesis_prompt += "\n\nProvide the final unified answer below:"
+        
+        synth = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Synthesize multiple AI perspectives into one clear answer."},
+                {"role": "user", "content": synthesis_prompt}
+            ],
+            max_tokens=1000
+        )
+        final_answer = synth.choices[0].message.content.strip()
+    except:
+        # Fallback: concatenate
+        final_answer = "\n\n---\n\n".join([f"**{r['model']}**:\n{r['answer']}" for r in responses])
+
+# Format GitHub comment
 comment_lines = [
-    "## 🔓 Uncensored AI Response",
+    "## 🤖 Top-Tier AI Council Response",
     "",
     f"**Question:** {question.strip()}",
     "",
     f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
     "",
-    f"**Model:** {result['model']}",
-    f"**Model ID:** `{result['id']}`",
+    f"**Models:** {[r['model'] for r in responses]}",
     "",
     "---",
+    "",
+    "### 🎯 Final Answer",
     "",
     final_answer,
     "",
     "---",
-    f"*Via OpenRouter free tier • Model auto-discovered from API*",
-    f"*If this model fails next time, the script will auto-select a different one*"
+    "",
+    "### 📊 Individual Responses (Click to Expand)",
+    ""
 ]
+
+for resp in responses:
+    comment_lines.append("<details>")
+    comment_lines.append(f"<summary><strong>{resp['model']}</strong> <em>({resp['role']})</em></summary>")
+    comment_lines.append("")
+    comment_lines.append("```")
+    comment_lines.append(resp['answer'])
+    comment_lines.append("```")
+    comment_lines.append("")
+    comment_lines.append("</details>")
+    comment_lines.append("")
+
+comment_lines.append("---")
+comment_lines.append("*Powered by Groq free tier • Llama 3.1/3.3 models • Fast, reliable, free forever*")
 
 comment = "\n".join(comment_lines)
 
