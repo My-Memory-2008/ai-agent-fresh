@@ -25,13 +25,11 @@ print("=" * 70)
 
 # ✅ START WITH JUST ONE CONFIRMED WORKING MODEL
 # Go to https://openrouter.ai/models?max_price=0 to verify current IDs
+# Backup options (test one at a time)
 models = [
-    {
-        "name": "Venice Uncensored",
-        "id": "venice/uncensored:free",  # 🔓 Your main choice
-        "role": "Uncensored & Direct"
-    }
-    # Add more models ONE AT A TIME after this works
+    {"name": "Nous Hermes 3", "id": "nousresearch/nous-hermes-3-405b-instruct:free", "role": "Less Filtered"},
+    {"name": "Qwen3 4B", "id": "qwen/qwen3-4b:free", "role": "Direct"},
+    {"name": "Llama 3.3 70B", "id": "meta-llama/llama-3.3-70b-instruct:free", "role": "Powerful"}
 ]
 
 print(f"🧠 Consulting {len(models)} model(s)...")
