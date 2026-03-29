@@ -18,21 +18,21 @@ if not question or question.strip() == "No Title\nNo Body":
 print(f"📝 Question: {question.strip()[:100]}...")
 print("=" * 70)
 
-# ✅ TOP-TIER FREE MODELS ON GROQ (Stable, High-Quality, Free Forever)
+# ✅ VERIFIED WORKING MODELS (Early 2026)
 models = [
     {
         "name": "Llama 3.1 8B",
-        "id": "llama-3.1-8b-instant",  # ✅ Correct
+        "id": "llama-3.1-8b-instant",
         "role": "Fast & Concise"
     },
     {
         "name": "Llama 3.3 70B",
-        "id": "llama-3.3-70b-versatile",  # ✅ Correct
+        "id": "llama-3.3-70b-versatile",
         "role": "Powerful & Detailed"
     },
     {
         "name": "Gemma 2 9B",
-        "id": "gemma2-9b-it",  # ✅ Reliable alternative to Llama 3.2 3B
+        "id": "gemma2-9b-it",
         "role": "Balanced & Creative"
     }
 ]
@@ -82,16 +82,18 @@ print(f"📊 Results: {len(responses)}/{len(models)} models succeeded")
 
 if not responses:
     print("\n❌ ALL MODELS FAILED")
-    print("\n🔧 Check: 1) GROQ_API_KEY is valid 2) No typos in model IDs")
+    print("\n🔧 Check: 1) GROQ_API_KEY is valid 2) Model IDs at console.groq.com/docs/models")
     exit(1)
 
-# Synthesize answers
+# Synthesize answers (use most powerful available model)
 print("\n⚖️ Synthesizing final answer...")
+
+# Prefer Llama 3.3 70B for synthesis if it responded
+synth_model = next((r for r in responses if "70B" in r["model"]), responses[0])
 
 if len(responses) == 1:
     final_answer = responses[0]["answer"]
 else:
-    # Use Llama 3.3 70B to synthesize if available
     try:
         synthesis_prompt = f"""Combine these AI responses into ONE clear, comprehensive answer.
 
@@ -100,21 +102,21 @@ QUESTION: {question}
 RESPONSES:
 """
         for r in responses:
-            synthesis_prompt += f"\n- {r['model']}: {r['answer'][:200]}..."
+            synthesis_prompt += f"\n- {r['model']}: {r['answer'][:300]}..."
         
         synthesis_prompt += "\n\nProvide the final unified answer below:"
         
         synth = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.3-70b-versatile",  # Always use most powerful for synthesis
             messages=[
-                {"role": "system", "content": "Synthesize multiple AI perspectives into one clear answer."},
+                {"role": "system", "content": "Synthesize multiple AI perspectives into one clear, actionable answer."},
                 {"role": "user", "content": synthesis_prompt}
             ],
             max_tokens=1000
         )
         final_answer = synth.choices[0].message.content.strip()
     except:
-        # Fallback: concatenate
+        # Fallback: concatenate with clear separators
         final_answer = "\n\n---\n\n".join([f"**{r['model']}**:\n{r['answer']}" for r in responses])
 
 # Format GitHub comment
@@ -125,17 +127,17 @@ comment_lines = [
     "",
     f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
     "",
-    f"**Models:** {[r['model'] for r in responses]}",
+    f"**Models Responded:** {len(responses)}/{len(models)}",
     "",
     "---",
     "",
-    "### 🎯 Final Answer",
+    "### 🎯 Final Synthesized Answer",
     "",
     final_answer,
     "",
     "---",
     "",
-    "### 📊 Individual Responses (Click to Expand)",
+    "### 📊 Individual Model Responses",
     ""
 ]
 
@@ -151,7 +153,7 @@ for resp in responses:
     comment_lines.append("")
 
 comment_lines.append("---")
-comment_lines.append("*Powered by Groq free tier • Llama 3.1/3.3 models • Fast, reliable, free forever*")
+comment_lines.append("*Powered by Groq free tier • Llama 3.1/3.3 + Gemma 2 • Fast, reliable, free forever*")
 
 comment = "\n".join(comment_lines)
 
