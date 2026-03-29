@@ -31,9 +31,9 @@ models = [
         "role": "Powerful & Detailed"
     },
     {
-        "name": "Llama 3.2 3B",
-        "id": "llama-3.2-3b-preview",  # ✅ Fixed ID (was: llama-3.2-3b-instruct)
-        "role": "Ultra-Fast & Lightweight"
+        "name": "Gemma 2 9B",
+        "id": "gemma2-9b-it",  # ✅ Reliable alternative to Llama 3.2 3B
+        "role": "Balanced & Creative"
     }
 ]
 
