@@ -31,9 +31,7 @@ models = [
         "role": "Powerful & Detailed"
     },
     {
-        "name": "Gemma 2 9B",
-        "id": "gemma2-9b-it",
-        "role": "Balanced & Creative"
+        "name": "Mixtral 8x7B", "id": "mixtral-8x7b-32768", "role": "Creative & Analytical"
     }
 ]
 
