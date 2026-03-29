@@ -1,4 +1,4 @@
-name: Uncensored AI Council (OpenRouter)
+name: Top-Tier AI Council (Groq)
 
 on:
   issues:
@@ -21,7 +21,7 @@ jobs:
 
       - name: Consult AI Council
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: python scripts/council_agent.py
