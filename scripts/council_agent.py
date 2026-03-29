@@ -29,7 +29,12 @@ models = [
         "name": "Llama 3.3 70B",
         "id": "llama-3.3-70b-versatile", 
         "role": "Powerful & Detailed"
-    }
+    },
+    {
+    "name": "Mixtral 8x7B",
+    "id": "mixtral-8x7b-32768", 
+    "role": "Creative & Analytical"
+}
 ]
 
 print(f"🧠 Consulting {len(models)} stable models via Groq...")
