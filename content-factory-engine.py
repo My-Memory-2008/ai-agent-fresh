@@ -104,43 +104,55 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
-
 # ==========================================
-# 4 & 5. ACCELERATED METADATA PROCESSING, SYNC & RENDERING
+# 4 & 5. T4 GPU AUDIO EXTRACTION, SPEECH TRANSCRIPTION & SPEED-SYNC RENDERING
 # ==========================================
-print("🚀 Initiating metadata-driven audio matching and video layout...")
+print("🚀 Initiating dynamic dependency checks & audio extraction sequence...")
+import subprocess
+import sys
 import os
-import json
 import random
 import asyncio
-import subprocess
 
+# 4a. Dynamic Dependency Injector (Ensures SpeechRecognition is installed on boot)
+try:
+    import speech_recognition as sr
+except ImportError:
+    print("-> speech_recognition package missing. Forcing local environment injection...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "SpeechRecognition"])
+    import speech_recognition as sr
+    print("✅ Package loaded successfully.")
+
+# Define absolute workspace audio tracking paths
+EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
+EXTRACTED_AUDIO_WAV = "/kaggle/working/extracted_audio.wav"
 NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
 
-# 4a. METADATA EXTRACTION: Capture the exact original caption text
-print("-> Extracting the original post caption text to preserve script context...")
-try:
-    # Read the text caption generated during the download phase in Section 3
-    # If using the manifest mapping block, load from the pipeline tracking variables
-    extracted_text = pipeline.get("original_caption", "")
-    
-    # Clean out hashtags, links, emojis, and clutter to leave pure readable text
-    extracted_text = re.sub(r'#\w+', '', extracted_text) # Remove hashtags
-    extracted_text = re.sub(r'@\w+', '', extracted_text) # Remove mentions
-    extracted_text = re.sub(r'http\S+', '', extracted_text) # Remove URLs
-    extracted_text = extracted_text.encode('ascii', 'ignore').decode('ascii') # Strip emojis
-    extracted_text = " ".join(extracted_text.split()) # Normalize spacing
-    
-    # Fallback to description lines if the caption was entirely blank
-    if not extracted_text or len(extracted_text.strip()) < 5:
-        extracted_text = pipeline.get("script_text", "Check out this amazing find!")
-        
-    print(f"📝 Cleaned script text locked: \"{extracted_text}\"")
-except Exception as e:
-    print(f"⚠️ Metadata extraction warning, using pipeline fallback: {e}")
-    extracted_text = pipeline.get("script_text", "Amazing tech tips you need to see.")
+# 4b. Extract the true audio track from the downloaded Reel via FFmpeg
+print("-> Isolating original audio track matrix...")
+subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
 
-# 4b. Run Edge-TTS natively to build the professional human voice file
+# Convert to standard uncompressed WAV format for the local transcription engine
+subprocess.run(["ffmpeg", "-y", "-i", EXTRACTED_AUDIO_MP3, EXTRACTED_AUDIO_WAV], check=True, capture_output=True)
+
+# 4c. Transcribe the original speech using local CPU execution (Bypasses CUDA bugs)
+print("-> Initializing CPU speech-to-text transcription engine...")
+recognizer = sr.Recognizer()
+extracted_text = ""
+
+try:
+    with sr.AudioFile(EXTRACTED_AUDIO_WAV) as source:
+        audio_data = recognizer.record(source)
+        # Uses Google's free public web speech API gateway to extract exact words
+        extracted_text = recognizer.recognize_google(audio_data)
+    print(f"📝 SUCCESS! Transcribed original video script: \"{extracted_text}\"")
+except Exception as e:
+    print(f"⚠️ Speech API failed or audio was silent: {e}")
+    # Fallback only if the original audio track cannot be transcribed
+    extracted_text = "Check out this amazing video!"
+    print(f"📋 Using safety text fallback: \"{extracted_text}\"")
+
+# 4d. Run Edge-TTS natively to build the professional human voice file
 print("-> Querying Edge-TTS cloud service for professional narration...")
 sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
 selected_voice = "en-US-ChristopherNeural"
@@ -151,9 +163,9 @@ async def generate_edge_voice():
     await communicate.save(NEW_VOICEOVER)
 
 asyncio.run(generate_edge_voice())
-print("✅ Edge-TTS voice track successfully generated.")
+print("✅ Professional Edge-TTS voice track generated.")
 
-# 4c. DYNAMIC SPEED CALCULATION ENGINE
+# 4e. DYNAMIC SPEED CALCULATION ENGINE
 print("⚡ Calculating precise speed normalization adjustments...")
 
 def get_duration(file_path):
@@ -164,10 +176,10 @@ def get_duration(file_path):
 orig_duration = get_duration(output_path)
 tts_duration = get_duration(NEW_VOICEOVER)
 
-# Calculate exactly how much we need to speed up/slow down the TTS voice
+# Calculate exactly how much we need to speed up/slow down the TTS voice to match the video length
 speed_factor = tts_duration / orig_duration
 
-# FFmpeg atempo rules limit boundaries: Must stay between 0.5 and 2.0
+# FFmpeg atempo boundaries rules: Must stay between 0.5 and 2.0
 if speed_factor < 0.5: speed_factor = 0.5
 if speed_factor > 2.0: speed_factor = 2.0
 
