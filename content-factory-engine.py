@@ -161,73 +161,118 @@ async def generate_edge_voice():
 # Execute the asynchronous generator natively within Python's running thread
 asyncio.run(generate_edge_voice())
 print("✅ Professional custom narrator voiceover file successfully generated.")
+# ==========================================
+# 4 & 5. T4 GPU ACCELERATED AUDIO SPEED-SYNC & RENDERING
+# ==========================================
+print("🚀 Initiating T4 GPU-Accelerated Audio Transformation & Video Compilation...")
+import asyncio
 
+# Define absolute workspace audio tracking paths
+NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
+
+# 4a. DIRECT HANDSHAKE: Read script text directly from pipeline_data.json
+print("-> Reading pre-generated script text directly from GitHub pipeline data...")
+try:
+    # Use the pre-loaded pipeline data from Section 2
+    extracted_text = pipeline.get("script_text", "")
+    
+    # If for some reason the script text is empty, grab the fallback description
+    if not extracted_text:
+        extracted_text = pipeline.get("youtube_description", "Check out this amazing AI hack!")
+        
+    print(f"📝 Script text content locked: \"{extracted_text}\"")
+except Exception as e:
+    print(f"⚠️ Failed to parse pipeline script text, using safety fallback: {e}")
+    extracted_text = "Amazing AI tools you need to know."
+
+# 4b. Run Edge-TTS natively to build the professional human voice file
+print("-> Querying Edge-TTS cloud service for professional narration...")
+sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
+selected_voice = "en-US-ChristopherNeural"
+
+async def generate_edge_voice():
+    import edge_tts
+    communicate = edge_tts.Communicate(sanitized_text, selected_voice)
+    await communicate.save(NEW_VOICEOVER)
+
+asyncio.run(generate_edge_voice())
+print("✅ Edge-TTS voice track generated.")
+
+# 4c. DYNAMIC SPEED CALCULATION ENGINE
+print("⚡ Calculating precise speed normalization adjustments...")
+
+def get_duration(file_path):
+    cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
+    return float(subprocess.check_output(cmd, shell=True).decode().strip())
+
+# Fetch durations down to the millisecond
+orig_duration = get_duration(output_path)
+tts_duration = get_duration(NEW_VOICEOVER)
+
+# Calculate exactly how much we need to speed up/slow down the TTS voice
+speed_factor = tts_duration / orig_duration
+
+# FFmpeg atempo rules: Must be between 0.5 and 2.0
+if speed_factor < 0.5: speed_factor = 0.5
+if speed_factor > 2.0: speed_factor = 2.0
+
+print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
+print(f"⏱️ Raw Voiceover Duration: {tts_duration:.2f}s")
+print(f"⏩ Required Voiceover Speed Factor: {speed_factor:.2f}x")
 
 # ==========================================
-# 4. RANDOMIZED TRANSFORMATIVE RENDERING (Safe Unmirrored Captions + Effects)
+# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
 # ==========================================
-print("🎬 Setting up randomized filters and effects engines...")
+print("🎬 Stacking randomized filters and rendering vertical layout via NVIDIA NVENC GPU...")
 
-# Style Filters Matrix (NO MIRRORING - Captions remain perfectly readable left-to-right)
 styles = [
-    # Style A: Clean & Minimal (Crisp contrast highlights, balanced white mappings)
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
-    # Style B: Cyber/Tech (Cyan tints, matrix neon enhancements via map curves)
     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1':r='0/0 0.5/0.42 1/1':b='0/0 0.4/0.58 1/1'",
-    # Style C: Retro Film (Warm organic grading curves, subtle low-fidelity black points)
     "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
 ]
 chosen_style = random.choice(styles)
 
-# Transition Overlay Effects Matrix
 effects = [
-    # Effect A: Whip Pan / Dynamic Positional Zoom Bounce
     "zoompan=z='min(zoom+0.003,1.12)':x='iw/2-iw/zoom/2+sin(time*2.5)*6':y='ih/2-ih/zoom/2':d=1",
-    # Effect B: Text Pop-up with Edge Shimmering Glow Matrix (Slight sharpening convolution filter)
     "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
-    # Effect C: Vintage Light Leaks / Chemical Film Burn Color Shifting Cycles
     "hue='H=2.5*PI*t:s=1.03'"
 ]
 chosen_effect = random.choice(effects)
 
-print(f"🎨 Selected Visual Filter Style: {chosen_style}")
-print(f"⚡ Injected Animation Effect Layer: {chosen_effect}")
-
-# Construct 9:16 Architecture Pipeline (Unmirrored Zoom-Out + Blurred Backdrop Wrapper):
-# 1. [0:v]scale=1080:1920,boxblur=25:5 -> Force full vertical backdrop frame, heavily blurred to serve as shifting wallpaper.
-# 2. [0:v]scale=918:1632 -> Shrink original video layout to exactly 85%. This ZOOMS OUT the core file so text boundaries remain safe from clipping.
-# 3. noise=alls=7:allf=t+u -> Layers an unnoticeable, moving frame-by-frame transparent dust/grain hash over everything.
-# 4. drawtext -> Solidifies your custom '@AWRAM' protection monetization signature overlay watermark block.
+# Setup 9:16 portrait layout canvas (Safe captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main];"
     f"[bg][main]overlay=(W-w)/2:(H-h)/2[merged];"
     f"[merged]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
+    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v];"
+    f"[1:a]atempo={speed_factor}[speed_synced_audio]"
 )
 
+# GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
 ffmpeg_cmd = [
     "ffmpeg", "-y", 
-    "-i", output_path,          # Input index 0: Original video layout 
-    "-i", NEW_VOICEOVER,         # Input index 1: New Edge-TTS narrator track file
+    "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
+    "-i", output_path,          # Original video matrix
+    "-i", NEW_VOICEOVER,         # Raw Edge-TTS track
     "-filter_complex", filter_complex_string,
     "-map", "[v]", 
-    "-map", "1:a",              # Map the new custom AI voiceover audio track completely overwriting original sound
-    "-c:v", "libx264", 
-    "-preset", "faster", 
-    "-crf", "18", 
-    "-c:a", "aac",              # Re-encode clean audio signature track profiles
+    "-map", "[speed_synced_audio]", # Map the speed-corrected narration track
+    "-c:v", "h264_nvenc",       # Force NVIDIA NVENC Hardware Video Encoder GPU
+    "-preset", "p4",            # High-performance hardware preset mapping
+    "-cq", "20",                # Maintain perfect clarity for text and borders
+    "-c:a", "aac",              
     "-b:a", "128k",
-    "-shortest",                # Clamp timeline clip boundaries to match the script execution length
+    "-shortest",                # Ensure no trailing dead space
     OUTPUT_VIDEO
 ]
 
-
 res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
 if res.returncode != 0:
-    print(f"❌ FFmpeg compilation crashed: {res.stderr}")
-    raise RuntimeError("FFmpeg Procedural Execution Failure")
-print(f"✅ 10x Transformed Vertical Shorts Video Rendered: {OUTPUT_VIDEO}")
+    print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
+    raise RuntimeError("FFmpeg Pipeline Failure")
+print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
+
 
 # ==========================================
 # 5. UPLOAD TO YOUTUBE
