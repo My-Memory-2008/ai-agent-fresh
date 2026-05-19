@@ -106,84 +106,39 @@ print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output
 
 
 # ==========================================
-# 4. AUDIO GENERATION: NATIVE EDGE-TTS CLOUD NARRATOR
+# 4 & 5. ACCELERATED METADATA PROCESSING, SYNC & RENDERING
 # ==========================================
-print("🎙️ Initiating Edge-TTS custom voiceover transformation sequence...")
-import torch
-import librosa
+print("🚀 Initiating metadata-driven audio matching and video layout...")
+import os
+import json
+import random
 import asyncio
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
+import subprocess
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# Define absolute workspace audio tracking paths
-EXTRACTED_AUDIO = "/kaggle/working/extracted_audio.wav"
 NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
 
-# 4a. Isolate and extract clean 16kHz mono audio from the downloaded Reel via FFmpeg
-print("-> Isolating original audio track matrix...")
-subprocess.run(["ffmpeg", "-y", "-i", output_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", EXTRACTED_AUDIO], check=True, capture_output=True)
-
-# 4b. Load Native Whisper model directly to convert original speech into clean script text
-print("-> Loading Native OpenAI Whisper for safe speech transcription...")
-whisper_model_id = "openai/whisper-tiny.en"
-whisper_processor = WhisperProcessor.from_pretrained(whisper_model_id)
-whisper_model = WhisperForConditionalGeneration.from_pretrained(whisper_model_id).to(device)
-
-# Load the audio file arrays using librosa to prevent missing frame errors
-audio_input, sampling_rate = librosa.load(EXTRACTED_AUDIO, sr=16000)
-input_features = whisper_processor(audio_input, sampling_rate=sampling_rate, return_tensors="pt").input_features.to(device)
-
-# Generate transcribed token arrays via GPU
-predicted_ids = whisper_model.generate(input_features)
-extracted_text = whisper_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
-print(f"📝 Extracted Script text content: \"{extracted_text}\"")
-
-# Clear Whisper from VRAM to prevent memory conflicts during video rendering stages
-del whisper_model, whisper_processor, input_features, predicted_ids; torch.cuda.empty_cache()
-
-# 4c. Run Edge-TTS natively to build the professional human voice file
-print("-> Querying Edge-TTS cloud service for professional narration...")
-
-# Clean text from quotes or characters that could break parsing parameters
-sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
-
-# Select your custom narrator profile here:
-# Male Voices: 'en-US-ChristopherNeural', 'en-US-EricNeural', 'en-GB-RyanNeural'
-# Female Voices: 'en-US-JennyNeural', 'en-US-MichelleNeural'
-selected_voice = "en-US-ChristopherNeural"
-
-async def generate_edge_voice():
-    import edge_tts
-    communicate = edge_tts.Communicate(sanitized_text, selected_voice)
-    await communicate.save(NEW_VOICEOVER)
-
-# Execute the asynchronous generator natively within Python's running thread
-asyncio.run(generate_edge_voice())
-print("✅ Professional custom narrator voiceover file successfully generated.")
-# ==========================================
-# 4 & 5. T4 GPU ACCELERATED AUDIO SPEED-SYNC & RENDERING
-# ==========================================
-print("🚀 Initiating T4 GPU-Accelerated Audio Transformation & Video Compilation...")
-import asyncio
-
-# Define absolute workspace audio tracking paths
-NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
-
-# 4a. DIRECT HANDSHAKE: Read script text directly from pipeline_data.json
-print("-> Reading pre-generated script text directly from GitHub pipeline data...")
+# 4a. METADATA EXTRACTION: Capture the exact original caption text
+print("-> Extracting the original post caption text to preserve script context...")
 try:
-    # Use the pre-loaded pipeline data from Section 2
-    extracted_text = pipeline.get("script_text", "")
+    # Read the text caption generated during the download phase in Section 3
+    # If using the manifest mapping block, load from the pipeline tracking variables
+    extracted_text = pipeline.get("original_caption", "")
     
-    # If for some reason the script text is empty, grab the fallback description
-    if not extracted_text:
-        extracted_text = pipeline.get("youtube_description", "Check out this amazing AI hack!")
+    # Clean out hashtags, links, emojis, and clutter to leave pure readable text
+    extracted_text = re.sub(r'#\w+', '', extracted_text) # Remove hashtags
+    extracted_text = re.sub(r'@\w+', '', extracted_text) # Remove mentions
+    extracted_text = re.sub(r'http\S+', '', extracted_text) # Remove URLs
+    extracted_text = extracted_text.encode('ascii', 'ignore').decode('ascii') # Strip emojis
+    extracted_text = " ".join(extracted_text.split()) # Normalize spacing
+    
+    # Fallback to description lines if the caption was entirely blank
+    if not extracted_text or len(extracted_text.strip()) < 5:
+        extracted_text = pipeline.get("script_text", "Check out this amazing find!")
         
-    print(f"📝 Script text content locked: \"{extracted_text}\"")
+    print(f"📝 Cleaned script text locked: \"{extracted_text}\"")
 except Exception as e:
-    print(f"⚠️ Failed to parse pipeline script text, using safety fallback: {e}")
-    extracted_text = "Amazing AI tools you need to know."
+    print(f"⚠️ Metadata extraction warning, using pipeline fallback: {e}")
+    extracted_text = pipeline.get("script_text", "Amazing tech tips you need to see.")
 
 # 4b. Run Edge-TTS natively to build the professional human voice file
 print("-> Querying Edge-TTS cloud service for professional narration...")
@@ -196,7 +151,7 @@ async def generate_edge_voice():
     await communicate.save(NEW_VOICEOVER)
 
 asyncio.run(generate_edge_voice())
-print("✅ Edge-TTS voice track generated.")
+print("✅ Edge-TTS voice track successfully generated.")
 
 # 4c. DYNAMIC SPEED CALCULATION ENGINE
 print("⚡ Calculating precise speed normalization adjustments...")
@@ -212,7 +167,7 @@ tts_duration = get_duration(NEW_VOICEOVER)
 # Calculate exactly how much we need to speed up/slow down the TTS voice
 speed_factor = tts_duration / orig_duration
 
-# FFmpeg atempo rules: Must be between 0.5 and 2.0
+# FFmpeg atempo rules limit boundaries: Must stay between 0.5 and 2.0
 if speed_factor < 0.5: speed_factor = 0.5
 if speed_factor > 2.0: speed_factor = 2.0
 
@@ -239,7 +194,7 @@ effects = [
 ]
 chosen_effect = random.choice(effects)
 
-# Setup 9:16 portrait layout canvas (Safe captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
+# Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main];"
@@ -253,7 +208,7 @@ filter_complex_string = (
 ffmpeg_cmd = [
     "ffmpeg", "-y", 
     "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
-    "-i", output_path,          # Original video matrix
+    "-i", output_path,          # Original video matrix layout
     "-i", NEW_VOICEOVER,         # Raw Edge-TTS track
     "-filter_complex", filter_complex_string,
     "-map", "[v]", 
