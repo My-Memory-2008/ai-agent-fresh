@@ -105,93 +105,72 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
+
 # ==========================================
-# 4 & 5. T4 GPU AUDIO EXTRACTION, SPEECH TRANSCRIPTION & SPEED-SYNC RENDERING
+# 4 & 5. ACCELERATED RESIZED CAT STITCHING & GPU RENDERING
 # ==========================================
-print("🚀 Initiating dynamic dependency checks & audio extraction sequence...")
-import subprocess
-import sys
+print("🚀 Initiating pixel-aligned Kaggle Dataset video compilation sequence...")
 import os
 import random
-import asyncio
+import subprocess
 
-# 4a. Dynamic Dependency Injector (Ensures SpeechRecognition is installed on boot)
-try:
-    import speech_recognition as sr
-except ImportError:
-    print("-> speech_recognition package missing. Forcing local environment injection...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "SpeechRecognition"])
-    import speech_recognition as sr
-    print("✅ Package loaded successfully.")
-
-# Define absolute workspace audio tracking paths
-EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
-EXTRACTED_AUDIO_WAV = "/kaggle/working/extracted_audio.wav"
-NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
-
-# 4b. Extract the true audio track from the downloaded Reel via FFmpeg
-print("-> Isolating original audio track matrix...")
-subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
-
-# Convert to standard uncompressed WAV format for the local transcription engine
-subprocess.run(["ffmpeg", "-y", "-i", EXTRACTED_AUDIO_MP3, EXTRACTED_AUDIO_WAV], check=True, capture_output=True)
-
-# 4c. Transcribe the original speech using local CPU execution (Bypasses CUDA bugs)
-print("-> Initializing CPU speech-to-text transcription engine...")
-recognizer = sr.Recognizer()
-extracted_text = ""
-
-try:
-    with sr.AudioFile(EXTRACTED_AUDIO_WAV) as source:
-        audio_data = recognizer.record(source)
-        # Uses Google's free public web speech API gateway to extract exact words
-        extracted_text = recognizer.recognize_google(audio_data)
-    print(f"📝 SUCCESS! Transcribed original video script: \"{extracted_text}\"")
-except Exception as e:
-    print(f"⚠️ Speech API failed or audio was silent: {e}")
-    # Fallback only if the original audio track cannot be transcribed
-    extracted_text = "Check out this amazing video!"
-    print(f"📋 Using safety text fallback: \"{extracted_text}\"")
-
-# 4d. Run Edge-TTS natively to build the professional human voice file
-print("-> Querying Edge-TTS cloud service for professional narration...")
-sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
-selected_voice = "en-US-ChristopherNeural"
-
-async def generate_edge_voice():
-    import edge_tts
-    communicate = edge_tts.Communicate(sanitized_text, selected_voice)
-    await communicate.save(NEW_VOICEOVER)
-
-asyncio.run(generate_edge_voice())
-print("✅ Professional Edge-TTS voice track generated.")
-
-# 4e. DYNAMIC SPEED CALCULATION ENGINE
-print("⚡ Calculating precise speed normalization adjustments...")
+# Define absolute workspace tracking paths
+TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
+EXTRACTED_AUDIO = "/kaggle/working/original_audio.aac"
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
     return float(subprocess.check_output(cmd, shell=True).decode().strip())
 
-# Fetch durations down to the millisecond
+# 4a. DYNAMIC TRIMMING & SELECTION
+print("⚡ Processing internal video timeline assembly structures...")
 orig_duration = get_duration(output_path)
-tts_duration = get_duration(NEW_VOICEOVER)
-
-# Calculate exactly how much we need to speed up/slow down the TTS voice to match the video length
-speed_factor = tts_duration / orig_duration
-
-# FFmpeg atempo boundaries rules: Must stay between 0.5 and 2.0
-if speed_factor < 0.5: speed_factor = 0.5
-if speed_factor > 2.0: speed_factor = 2.0
-
 print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
-print(f"⏱️ Raw Voiceover Duration: {tts_duration:.2f}s")
-print(f"⏩ Required Voiceover Speed Factor: {speed_factor:.2f}x")
+
+# Calculate trimmed target duration (Cut off the last 4 seconds)
+trim_target_duration = max(2.0, orig_duration - 4.0) 
+print(f"✂️ Trimming source video to: {trim_target_duration:.2f}s")
+
+# Trim the source video accurately using high-speed stream copying
+subprocess.run([
+    "ffmpeg", "-y", "-i", output_path, 
+    "-t", str(trim_target_duration), 
+    "-c:v", "copy", "-c:a", "copy", 
+    TRIMMED_VIDEO
+], check=True, capture_output=True)
+
+# Extract the complete original audio track to layer it back over the cat video smoothly
+print("🎵 Extracting the full original sound track...")
+subprocess.run([
+    "ffmpeg", "-y", "-i", output_path,
+    "-vn", "-acodec", "copy",
+    EXTRACTED_AUDIO
+], check=True, capture_output=True)
+
+# 4b. Randomly select a cat reaction file directly from your Kaggle Dataset input path
+cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
+
+if os.path.exists(cat_dataset_dir):
+    valid_clips = []
+    for root, dirs, files in os.walk(cat_dataset_dir):
+        for file in files:
+            if file.endswith('.mp4'):
+                valid_clips.append(os.path.join(root, file))
+                
+    if valid_clips:
+        chosen_cat_file = random.choice(valid_clips)
+    else:
+        raise FileNotFoundError("❌ Error: No .mp4 video files detected inside your dataset directory!")
+else:
+    print("⚠️ Dataset directory not found. Using safety video fallback...")
+    chosen_cat_file = output_path 
+
+print(f"🐱 Selected Reaction Asset from Internal Storage: {chosen_cat_file}")
 
 # ==========================================
-# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
+# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK (PIXEL RE-ALIGNED)
 # ==========================================
-print("🎬 Stacking randomized filters and rendering vertical layout via NVIDIA NVENC GPU...")
+print("🎬 Aligning dimensions and rendering multi-layer canvas via NVIDIA NVENC GPU...")
 
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
@@ -207,39 +186,46 @@ effects = [
 ]
 chosen_effect = random.choice(effects)
 
-# Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
+# FIX: Dynamic Filtergraph Layout for Pixel Alignment:
+# 1. Takes input 0 (trimmed reel) and scales the wallpaper background exactly to 1080x1920 portrait format size profiles.
+# 2. Scales the inner primary unmirrored core reel container to exactly 918x1632 layout dimensions (zooms out to protect text captions).
+# 3. Merges them together and locks the resolution dimensions container at exactly 1080x1920 with setsar=1.
+# 4. Takes input 2 (cat clip) and forces its aspect layout canvas sizing directly to 1080x1920 with setsar=1.
+# 5. Connects both tracks cleanly via 'concat=n=2:v=1:a=0' without throwing mismatched input channel parameter errors.
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main];"
-    f"[bg][main]overlay=(W-w)/2:(H-h)/2[merged];"
-    f"[merged]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v];"
-    f"[1:a]atempo={speed_factor}[speed_synced_audio]"
+    f"[bg][main]overlay=(W-w)/2:(H-h)/2,scale=1080:1920,setsar=1[processed_source];"
+    f"[2:v]scale=1080:1920,setsar=1[processed_cat];"
+    f"[processed_source][processed_cat]concat=n=2:v=1:a=0[merged_video];"
+    f"[merged_video]noise=alls=7:allf=t+u[grained];"
+    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
-# GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
 ffmpeg_cmd = [
     "ffmpeg", "-y", 
-    "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
-    "-i", output_path,          # Original video matrix layout
-    "-i", NEW_VOICEOVER,         # Raw Edge-TTS track
+    "-hwaccel", "cuda", 
+    "-i", TRIMMED_VIDEO,         # Input index 0: Trimmed source video file
+    "-i", EXTRACTED_AUDIO,       # Input index 1: Full original sound track file
+    "-i", chosen_cat_file,       # Input index 2: Mounted dataset cat video file
     "-filter_complex", filter_complex_string,
     "-map", "[v]", 
-    "-map", "[speed_synced_audio]", # Map the speed-corrected narration track
-    "-c:v", "h264_nvenc",       # Force NVIDIA NVENC Hardware Video Encoder GPU
-    "-preset", "p4",            # High-performance hardware preset mapping
-    "-cq", "20",                # Maintain perfect clarity for text and borders
-    "-c:a", "aac",              
+    "-map", "1:a",               # Map the original sound track smoothly across the video layout timeline
+    "-c:v", "h264_nvenc",        # NVIDIA Hardware Acceleration GPU
+    "-preset", "p4", 
+    "-cq", "20", 
+    "-c:a", "aac", 
     "-b:a", "128k",
-    "-shortest",                # Ensure no trailing dead space
+    "-shortest",                 # Cut off extra audio if it exceeds the video execution length boundaries
     OUTPUT_VIDEO
 ]
 
 res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
 if res.returncode != 0:
-    print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
-    raise RuntimeError("FFmpeg Pipeline Failure")
-print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
+    print(f"❌ FFmpeg compilation crashed: {res.stderr}")
+    raise RuntimeError("FFmpeg Dataset Timeline Assembly Failure")
+print(f"🚀 GPU Render Complete! Video Compiled from Internal Dataset at: {OUTPUT_VIDEO}")
+
 
 
 # ==========================================
@@ -297,138 +283,3 @@ except Exception as e:
     print(f"⚠️ Ledger warning: {e}")
 
 print("\n🏆 PIPELINE COMPLETE!")
-
-
-
-# # ==========================================
-# # 4 & 5. DATASET CAT REACTION STITCHING & GPU RENDERING
-# # ==========================================
-# print("🚀 Initiating high-speed Kaggle Dataset video compilation sequence...")
-# import os
-# import random
-# import asyncio
-# import subprocess
-
-# # Define path configurations
-# NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
-# TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
-
-# # 4a. Read script text sent from your GitHub queue file
-# extracted_text = pipeline.get("script_text", "Look at this mind-blowing tech hack!")
-# sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
-
-# # 4b. Run Edge-TTS natively to build the professional human voice file
-# print("-> Querying Edge-TTS cloud service for professional narration...")
-# selected_voice = "en-US-ChristopherNeural"
-
-# async def generate_edge_voice():
-#     import edge_tts
-#     communicate = edge_tts.Communicate(sanitized_text, selected_voice)
-#     await communicate.save(NEW_VOICEOVER)
-
-# asyncio.run(generate_edge_voice())
-# print("✅ Edge-TTS voice track successfully generated.")
-
-# # 4c. DYNAMIC TRIMMING & INTERNAL STORAGE CAT SELECTION
-# print("⚡ Processing internal video timeline assembly structures...")
-
-# def get_duration(file_path):
-#     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
-#     return float(subprocess.check_output(cmd, shell=True).decode().strip())
-
-# orig_duration = get_duration(output_path)
-# print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
-
-# # Calculate trimmed target duration (Cut off the last 4 seconds)
-# trim_target_duration = max(2.0, orig_duration - 4.0) 
-# print(f"✂️ Trimming source video to: {trim_target_duration:.2f}s")
-
-# # Trim the source video accurately using high-speed stream copying
-# subprocess.run([
-#     "ffmpeg", "-y", "-i", output_path, 
-#     "-t", str(trim_target_duration), 
-#     "-c:v", "copy", "-c:a", "copy", 
-#     TRIMMED_VIDEO
-# ], check=True, capture_output=True)
-
-# # 4d. 🔥 NEW: Randomly select a cat reaction file directly from your Kaggle Dataset input path
-# # Change 'cat-reactions-vault' to match your folder sub-directory name inside Kaggle Input
-# cat_dataset_dir = "/kaggle/input/cat-reactions-vault"
-
-# if os.path.exists(cat_dataset_dir) and os.listdir(cat_dataset_dir):
-#     # Filter out hidden or non-video assets to isolate clean .mp4 files safely
-#     valid_clips = [f for f in os.listdir(cat_dataset_dir) if f.endswith('.mp4')]
-#     if valid_clips:
-#         chosen_cat_file = os.path.join(cat_dataset_dir, random.choice(valid_clips))
-#     else:
-#         chosen_cat_file = os.path.join(cat_dataset_dir, random.choice(os.listdir(cat_dataset_dir)))
-# else:
-#     print("⚠️ Dataset empty or not mounted properly yet. Using safety video fallback...")
-#     chosen_cat_file = output_path 
-
-# print(f"🐱 Selected Reaction Asset from Internal Storage: {chosen_cat_file}")
-
-# # 4e. SPEED FACTORS MEASUREMENTS
-# tts_duration = get_duration(NEW_VOICEOVER)
-# total_new_duration = trim_target_duration + 4.0 
-# speed_factor = tts_duration / total_new_duration
-
-# if speed_factor < 0.5: speed_factor = 0.5
-# if speed_factor > 2.0: speed_factor = 2.0
-# print(f"⏩ Required Voiceover Speed Factor: {speed_factor:.2f}x")
-
-# # ==========================================
-# # 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
-# # ==========================================
-# print("🎬 Merging tracks and rendering multi-layer canvas via NVIDIA NVENC GPU...")
-
-# styles = [
-#     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
-#     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1':r='0/0 0.5/0.42 1/1':b='0/0 0.4/0.58 1/1'",
-#     "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
-# ]
-# chosen_style = random.choice(styles)
-
-# effects = [
-#     "zoompan=z='min(zoom+0.003,1.12)':x='iw/2-iw/zoom/2+sin(time*2.5)*6':y='ih/2-ih/zoom/2':d=1",
-#     "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
-#     "hue='H=2.5*PI*t:s=1.03'"
-# ]
-# chosen_effect = random.choice(effects)
-
-# # Construct 9:16 complex layout pipeline map:
-# filter_complex_string = (
-#     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
-#     f"[0:v]scale=918:1632,{chosen_style}[main];"
-#     f"[bg][main]overlay=(W-w)/2:(H-h)/2[processed_source];"
-#     f"[2:v]scale=1080:1920[processed_cat];"
-#     f"[processed_source][processed_cat]concat=n=2:v=1:a=0[merged_video];"
-#     f"[merged_video]noise=alls=7:allf=t+u[grained];"
-#     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v];"
-#     f"[1:a]atempo={speed_factor}[speed_synced_audio]"
-# )
-
-# ffmpeg_cmd = [
-#     "ffmpeg", "-y", 
-#     "-hwaccel", "cuda", 
-#     "-i", TRIMMED_VIDEO,         # Input index 0: Trimmed source video file
-#     "-i", NEW_VOICEOVER,         # Input index 1: New Edge-TTS narrator audio file
-#     "-i", chosen_cat_file,       # Input index 2: Mounted dataset cat video file
-#     "-filter_complex", filter_complex_string,
-#     "-map", "[v]", 
-#     "-map", "[speed_synced_audio]", 
-#     "-c:v", "h264_nvenc",       # NVIDIA Hardware Acceleration GPU
-#     "-preset", "p4", 
-#     "-cq", "20", 
-#     "-c:a", "aac", 
-#     "-b:a", "128k",
-#     "-shortest",
-#     OUTPUT_VIDEO
-# ]
-
-# res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-# if res.returncode != 0:
-#     print(f"❌ FFmpeg compilation crashed: {res.stderr}")
-#     raise RuntimeError("FFmpeg Dataset Timeline Assembly Failure")
-# print(f"🚀 GPU Render Complete! Video Compiled from Internal Dataset at: {OUTPUT_VIDEO}")
-
