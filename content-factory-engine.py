@@ -105,50 +105,109 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
-
 # ==========================================
-# 4 & 5. ACCELERATED RESIZED CAT STITCHING & GPU RENDERING
+# 3b. 🔥 AI OCR CHECKPOINT: USERNAME WATERMARK SCANNER & BLUR PATCHER
 # ==========================================
-print("🚀 Initiating pixel-aligned Kaggle Dataset video compilation sequence...")
-import os
-import random
-import subprocess
+print("👁️ Launching OCR text-vision scanner for creator username watermarks...")
+import cv2
+import pytesseract
+from pytesseract import Output
 
-# Define absolute workspace tracking paths
+CLEANED_SOURCE_VIDEO = "/kaggle/working/cleaned_source.mp4"
 TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
 EXTRACTED_AUDIO = "/kaggle/working/original_audio.aac"
+
+# Open the downloaded video to scan layout coordinates
+cap = cv2.VideoCapture(output_path)
+frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+
+text_watermark_box = None
+clean_username_target = username.lower().strip()
+
+print(f"🕵️ Scanning frame grids for creator name text matching: '{clean_username_target}'")
+
+for idx in sample_frames:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    ret, frame = cap.read()
+    if not ret: continue
+    
+    # Sharpen contrast vectors for the OCR engine using grayscale conversion
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    
+    # Run full OCR positional word scanning passes
+    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
+    
+    # Loop over every single text word block detected inside the image canvas
+    for i in range(len(ocr_data['text'])):
+        detected_word = str(ocr_data['text'][i]).lower().strip()
+        
+        # Check if the scanned word matches or contains the creator's account handle name
+        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
+            x = ocr_data['left'][i]
+            y = ocr_data['top'][i]
+            w = ocr_data['width'][i]
+            h = ocr_data['height'][i]
+            
+            # Add safety padding margins around the box coordinates to fully cover the text width
+            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
+            break
+    if text_watermark_box: break
+cap.release()
+
+# If the creator's name text block was found, execute erasure loop
+if text_watermark_box:
+    x, y, w, h = text_watermark_box
+    print(f"🎯 Creator Watermark Found! Pixels located -> X:{x}, Y:{y}, W:{w}, H:{h}")
+    print("🧼 Applying spatial blur-mask patch filter over username region...")
+    
+    # Run FFmpeg's built-in delogo filter exclusively over the text coordinates box boundaries
+    subprocess.run([
+        "ffmpeg", "-y", "-i", output_path,
+        "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}",
+        "-c:a", "copy", CLEANED_SOURCE_VIDEO
+    ], check=True, capture_output=True)
+    
+    PROCESSING_INPUT_VIDEO = CLEANED_SOURCE_VIDEO
+    print("✅ Creator username watermark blurred out. Safe file passed forward.")
+else:
+    print("✨ Clean Check! No matching account name text signatures found on screen.")
+    PROCESSING_INPUT_VIDEO = output_path
+
+# ==========================================
+# 4. DYNAMIC TRIMMING & INTERNAL STORAGE CAT SELECTION
+# ==========================================
+print("⚡ Processing internal video timeline assembly structures...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
     return float(subprocess.check_output(cmd, shell=True).decode().strip())
 
-# 4a. DYNAMIC TRIMMING & SELECTION
-print("⚡ Processing internal video timeline assembly structures...")
-orig_duration = get_duration(output_path)
+orig_duration = get_duration(PROCESSING_INPUT_VIDEO)
 print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
 
 # Calculate trimmed target duration (Cut off the last 4 seconds)
 trim_target_duration = max(2.0, orig_duration - 4.0) 
 print(f"✂️ Trimming source video to: {trim_target_duration:.2f}s")
 
-# Trim the source video accurately using high-speed stream copying
+# Trim the watermark-scrubbed source video using high-speed stream copying
 subprocess.run([
-    "ffmpeg", "-y", "-i", output_path, 
+    "ffmpeg", "-y", "-i", PROCESSING_INPUT_VIDEO, 
     "-t", str(trim_target_duration), 
     "-c:v", "copy", "-c:a", "copy", 
     TRIMMED_VIDEO
 ], check=True, capture_output=True)
 
-# Extract the complete original audio track to layer it back over the cat video smoothly
+# Extract the complete audio track out of the watermark-scrubbed path to map over the cat scene smoothly
 print("🎵 Extracting the full original sound track...")
 subprocess.run([
-    "ffmpeg", "-y", "-i", output_path,
+    "ffmpeg", "-y", "-i", PROCESSING_INPUT_VIDEO,
     "-vn", "-acodec", "copy",
     EXTRACTED_AUDIO
 ], check=True, capture_output=True)
 
-# 4b. Randomly select a cat reaction file directly from your Kaggle Dataset input path
-cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
+# Randomly select a cat reaction file directly from your Kaggle Dataset input path
+cat_dataset_dir = "/kaggle/input/cat-reactions-vault"
 
 if os.path.exists(cat_dataset_dir):
     valid_clips = []
@@ -163,7 +222,7 @@ if os.path.exists(cat_dataset_dir):
         raise FileNotFoundError("❌ Error: No .mp4 video files detected inside your dataset directory!")
 else:
     print("⚠️ Dataset directory not found. Using safety video fallback...")
-    chosen_cat_file = output_path 
+    chosen_cat_file = PROCESSING_INPUT_VIDEO 
 
 print(f"🐱 Selected Reaction Asset from Internal Storage: {chosen_cat_file}")
 
@@ -186,12 +245,13 @@ effects = [
 ]
 chosen_effect = random.choice(effects)
 
-# FIX: Dynamic Filtergraph Layout for Pixel Alignment:
-# 1. Takes input 0 (trimmed reel) and scales the wallpaper background exactly to 1080x1920 portrait format size profiles.
-# 2. Scales the inner primary unmirrored core reel container to exactly 918x1632 layout dimensions (zooms out to protect text captions).
+# Dynamic Filtergraph Layout for Pixel Alignment:
+# 1. Takes the trimmed source video and forces the wallpaper backdrop to 1080x1920 portrait size.
+# 2. Scales the inner primary unmirrored core reel container to exactly 918x1632 layout dimensions (safely protects original captions).
 # 3. Merges them together and locks the resolution dimensions container at exactly 1080x1920 with setsar=1.
-# 4. Takes input 2 (cat clip) and forces its aspect layout canvas sizing directly to 1080x1920 with setsar=1.
+# 4. Takes your Kaggle dataset cat clip and forces its aspect layout sizing directly to 1080x1920 with setsar=1.
 # 5. Connects both tracks cleanly via 'concat=n=2:v=1:a=0' without throwing mismatched input channel parameter errors.
+# 6. Layers transparent moving grain text patterns and burns your custom brand watermark label '@AWRAM' securely over the whole project.
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main];"
