@@ -242,9 +242,8 @@ if res.returncode != 0:
     raise RuntimeError("FFmpeg Pipeline Failure")
 print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
-
 # ==========================================
-# 5b. 🔥 DUAL-STREAM FULL-VIDEO AI SEO ENGINE (Fast Full Analysis)
+# 5b. 🔥 DUAL-STREAM FULL-VIDEO AI SEO ENGINE (PATCHED MODEL STRING)
 # ==========================================
 print("🧠 Launching Accelerated Full-Video SEO Analyzer via Dual-Stream Tokenization...")
 import json
@@ -275,9 +274,7 @@ seo_metadata = {
 if gemini_key:
     try:
         # 2. STREAM 1: High-Speed Visual Tokenization (Storyboard Sheet Extraction)
-        # We tell FFmpeg to extract 6 equidistant frame shots across the video layout timeline
-        # and stitch them horizontally into one single clean image strip.
-        # This shows Gemini the hook, the text captions, the transitions, and the cat reaction instantly.
+        # Extract 6 equidistant frame shots across the video timeline and stitch them horizontally
         print("-> Compiling 6-frame narrative storyboard layout strip via FFmpeg...")
         subprocess.run([
             "ffmpeg", "-y", "-i", OUTPUT_VIDEO,
@@ -286,7 +283,6 @@ if gemini_key:
         ], check=True, capture_output=True)
 
         # 3. STREAM 2: Direct Context Retrieval (Audio Stream Mapping)
-        # Pull the absolute written transcript script that we passed down from your pipeline JSON
         pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
 
         # 4. Upload only the lightweight horizontal storyboard strip to Google AI Studio
@@ -310,9 +306,9 @@ if gemini_key:
             f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown wrap lines."
         )
 
-        # 6. Trigger the Gemini Flash generative pipeline (Completes in 3-5 seconds)
+        # 6. 🔥 FIX: USE THE COMPATIBLE FULL MODEL PATH IDENTIFIER TAG STRING
         print("🔥 Executing semantic processing for high-retention SEO optimization...")
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash") # 👈 Changed target string to models/
         response = model.generate_content([visual_blueprint, seo_prompt])
         
         # Clean up any accidental markdown code wrappers in the AI response
@@ -332,7 +328,6 @@ if gemini_key:
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-
 
 
 
