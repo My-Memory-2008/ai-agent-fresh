@@ -245,18 +245,18 @@ print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
 # ==========================================
-# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (OFFICIAL GROQ SDK)
+# 5b. 🔥 BALANCED LLAMA 3.3 VIDEO SEO ENGINE (OFFICIAL GROQ SDK)
 # ==========================================
-print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Official Groq SDK...")
+print("🧠 Launching Balanced Llama 3.3 Video SEO Optimizer via Official Groq SDK...")
 import json
 import os
 from kaggle_secrets import UserSecretsClient
 
 # Initialize default fallback metadata tags in case of validation triggers
 seo_metadata = {
-    "title": f"This Mind-Blowing Hack Changes Everything! 🤯 #shorts",
-    "description": f"Wait till the end for the cat reaction! Credits to @{username} for the original clip. #shorts #ai #trending",
-    "tags": ["shorts", "trending", "ai", "viral", "comedy", "hacks"]
+    "title": f"This Mind-Blowing AI Hack Changes Everything! 🤯 #shorts",
+    "description": f"Learn this crazy AI tutorial trick right now! Credits to @{username} for the original clip. #shorts #ai #trending",
+    "tags": ["shorts", "trending", "ai", "viral", "tech", "tutorial"]
 }
 
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
@@ -274,30 +274,29 @@ if groq_key:
         # Import the official client directly from system memory arrays
         from groq import Groq
         
-        # 2. Initialize the official SDK wrapper (Completely bypasses 405 link layout errors)
+        # 2. Initialize the official SDK wrapper
         client = Groq(api_key=groq_key.strip())
         
         # Pull original context script strings from the pipeline data
         pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
         
-        # 3. Formulate the precise human-style trending SEO prompt
+        # 3. Formulate the precise balanced AI Tutorial + Cat Loop SEO prompt
         seo_prompt = (
-            f"You are a viral YouTube Shorts marketer and SEO expert. A video clip has been heavily edited "
-            f"applying a 10x visual transformation filter matrix, ending with a funny cat reaction punchline. "
-            f"Combine those structural visual changes with this video transcript script: \"{pipeline_full_transcript}\". "
-            f"Generate high-performance metadata tags in a human-like narrative structure packed with current humor, "
-            f"internet slang, and high-retention algorithmic triggers. "
-            f"Requirements:\n"
-            f"1. TITLE: Max 70 characters, include modern emojis, a shocking hook, and end strictly with the tag #shorts.\n"
-            f"2. DESCRIPTION: Write an engaging 3-sentence narrative description. Sentence 1 must be a humorous trend-based statement or joke about the cat reaction scene. "
-            f"Sentence 2 must summarize the core value of this specific topic: {pipeline_full_transcript}. Sentence 3 must be a strong Call to Action (CTA) to subscribe. "
-            f"Include the tracking phrase 'Original concept inspired by @{username}'. Append trendy tags at the very bottom.\n"
-            f"3. TAGS: Provide an array of 8 highly relevant trending keywords based on the video context.\n\n"
+            f"You are a viral YouTube Shorts marketer and SEO expert. A tech/AI tutorial video by @{username} "
+            f"has been edited, applying a 10x visual transformation filter matrix, and ends with a funny cat reaction punchline.\n\n"
+            f"Review this core video script topic context: \"{pipeline_full_transcript}\".\n\n"
+            f"Generate high-performance metadata tags in a human-like narrative structure based on these rules:\n"
+            f"1. TITLE: Max 70 characters. It must focus 100% on the mind-blowing AI tutorial hack or tech value shown in the script. Add a viral hook, modern emojis, and end strictly with the tag #shorts.\n"
+            f"2. DESCRIPTION: Write an engaging 3-sentence narrative description. \n"
+            f"   - Sentence 1: Must be a shocking hook explaining the exact value of this AI/tech tutorial tip: {pipeline_full_transcript}.\n"
+            f"   - Sentence 2: Must be a funny trend-based joke teasing the audience to stick around for the surprise cat reaction loop at the very end.\n"
+            f"   - Sentence 3: Must be a strong Call to Action (CTA) to subscribe for daily tech hacks. Include the tracking phrase 'Original concept inspired by @{username}'. Append trendy tech and short tags at the very bottom.\n"
+            f"3. TAGS: Provide an array of 8 highly relevant keywords focusing on AI, Tech, Tutorials, and Hacks, with only 1 tag for the cat meme.\n\n"
             f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown code fence lines like ```json or ```."
         )
 
-        # 4. Trigger the Llama 3.3 model execution via native SDK functions (Completes in 1.5 seconds)
-        print("🔥 Querying core Groq LPU cluster for high-retention SEO optimization...")
+        # 4. Trigger the Llama 3.3 model execution via native SDK functions
+        print("🔥 Querying core Groq LPU cluster for balanced SEO optimization...")
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "You are an advanced YouTube SEO optimizer that outputs raw JSON text data."},
@@ -308,13 +307,13 @@ if groq_key:
             max_tokens=300
         )
         
-        raw_response_text = chat_completion.choices[0].message.content.strip()
+        raw_response_text = chat_completion.choices.message.content.strip()
         
         # Clean up any accidental markdown wrappers in the AI response text profile
         clean_json_text = raw_response_text.replace("```json", "").replace("```", "").strip()
         seo_metadata = json.loads(clean_json_text)
         
-        print("🎉 SUCCESS! High-retention SEO generated inside Kaggle natively via official SDK:")
+        print("🎉 SUCCESS! Balanced AI Tutorial SEO generated successfully inside Kaggle:")
         print(f"📌 Title: {seo_metadata.get('title')}")
 
     except Exception as e:
@@ -323,8 +322,6 @@ if groq_key:
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-
-
 
 
 # ==========================================
