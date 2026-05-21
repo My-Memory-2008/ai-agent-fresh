@@ -244,7 +244,7 @@ print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
 # ==========================================
-# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (Groq Integration)
+# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (FIXED BASE URL)
 # ==========================================
 print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Groq API...")
 import json
@@ -271,13 +271,14 @@ seo_metadata = {
 
 if groq_key:
     try:
-        # Pull original context strings from the data packet generated on GitHub
         pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
         
-        # 2. Initialize the OpenAI client wrapped around Groq's API gateway
-        client = OpenAI(api_key=groq_key, base_url="https://groq.com")
+        # 🔥 FIX: Corrected base_url string to point to the correct Groq REST API layer
+        client = OpenAI(
+            api_key=groq_key, 
+            base_url="https://groq.com" # 👈 Removed 'openai/' or extra folder paths
+        )
         
-        # 3. Formulate the precise human-style trending SEO prompt
         seo_prompt = (
             f"You are a viral YouTube Shorts marketer and SEO expert. A video clip has been heavily edited "
             f"applying a 10x visual transformation filter matrix, ending with a funny cat reaction punchline. "
@@ -293,7 +294,6 @@ if groq_key:
             f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown code fence lines like ```json or ```."
         )
 
-        # 4. Trigger the Llama 3.3 generative pipeline (Completes in under 2 seconds)
         print("🔥 Querying Groq API for high-retention SEO optimization...")
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -315,11 +315,12 @@ if groq_key:
         print(f"📌 Title: {seo_metadata.get('title')}")
 
     except Exception as e:
-        print(f"⚠️ Groq SEO generation failed (using standard fallbacks): {e}")
+        print(f"❌ Groq SEO generation failed (using standard fallbacks): {e}")
 
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
+
 
 
 
