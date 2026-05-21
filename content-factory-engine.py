@@ -15,7 +15,8 @@ packages = [
     "google-auth-httplib2",
     "instaloader",
     "edge-tts",
-    "google-genai"
+    "google-genai",
+    "groq"
 ]
 
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q"] + packages)
@@ -244,15 +245,23 @@ print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
 # ==========================================
-# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (DIRECT NATIVE REST API)
+# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (OFFICIAL GROQ SDK)
 # ==========================================
-print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Native Groq REST API...")
+print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Official Groq SDK...")
 import json
 import os
-import requests
 from kaggle_secrets import UserSecretsClient
 
-# 1. Authenticate with your secure Kaggle secret token
+# Initialize default fallback metadata tags in case of validation triggers
+seo_metadata = {
+    "title": f"This Mind-Blowing Hack Changes Everything! 🤯 #shorts",
+    "description": f"Wait till the end for the cat reaction! Credits to @{username} for the original clip. #shorts #ai #trending",
+    "tags": ["shorts", "trending", "ai", "viral", "comedy", "hacks"]
+}
+
+SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
+
+# 1. Authenticate using your secure Kaggle secret token vault
 secrets = UserSecretsClient()
 try:
     groq_key = secrets.get_secret("GROQ_API_KEY")
@@ -260,21 +269,18 @@ except Exception:
     print("⚠️ Missing GROQ_API_KEY inside Kaggle Secrets. Using standard fallback metadata.")
     groq_key = None
 
-SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
-
-# Establish default fallback tags
-seo_metadata = {
-    "title": f"This Mind-Blowing Hack Changes Everything! 🤯 #shorts",
-    "description": f"Wait till the end for the cat reaction! Credits to @{username} for the original clip. #shorts #ai #trending",
-    "tags": ["shorts", "trending", "ai", "viral", "comedy", "hacks"]
-}
-
 if groq_key:
     try:
-        # Pull original context strings from the data packet generated on GitHub
+        # Import the official client directly from system memory arrays
+        from groq import Groq
+        
+        # 2. Initialize the official SDK wrapper (Completely bypasses 405 link layout errors)
+        client = Groq(api_key=groq_key.strip())
+        
+        # Pull original context script strings from the pipeline data
         pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
         
-        # 2. Set up the exact explicit text payload prompt
+        # 3. Formulate the precise human-style trending SEO prompt
         seo_prompt = (
             f"You are a viral YouTube Shorts marketer and SEO expert. A video clip has been heavily edited "
             f"applying a 10x visual transformation filter matrix, ending with a funny cat reaction punchline. "
@@ -290,50 +296,34 @@ if groq_key:
             f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown code fence lines like ```json or ```."
         )
 
-        # 3. Construct direct native HTTP header and data structures
-        # FIXED: Using the direct, non-proxied Groq native REST URL layout
-        url = "https://groq.com"
-        headers = {
-            "Authorization": f"Bearer {groq_key.strip()}",
-            "Content-Type": "application/json"
-        }
-        
-        data_payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
+        # 4. Trigger the Llama 3.3 model execution via native SDK functions (Completes in 1.5 seconds)
+        print("🔥 Querying core Groq LPU cluster for high-retention SEO optimization...")
+        chat_completion = client.chat.completions.create(
+            messages=[
                 {"role": "system", "content": "You are an advanced YouTube SEO optimizer that outputs raw JSON text data."},
                 {"role": "user", "content": seo_prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 250
-        }
-
-        # 4. Fire the direct network call over the secure network gateway
-        print("🔥 Dispatching native network request directly to Groq REST servers...")
-        response = requests.post(url, headers=headers, json=data_payload, timeout=20)
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=300
+        )
         
-        # Check for network response errors
-        response.raise_for_status()
-        response_json = response.json()
+        raw_response_text = chat_completion.choices[0].message.content.strip()
         
-        # Parse the text response out of the raw nested choices dictionary
-        raw_response_text = response_json["choices"][0]["message"]["content"].strip()
-        
-        # Clean up any accidental markdown code wrappers in the AI response
+        # Clean up any accidental markdown wrappers in the AI response text profile
         clean_json_text = raw_response_text.replace("```json", "").replace("```", "").strip()
         seo_metadata = json.loads(clean_json_text)
         
-        print("🎉 SUCCESS! High-retention SEO successfully generated via direct native REST API:")
+        print("🎉 SUCCESS! High-retention SEO generated inside Kaggle natively via official SDK:")
         print(f"📌 Title: {seo_metadata.get('title')}")
 
     except Exception as e:
-        print(f"❌ Direct Groq REST API connection failed (using standard fallbacks): {e}")
-        if 'response' in locals() and hasattr(response, 'text'):
-            print(f"📋 Raw Server Diagnostic Trace: {response.text}")
+        print(f"❌ Groq Native SDK generation failed (using standard fallbacks): {e}")
 
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
+
 
 
 
