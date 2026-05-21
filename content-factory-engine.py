@@ -14,7 +14,8 @@ packages = [
     "google-auth-oauthlib",
     "google-auth-httplib2",
     "instaloader",
-    "edge-tts"
+    "edge-tts",
+    "google-genai"
 ]
 
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q"] + packages)
@@ -106,130 +107,92 @@ print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output
 
 
 # ==========================================
-# 3b. 🔥 AI OCR CHECKPOINT: USERNAME WATERMARK SCANNER & BLUR PATCHER
+# 4 & 5. T4 GPU AUDIO EXTRACTION, SPEECH TRANSCRIPTION & SPEED-SYNC RENDERING
 # ==========================================
-print("👁️ Launching OCR text-vision scanner for creator username watermarks...")
-import cv2
-import pytesseract
-from pytesseract import Output
+print("🚀 Initiating dynamic dependency checks & audio extraction sequence...")
+import subprocess
+import sys
+import os
+import random
+import asyncio
 
-CLEANED_SOURCE_VIDEO = "/kaggle/working/cleaned_source.mp4"
-TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
-EXTRACTED_AUDIO = "/kaggle/working/original_audio.aac"
+# 4a. Dynamic Dependency Injector (Ensures SpeechRecognition is installed on boot)
+try:
+    import speech_recognition as sr
+except ImportError:
+    print("-> speech_recognition package missing. Forcing local environment injection...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "SpeechRecognition"])
+    import speech_recognition as sr
+    print("✅ Package loaded successfully.")
 
-# Open the downloaded video to scan layout coordinates
-cap = cv2.VideoCapture(output_path)
-frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+# Define absolute workspace audio tracking paths
+EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
+EXTRACTED_AUDIO_WAV = "/kaggle/working/extracted_audio.wav"
+NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
 
-text_watermark_box = None
-clean_username_target = username.lower().strip()
+# 4b. Extract the true audio track from the downloaded Reel via FFmpeg
+print("-> Isolating original audio track matrix...")
+subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
 
-print(f"🕵️ Scanning frame grids for creator name text matching: '{clean_username_target}'")
+# Convert to standard uncompressed WAV format for the local transcription engine
+subprocess.run(["ffmpeg", "-y", "-i", EXTRACTED_AUDIO_MP3, EXTRACTED_AUDIO_WAV], check=True, capture_output=True)
 
-for idx in sample_frames:
-    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-    ret, frame = cap.read()
-    if not ret: continue
-    
-    # Sharpen contrast vectors for the OCR engine using grayscale conversion
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    # Run full OCR positional word scanning passes
-    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
-    
-    # Loop over every single text word block detected inside the image canvas
-    for i in range(len(ocr_data['text'])):
-        detected_word = str(ocr_data['text'][i]).lower().strip()
-        
-        # Check if the scanned word matches or contains the creator's account handle name
-        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
-            x = ocr_data['left'][i]
-            y = ocr_data['top'][i]
-            w = ocr_data['width'][i]
-            h = ocr_data['height'][i]
-            
-            # Add safety padding margins around the box coordinates to fully cover the text width
-            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
-            break
-    if text_watermark_box: break
-cap.release()
+# 4c. Transcribe the original speech using local CPU execution (Bypasses CUDA bugs)
+print("-> Initializing CPU speech-to-text transcription engine...")
+recognizer = sr.Recognizer()
+extracted_text = ""
 
-# If the creator's name text block was found, execute erasure loop
-if text_watermark_box:
-    x, y, w, h = text_watermark_box
-    print(f"🎯 Creator Watermark Found! Pixels located -> X:{x}, Y:{y}, W:{w}, H:{h}")
-    print("🧼 Applying spatial blur-mask patch filter over username region...")
-    
-    # Run FFmpeg's built-in delogo filter exclusively over the text coordinates box boundaries
-    subprocess.run([
-        "ffmpeg", "-y", "-i", output_path,
-        "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}",
-        "-c:a", "copy", CLEANED_SOURCE_VIDEO
-    ], check=True, capture_output=True)
-    
-    PROCESSING_INPUT_VIDEO = CLEANED_SOURCE_VIDEO
-    print("✅ Creator username watermark blurred out. Safe file passed forward.")
-else:
-    print("✨ Clean Check! No matching account name text signatures found on screen.")
-    PROCESSING_INPUT_VIDEO = output_path
+try:
+    with sr.AudioFile(EXTRACTED_AUDIO_WAV) as source:
+        audio_data = recognizer.record(source)
+        # Uses Google's free public web speech API gateway to extract exact words
+        extracted_text = recognizer.recognize_google(audio_data)
+    print(f"📝 SUCCESS! Transcribed original video script: \"{extracted_text}\"")
+except Exception as e:
+    print(f"⚠️ Speech API failed or audio was silent: {e}")
+    # Fallback only if the original audio track cannot be transcribed
+    extracted_text = "Check out this amazing video!"
+    print(f"📋 Using safety text fallback: \"{extracted_text}\"")
 
-# ==========================================
-# 4. DYNAMIC TRIMMING & INTERNAL STORAGE CAT SELECTION
-# ==========================================
-print("⚡ Processing internal video timeline assembly structures...")
+# 4d. Run Edge-TTS natively to build the professional human voice file
+print("-> Querying Edge-TTS cloud service for professional narration...")
+sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
+selected_voice = "en-US-ChristopherNeural"
+
+async def generate_edge_voice():
+    import edge_tts
+    communicate = edge_tts.Communicate(sanitized_text, selected_voice)
+    await communicate.save(NEW_VOICEOVER)
+
+asyncio.run(generate_edge_voice())
+print("✅ Professional Edge-TTS voice track generated.")
+
+# 4e. DYNAMIC SPEED CALCULATION ENGINE
+print("⚡ Calculating precise speed normalization adjustments...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
     return float(subprocess.check_output(cmd, shell=True).decode().strip())
 
-orig_duration = get_duration(PROCESSING_INPUT_VIDEO)
+# Fetch durations down to the millisecond
+orig_duration = get_duration(output_path)
+tts_duration = get_duration(NEW_VOICEOVER)
+
+# Calculate exactly how much we need to speed up/slow down the TTS voice to match the video length
+speed_factor = tts_duration / orig_duration
+
+# FFmpeg atempo boundaries rules: Must stay between 0.5 and 2.0
+if speed_factor < 0.5: speed_factor = 0.5
+if speed_factor > 2.0: speed_factor = 2.0
+
 print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
-
-# Calculate trimmed target duration (Cut off the last 4 seconds)
-trim_target_duration = max(2.0, orig_duration - 4.0) 
-print(f"✂️ Trimming source video to: {trim_target_duration:.2f}s")
-
-# Trim the watermark-scrubbed source video using high-speed stream copying
-subprocess.run([
-    "ffmpeg", "-y", "-i", PROCESSING_INPUT_VIDEO, 
-    "-t", str(trim_target_duration), 
-    "-c:v", "copy", "-c:a", "copy", 
-    TRIMMED_VIDEO
-], check=True, capture_output=True)
-
-# Extract the complete audio track out of the watermark-scrubbed path to map over the cat scene smoothly
-print("🎵 Extracting the full original sound track...")
-subprocess.run([
-    "ffmpeg", "-y", "-i", PROCESSING_INPUT_VIDEO,
-    "-vn", "-acodec", "copy",
-    EXTRACTED_AUDIO
-], check=True, capture_output=True)
-
-# Randomly select a cat reaction file directly from your Kaggle Dataset input path
-cat_dataset_dir = "/kaggle/input/cat-reactions-vault"
-
-if os.path.exists(cat_dataset_dir):
-    valid_clips = []
-    for root, dirs, files in os.walk(cat_dataset_dir):
-        for file in files:
-            if file.endswith('.mp4'):
-                valid_clips.append(os.path.join(root, file))
-                
-    if valid_clips:
-        chosen_cat_file = random.choice(valid_clips)
-    else:
-        raise FileNotFoundError("❌ Error: No .mp4 video files detected inside your dataset directory!")
-else:
-    print("⚠️ Dataset directory not found. Using safety video fallback...")
-    chosen_cat_file = PROCESSING_INPUT_VIDEO 
-
-print(f"🐱 Selected Reaction Asset from Internal Storage: {chosen_cat_file}")
+print(f"⏱️ Raw Voiceover Duration: {tts_duration:.2f}s")
+print(f"⏩ Required Voiceover Speed Factor: {speed_factor:.2f}x")
 
 # ==========================================
-# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK (PIXEL RE-ALIGNED)
+# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
 # ==========================================
-print("🎬 Aligning dimensions and rendering multi-layer canvas via NVIDIA NVENC GPU...")
+print("🎬 Stacking randomized filters and rendering vertical layout via NVIDIA NVENC GPU...")
 
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
@@ -245,46 +208,131 @@ effects = [
 ]
 chosen_effect = random.choice(effects)
 
-# Dynamic Filtergraph Layout for Pixel Alignment:
-# 1. Takes the trimmed source video and forces the wallpaper backdrop to 1080x1920 portrait size.
-# 2. Scales the inner primary unmirrored core reel container to exactly 918x1632 layout dimensions (safely protects original captions).
-# 3. Merges them together and locks the resolution dimensions container at exactly 1080x1920 with setsar=1.
-# 4. Takes your Kaggle dataset cat clip and forces its aspect layout sizing directly to 1080x1920 with setsar=1.
-# 5. Connects both tracks cleanly via 'concat=n=2:v=1:a=0' without throwing mismatched input channel parameter errors.
-# 6. Layers transparent moving grain text patterns and burns your custom brand watermark label '@AWRAM' securely over the whole project.
+# Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main];"
-    f"[bg][main]overlay=(W-w)/2:(H-h)/2,scale=1080:1920,setsar=1[processed_source];"
-    f"[2:v]scale=1080:1920,setsar=1[processed_cat];"
-    f"[processed_source][processed_cat]concat=n=2:v=1:a=0[merged_video];"
-    f"[merged_video]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
+    f"[bg][main]overlay=(W-w)/2:(H-h)/2[merged];"
+    f"[merged]noise=alls=7:allf=t+u[grained];"
+    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v];"
+    f"[1:a]atempo={speed_factor}[speed_synced_audio]"
 )
 
+# GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
 ffmpeg_cmd = [
     "ffmpeg", "-y", 
-    "-hwaccel", "cuda", 
-    "-i", TRIMMED_VIDEO,         # Input index 0: Trimmed source video file
-    "-i", EXTRACTED_AUDIO,       # Input index 1: Full original sound track file
-    "-i", chosen_cat_file,       # Input index 2: Mounted dataset cat video file
+    "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
+    "-i", output_path,          # Original video matrix layout
+    "-i", NEW_VOICEOVER,         # Raw Edge-TTS track
     "-filter_complex", filter_complex_string,
     "-map", "[v]", 
-    "-map", "1:a",               # Map the original sound track smoothly across the video layout timeline
-    "-c:v", "h264_nvenc",        # NVIDIA Hardware Acceleration GPU
-    "-preset", "p4", 
-    "-cq", "20", 
-    "-c:a", "aac", 
+    "-map", "[speed_synced_audio]", # Map the speed-corrected narration track
+    "-c:v", "h264_nvenc",       # Force NVIDIA NVENC Hardware Video Encoder GPU
+    "-preset", "p4",            # High-performance hardware preset mapping
+    "-cq", "20",                # Maintain perfect clarity for text and borders
+    "-c:a", "aac",              
     "-b:a", "128k",
-    "-shortest",                 # Cut off extra audio if it exceeds the video execution length boundaries
+    "-shortest",                # Ensure no trailing dead space
     OUTPUT_VIDEO
 ]
 
 res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
 if res.returncode != 0:
-    print(f"❌ FFmpeg compilation crashed: {res.stderr}")
-    raise RuntimeError("FFmpeg Dataset Timeline Assembly Failure")
-print(f"🚀 GPU Render Complete! Video Compiled from Internal Dataset at: {OUTPUT_VIDEO}")
+    print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
+    raise RuntimeError("FFmpeg Pipeline Failure")
+print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
+
+
+# ==========================================
+# 5b. 🔥 DUAL-STREAM FULL-VIDEO AI SEO ENGINE (Fast Full Analysis)
+# ==========================================
+print("🧠 Launching Accelerated Full-Video SEO Analyzer via Dual-Stream Tokenization...")
+import json
+import os
+import subprocess
+import google.generativeai as genai
+from kaggle_secrets import UserSecretsClient
+
+# 1. Authenticate with your secure Kaggle secret token
+secrets = UserSecretsClient()
+try:
+    gemini_key = secrets.get_secret("GEMINI_API_KEY")
+    genai.configure(api_key=gemini_key)
+except Exception:
+    print("⚠️ Missing GEMINI_API_KEY inside Kaggle Secrets. Using standard fallback metadata.")
+    gemini_key = None
+
+SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
+STORYBOARD_STRIP = "/kaggle/working/video_storyboard_strip.jpg"
+
+# Establish baseline fallback tags
+seo_metadata = {
+    "title": f"This Mind-Blowing Hack Changes Everything! 🤯 #shorts",
+    "description": f"Wait till the end for the cat reaction! Credits to @{username} for the original clip. #shorts #ai #trending",
+    "tags": ["shorts", "trending", "ai", "viral", "comedy", "hacks"]
+}
+
+if gemini_key:
+    try:
+        # 2. STREAM 1: High-Speed Visual Tokenization (Storyboard Sheet Extraction)
+        # We tell FFmpeg to extract 6 equidistant frame shots across the video layout timeline
+        # and stitch them horizontally into one single clean image strip.
+        # This shows Gemini the hook, the text captions, the transitions, and the cat reaction instantly.
+        print("-> Compiling 6-frame narrative storyboard layout strip via FFmpeg...")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", OUTPUT_VIDEO,
+            "-vf", "select='not(mod(n,45))',scale=360:640,tile=6x1", 
+            "-vframes", "1", "-q:v", "3", STORYBOARD_STRIP
+        ], check=True, capture_output=True)
+
+        # 3. STREAM 2: Direct Context Retrieval (Audio Stream Mapping)
+        # Pull the absolute written transcript script that we passed down from your pipeline JSON
+        pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
+
+        # 4. Upload only the lightweight horizontal storyboard strip to Google AI Studio
+        print("-> Uploading processed visual blueprint to cloud endpoints...")
+        visual_blueprint = genai.upload_file(path=STORYBOARD_STRIP)
+        print("✅ Visual timeline token generated instantly.")
+
+        # 5. Formulate the precise human-style trending SEO prompt
+        seo_prompt = (
+            f"You are a viral YouTube Shorts marketer and SEO expert. Analyze this full horizontal storyboard layout strip "
+            f"showing the chronological scenes of our edited video (including the main tech hook and the cat reaction punchline at the end). "
+            f"Combine those visuals with this complete video audio script narrative: \"{pipeline_full_transcript}\". "
+            f"Generate high-performance metadata tags in a human-like narrative structure packed with current humor, "
+            f"internet slang, and high-retention algorithmic triggers. "
+            f"Requirements:\n"
+            f"1. TITLE: Max 70 characters, include modern emojis, a shocking hook, and end strictly with the tag #shorts.\n"
+            f"2. DESCRIPTION: Write an engaging 3-sentence narrative description. Sentence 1 must be a humorous trend-based statement or joke about the cat scene. "
+            f"Sentence 2 must summarize the core value of this specific script topic: {pipeline_full_transcript}. Sentence 3 must be a strong Call to Action (CTA) to subscribe. "
+            f"Include the tracking phrase 'Original concept inspired by @{username}'. Append trendy tags at the very bottom.\n"
+            f"3. TAGS: Provide an array of 8 highly relevant trending keywords based on the video context.\n\n"
+            f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown wrap lines."
+        )
+
+        # 6. Trigger the Gemini Flash generative pipeline (Completes in 3-5 seconds)
+        print("🔥 Executing semantic processing for high-retention SEO optimization...")
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        response = model.generate_content([visual_blueprint, seo_prompt])
+        
+        # Clean up any accidental markdown code wrappers in the AI response
+        clean_json_text = response.text.replace("```json", "").replace("```", "").strip()
+        seo_metadata = json.loads(clean_json_text)
+        
+        print("🎉 SUCCESS! High-retention SEO generated dynamically via complete video tracking:")
+        print(f"📌 Title: {seo_metadata.get('title')}")
+        
+        # Immediate workspace clean up to maintain system storage stability
+        genai.delete_file(visual_blueprint.name)
+        if os.path.exists(STORYBOARD_STRIP): os.remove(STORYBOARD_STRIP)
+
+    except Exception as e:
+        print(f"⚠️ Accelerated SEO system warning (using standard fallbacks): {e}")
+
+# Save the finalized outputs out to disk for verification reviews
+with open(SEO_MANIFEST_PATH, 'w') as f:
+    json.dump(seo_metadata, f, indent=2)
+
 
 
 
@@ -303,9 +351,11 @@ try:
     
     youtube = build("youtube", "v3", credentials=creds)
     body = {
-        "snippet": {"title": pipeline.get("youtube_title", "AI Tip #shorts"),
-                    "description": pipeline.get("youtube_description", ""),
-                    "tags": pipeline.get("youtube_tags", ["AI", "Shorts"])},
+        "snippet": {"title":  seo_metadata.get("title", "Amazing AI Hack! #shorts"),
+                    "description": seo_metadata.get("description", ""),
+                    "tags": seo_metadata.get("tags", ["AI", "Shorts"]),
+                   "categoryId": "22" 
+                   },
         "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False}
     }
     request = youtube.videos().insert(part=",".join(body.keys()), body=body, media_body=MediaFileUpload(OUTPUT_VIDEO, chunksize=-1, resumable=True))
@@ -315,6 +365,8 @@ try:
     print(f"🎉 YouTube Success: {yt_url}")
 except Exception as e:
     print(f"⚠️ Upload failed (video saved locally): {e}")
+
+
 
 # ==========================================
 # 6. UPDATE GITHUB LEDGER
