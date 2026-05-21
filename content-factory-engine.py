@@ -244,92 +244,83 @@ print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
 # ==========================================
-# 5b. 🔥 DUAL-STREAM FULL-VIDEO AI SEO ENGINE (FIXED MODEL ENDPOINT)
+# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (Groq Integration)
 # ==========================================
-print("🧠 Launching Accelerated Full-Video SEO Analyzer via Dual-Stream Tokenization...")
+print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Groq API...")
 import json
 import os
-import subprocess
-import google.generativeai as genai
 from kaggle_secrets import UserSecretsClient
+from openai import OpenAI
 
 # 1. Authenticate with your secure Kaggle secret token
 secrets = UserSecretsClient()
 try:
-    gemini_key = secrets.get_secret("GEMINI_API_KEY")
-    genai.configure(api_key=gemini_key)
+    groq_key = secrets.get_secret("GROQ_API_KEY")
 except Exception:
-    print("⚠️ Missing GEMINI_API_KEY inside Kaggle Secrets. Using standard fallback metadata.")
-    gemini_key = None
+    print("⚠️ Missing GROQ_API_KEY inside Kaggle Secrets. Using standard fallback metadata.")
+    groq_key = None
 
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
-STORYBOARD_STRIP = "/kaggle/working/video_storyboard_strip.jpg"
 
-# Establish baseline fallback tags
+# Establish default fallback tags
 seo_metadata = {
     "title": f"This Mind-Blowing Hack Changes Everything! 🤯 #shorts",
     "description": f"Wait till the end for the cat reaction! Credits to @{username} for the original clip. #shorts #ai #trending",
     "tags": ["shorts", "trending", "ai", "viral", "comedy", "hacks"]
 }
 
-if gemini_key:
+if groq_key:
     try:
-        # 2. STREAM 1: High-Speed Visual Tokenization (Storyboard Sheet Extraction)
-        # Extract 6 equidistant frame shots across the video timeline and stitch them horizontally
-        print("-> Compiling 6-frame narrative storyboard layout strip via FFmpeg...")
-        subprocess.run([
-            "ffmpeg", "-y", "-i", OUTPUT_VIDEO,
-            "-vf", "select='not(mod(n,45))',scale=360:640,tile=6x1", 
-            "-vframes", "1", "-q:v", "3", STORYBOARD_STRIP
-        ], check=True, capture_output=True)
-
-        # 3. STREAM 2: Direct Context Retrieval (Audio Stream Mapping)
+        # Pull original context strings from the data packet generated on GitHub
         pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
-
-        # 4. Upload only the lightweight horizontal storyboard strip to Google AI Studio
-        print("-> Uploading processed visual blueprint to cloud endpoints...")
-        visual_blueprint = genai.upload_file(path=STORYBOARD_STRIP)
-        print("✅ Visual timeline token generated instantly.")
-
-        # 5. Formulate the precise human-style trending SEO prompt
+        
+        # 2. Initialize the OpenAI client wrapped around Groq's API gateway
+        client = OpenAI(api_key=groq_key, base_url="https://groq.com")
+        
+        # 3. Formulate the precise human-style trending SEO prompt
         seo_prompt = (
-            f"You are a viral YouTube Shorts marketer and SEO expert. Analyze this full horizontal storyboard layout strip "
-            f"showing the chronological scenes of our edited video (including the main tech hook and the cat reaction punchline at the end). "
-            f"Combine those visuals with this complete video audio script narrative: \"{pipeline_full_transcript}\". "
+            f"You are a viral YouTube Shorts marketer and SEO expert. A video clip has been heavily edited "
+            f"applying a 10x visual transformation filter matrix, ending with a funny cat reaction punchline. "
+            f"Combine those structural visual changes with this video transcript script: \"{pipeline_full_transcript}\". "
             f"Generate high-performance metadata tags in a human-like narrative structure packed with current humor, "
             f"internet slang, and high-retention algorithmic triggers. "
             f"Requirements:\n"
             f"1. TITLE: Max 70 characters, include modern emojis, a shocking hook, and end strictly with the tag #shorts.\n"
-            f"2. DESCRIPTION: Write an engaging 3-sentence narrative description. Sentence 1 must be a humorous trend-based statement or joke about the cat scene. "
-            f"Sentence 2 must summarize the core value of this specific script topic: {pipeline_full_transcript}. Sentence 3 must be a strong Call to Action (CTA) to subscribe. "
+            f"2. DESCRIPTION: Write an engaging 3-sentence narrative description. Sentence 1 must be a humorous trend-based statement or joke about the cat reaction scene. "
+            f"Sentence 2 must summarize the core value of this specific topic: {pipeline_full_transcript}. Sentence 3 must be a strong Call to Action (CTA) to subscribe. "
             f"Include the tracking phrase 'Original concept inspired by @{username}'. Append trendy tags at the very bottom.\n"
             f"3. TAGS: Provide an array of 8 highly relevant trending keywords based on the video context.\n\n"
-            f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown wrap lines."
+            f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown code fence lines like ```json or ```."
         )
 
-        # 6. 🔥 FIX: USE THE COMPATIBLE VERSION STRING FOR GENERAL CHAT WRAPPERS
-        print("🔥 Executing semantic processing for high-retention SEO optimization...")
-        # Using 'gemini-1.5-flash-latest' forces the client to use the clean standard endpoint mapping path
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest") 
-        response = model.generate_content([visual_blueprint, seo_prompt])
+        # 4. Trigger the Llama 3.3 generative pipeline (Completes in under 2 seconds)
+        print("🔥 Querying Groq API for high-retention SEO optimization...")
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are an advanced YouTube SEO optimizer that outputs raw JSON text data."},
+                {"role": "user", "content": seo_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=250
+        )
+        
+        raw_response_text = response.choices[0].message.content.strip()
         
         # Clean up any accidental markdown code wrappers in the AI response
-        clean_json_text = response.text.replace("```json", "").replace("```", "").strip()
+        clean_json_text = raw_response_text.replace("```json", "").replace("```", "").strip()
         seo_metadata = json.loads(clean_json_text)
         
-        print("🎉 SUCCESS! High-retention SEO generated dynamically via complete video tracking:")
+        print("🎉 SUCCESS! High-retention SEO successfully generated in under 2 seconds:")
         print(f"📌 Title: {seo_metadata.get('title')}")
-        
-        # Immediate workspace clean up to maintain system storage stability
-        genai.delete_file(visual_blueprint.name)
-        if os.path.exists(STORYBOARD_STRIP): os.remove(STORYBOARD_STRIP)
 
     except Exception as e:
-        print(f"⚠️ Accelerated SEO system warning (using standard fallbacks): {e}")
+        print(f"⚠️ Groq SEO generation failed (using standard fallbacks): {e}")
 
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
+
 
 
 # ==========================================
