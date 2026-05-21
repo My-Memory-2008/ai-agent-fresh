@@ -244,13 +244,13 @@ print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
 # ==========================================
-# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (FIXED BASE URL)
+# 5b. 🔥 CRASH-PROOF LLAMA 3.3 VIDEO SEO ENGINE (DIRECT HTTP REQUESTS)
 # ==========================================
-print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Groq API...")
+print("🧠 Launching High-Speed Llama 3.3 Video SEO Optimizer via Direct Groq REST API...")
 import json
 import os
+import requests
 from kaggle_secrets import UserSecretsClient
-from openai import OpenAI
 
 # 1. Authenticate with your secure Kaggle secret token
 secrets = UserSecretsClient()
@@ -271,14 +271,10 @@ seo_metadata = {
 
 if groq_key:
     try:
+        # Pull original context strings from the data packet generated on GitHub
         pipeline_full_transcript = pipeline.get("script_text", "A brilliant viral tech hack concept.")
         
-        # 🔥 FIX: Corrected base_url string to point to the correct Groq REST API layer
-        client = OpenAI(
-            api_key=groq_key, 
-            base_url="https://groq.com" # 👈 Removed 'openai/' or extra folder paths
-        )
-        
+        # 2. Set up the exact explicit text payload prompt
         seo_prompt = (
             f"You are a viral YouTube Shorts marketer and SEO expert. A video clip has been heavily edited "
             f"applying a 10x visual transformation filter matrix, ending with a funny cat reaction punchline. "
@@ -294,33 +290,51 @@ if groq_key:
             f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown code fence lines like ```json or ```."
         )
 
-        print("🔥 Querying Groq API for high-retention SEO optimization...")
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
+        # 3. Construct direct HTTP header and data structures
+        # This targets the exact explicit chat completion endpoint layout to bypass 405 blocks
+        url = "https://groq.com"
+        headers = {
+            "Authorization": f"Bearer {groq_key.strip()}",
+            "Content-Type": "application/json"
+        }
+        
+        data_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
                 {"role": "system", "content": "You are an advanced YouTube SEO optimizer that outputs raw JSON text data."},
                 {"role": "user", "content": seo_prompt}
             ],
-            temperature=0.7,
-            max_tokens=250
-        )
+            "temperature": 0.7,
+            "max_tokens": 250
+        }
+
+        # 4. Fire the direct network call over the secure network gateway
+        print("🔥 Dispatching native network request directly to Groq REST servers...")
+        response = requests.post(url, headers=headers, json=data_payload, timeout=20)
         
-        raw_response_text = response.choices[0].message.content.strip()
+        # Check for network response errors
+        response.raise_for_status()
+        response_json = response.json()
+        
+        # Parse the text response out of the raw nested choices dictionary
+        raw_response_text = response_json["choices"][0]["message"]["content"].strip()
         
         # Clean up any accidental markdown code wrappers in the AI response
         clean_json_text = raw_response_text.replace("```json", "").replace("```", "").strip()
         seo_metadata = json.loads(clean_json_text)
         
-        print("🎉 SUCCESS! High-retention SEO successfully generated in under 2 seconds:")
+        print("🎉 SUCCESS! High-retention SEO successfully generated via direct API connection:")
         print(f"📌 Title: {seo_metadata.get('title')}")
 
     except Exception as e:
-        print(f"❌ Groq SEO generation failed (using standard fallbacks): {e}")
+        print(f"❌ Direct Groq REST API connection failed (using standard fallbacks): {e}")
+        # Print raw response text if available for easier log troubleshooting
+        if 'response' in locals() and hasattr(response, 'text'):
+            print(f"📋 Raw Server Diagnostic Trace: {response.text}")
 
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-
 
 
 
