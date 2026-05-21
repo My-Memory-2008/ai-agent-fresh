@@ -242,8 +242,9 @@ if res.returncode != 0:
     raise RuntimeError("FFmpeg Pipeline Failure")
 print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
+
 # ==========================================
-# 5b. 🔥 DUAL-STREAM FULL-VIDEO AI SEO ENGINE (PATCHED MODEL STRING)
+# 5b. 🔥 DUAL-STREAM FULL-VIDEO AI SEO ENGINE (FIXED MODEL ENDPOINT)
 # ==========================================
 print("🧠 Launching Accelerated Full-Video SEO Analyzer via Dual-Stream Tokenization...")
 import json
@@ -306,9 +307,10 @@ if gemini_key:
             f"Return the response STRICTLY as a raw JSON object with keys 'title', 'description', and 'tags'. Do not include markdown wrap lines."
         )
 
-        # 6. 🔥 FIX: USE THE COMPATIBLE FULL MODEL PATH IDENTIFIER TAG STRING
+        # 6. 🔥 FIX: USE THE COMPATIBLE VERSION STRING FOR GENERAL CHAT WRAPPERS
         print("🔥 Executing semantic processing for high-retention SEO optimization...")
-        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash") # 👈 Changed target string to models/
+        # Using 'gemini-1.5-flash-latest' forces the client to use the clean standard endpoint mapping path
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest") 
         response = model.generate_content([visual_blueprint, seo_prompt])
         
         # Clean up any accidental markdown code wrappers in the AI response
@@ -328,7 +330,6 @@ if gemini_key:
 # Save the finalized outputs out to disk for verification reviews
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-
 
 
 # ==========================================
