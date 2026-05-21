@@ -243,9 +243,8 @@ if res.returncode != 0:
     raise RuntimeError("FFmpeg Pipeline Failure")
 print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
-
 # ==========================================
-# 5b. 🔥 BALANCED LLAMA 3.3 VIDEO SEO ENGINE (OFFICIAL GROQ SDK)
+# 5b. 🔥 BALANCED LLAMA 3.3 VIDEO SEO ENGINE (FIXED ARRAY INDEX)
 # ==========================================
 print("🧠 Launching Balanced Llama 3.3 Video SEO Optimizer via Official Groq SDK...")
 import json
@@ -307,7 +306,8 @@ if groq_key:
             max_tokens=300
         )
         
-        raw_response_text = chat_completion.choices.message.content.strip()
+        # 🔥 FIX: Injected '[0]' index tracking array block to correctly extract the output text response string
+        raw_response_text = chat_completion.choices[0].message.content.strip()
         
         # Clean up any accidental markdown wrappers in the AI response text profile
         clean_json_text = raw_response_text.replace("```json", "").replace("```", "").strip()
