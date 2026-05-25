@@ -177,11 +177,21 @@ with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 
 
-
 # ==========================================
 # 4. AI OCR CHECKPOINT: USERNAME WATERMARK REMOVER
 # ==========================================
 print("👁️ Scanning frame layers for creator username text signatures...")
+
+# FORCED MEMORY PURGE: Explicitly garbage collect and terminate any lingering network scraper background loops
+import gc
+try:
+    if 'L' in locals(): del L
+    if 'post' in locals(): del post
+except Exception:
+    pass
+gc.collect()
+torch.cuda.empty_cache()
+
 cap = cv2.VideoCapture(output_path)
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
@@ -306,7 +316,7 @@ try:
     from googleapiclient.http import MediaFileUpload
     
     creds = Credentials(token=None, refresh_token=YT_REFRESH_TOKEN,
-                        token_uri="https://googleapis.com",
+                        token_uri="https://google.com",
                         client_id=YT_CLIENT_ID, client_secret=YT_CLIENT_SECRET,
                         scopes=["https://googleapis.com"])
     if creds.expired: creds.refresh(Request())
