@@ -1,8 +1,8 @@
 # %% [code]
-# %% [code]
 import subprocess
 import sys
-subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
+# Injected tesseract-ocr system packages into your working baseline
+subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg tesseract-ocr > /dev/null", shell=True, check=True)
 
 packages = [
     "requests",
@@ -14,7 +14,9 @@ packages = [
     "google-auth-oauthlib",
     "google-auth-httplib2",
     "instaloader",
-    "edge-tts"
+    "edge-tts",
+    "pytesseract", # Core OCR tracking module
+    "groq"          # Official Groq API client
 ]
 
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q"] + packages)
@@ -24,7 +26,10 @@ print("✅ Dependencies installed. Ready for main script.")
 #!/usr/bin/env python3
 # production_pipeline.py
 # Fully Automated YouTube Shorts Engine: Download → Visual Transformation → Upload → Ledger Update
-import os, json, re, requests, subprocess, time, random, torch
+import os, json, re, requests, subprocess, time, random, torch, asyncio
+import cv2
+import pytesseract
+from pytesseract import Output
 from kaggle_secrets import UserSecretsClient
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -51,6 +56,12 @@ PIPELINE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/r
 QUEUE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/refs/heads/{BRANCH}/reel_queue.json"
 OUTPUT_VIDEO = os.path.join(WORKING_DIR, "final_youtube_short.mp4")
 
+CLEANED_SOURCE_VIDEO = "/kaggle/working/cleaned_source.mp4"
+TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
+EXTRACTED_AUDIO = "/kaggle/working/original_audio.aac"
+NEW_VOICEOVER_MP3 = "/kaggle/working/new_ai_voiceover.mp3"
+SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
+
 os.makedirs(RAW_DIR, exist_ok=True)
 
 # ==========================================
@@ -64,6 +75,7 @@ pipeline = resp.json()
 reel_url = pipeline.get("reel_url")
 shortcode = pipeline.get("shortcode")
 username = pipeline.get("username", "unknown")
+incoming_source_script = pipeline.get("script_text", "Watching this precision should be a full time job.")
 print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 # ==========================================
@@ -104,184 +116,232 @@ with open(output_path, 'wb') as f:
         if chunk: f.write(chunk)
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
+# ==========================================
+# 3b. IN-KAGGLE LLAMA 3.3 SATISFYING COMMENTARY GENERATOR
+# ==========================================
+print("🧠 Launching native Llama 3.3 text-analysis engine through official SDK channels...")
+groq_key = secrets.get_secret("GROQ_API_KEY")
+
+# Safe default fallback settings
+seo_metadata = {
+    "title": "Oddly Satisfying Slicing Challenge! 🤯 #shorts",
+    "description": "Wait for the ending cat reaction loop! #shorts #satisfying",
+    "tags": ["satisfying", "asmr", "shorts"]
+}
+transformative_commentary_script = "Watching this precision should be a full time job. Stick around for the ending, because it is purely therapeutic."
+
+if groq_key:
+    try:
+        from groq import Groq
+        client = Groq(api_key=groq_key.strip())
+        
+        seo_prompt = (
+            f"You are a viral YouTube Shorts creator specializing in Oddly Satisfying and ASMR commentary. "
+            f"A video clip by @{username} is being heavily edited with video filters and finishes with a random funny cat reaction punchline.\n\n"
+            f"Context from source video text: \"{incoming_source_script}\".\n\n"
+            f"Tasks:\n"
+            f"1. SCRIPT_TEXT: Write a fast-paced, highly engaging 14-second human-like commentary (Max 40 words). "
+            f"Use a relatable, humorous tone or a satisfying rating scale. Focus on why the video is mesmerizing, "
+            f"hype up the precision of the clip, and explicitly tell viewers to stick around for the surprise cat reaction loop at the very end.\n"
+            f"2. YOUTUBE_TITLE: Write a clickable title (Max 70 chars) focusing entirely on the satisfying value. End strictly with #shorts.\n"
+            f"3. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty comment about the loop or the cat at the end. "
+            f"Sentence 2 states why this ASMR content is addictive. Sentence 3 is a CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append hashtags.\n"
+            f"4. YOUTUBE_TAGS: Provide an array of 6 trending keywords.\n\n"
+            f"Return response STRICTLY as a raw JSON object with keys 'script_text', 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks."
+        )
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are an advanced YouTube SEO optimizer that outputs raw JSON text data."},
+                {"role": "user", "content": seo_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=350
+        )
+        
+        clean_json_text = chat_completion.choices[0].message.content.strip().replace('```json', '').replace('```', '').strip()
+        ai_seo_data = json.loads(clean_json_text)
+        
+        transformative_commentary_script = ai_seo_data.get('script_text', transformative_commentary_script)
+        seo_metadata = {
+            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+        }
+        print(f"🎉 Llama Generation Verified: \"{transformative_commentary_script}\"")
+    except Exception as e:
+        print(f"⚠️ Groq internal block fallback applied: {e}")
+
+with open(SEO_MANIFEST_PATH, 'w') as f:
+    json.dump(seo_metadata, f, indent=2)
+
+
 
 # ==========================================
-# 4 & 5. T4 GPU AUDIO EXTRACTION, SPEECH TRANSCRIPTION & SPEED-SYNC RENDERING
+# 4. AI OCR CHECKPOINT: USERNAME WATERMARK REMOVER
 # ==========================================
-print("🚀 Initiating dynamic dependency checks & audio extraction sequence...")
-import subprocess
-import sys
-import os
-import random
-import asyncio
+print("👁️ Scanning frame layers for creator username text signatures...")
+cap = cv2.VideoCapture(output_path)
+frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+text_watermark_box = None
+clean_username_target = username.lower().strip()
 
-# 4a. Dynamic Dependency Injector (Ensures SpeechRecognition is installed on boot)
-try:
-    import speech_recognition as sr
-except ImportError:
-    print("-> speech_recognition package missing. Forcing local environment injection...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "SpeechRecognition"])
-    import speech_recognition as sr
-    print("✅ Package loaded successfully.")
+for idx in sample_frames:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    ret, frame = cap.read()
+    if not ret: continue
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
+    
+    for i in range(len(ocr_data['text'])):
+        detected_word = str(ocr_data['text'][i]).lower().strip()
+        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
+            x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
+            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
+            break
+    if text_watermark_box: break
+cap.release()
 
-# Define absolute workspace audio tracking paths
-EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
-EXTRACTED_AUDIO_WAV = "/kaggle/working/extracted_audio.wav"
-NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
+if text_watermark_box:
+    x, y, w, h = text_watermark_box
+    print(f"🎯 Watermark Matched! Scrubbing region -> X:{x}, Y:{y}, W:{w}, H:{h}")
+    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}", "-c:a", "copy", CLEANED_SOURCE_VIDEO], check=True, capture_output=True)
+    PROCESSING_INPUT_VIDEO = CLEANED_SOURCE_VIDEO
+else:
+    print("✨ Clean Layout Check! Bypassing OCR erasure step.")
+    PROCESSING_INPUT_VIDEO = output_path
 
-# 4b. Extract the true audio track from the downloaded Reel via FFmpeg
-print("-> Isolating original audio track matrix...")
-subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
-
-# Convert to standard uncompressed WAV format for the local transcription engine
-subprocess.run(["ffmpeg", "-y", "-i", EXTRACTED_AUDIO_MP3, EXTRACTED_AUDIO_WAV], check=True, capture_output=True)
-
-# 4c. Transcribe the original speech using local CPU execution (Bypasses CUDA bugs)
-print("-> Initializing CPU speech-to-text transcription engine...")
-recognizer = sr.Recognizer()
-extracted_text = ""
-
-try:
-    with sr.AudioFile(EXTRACTED_AUDIO_WAV) as source:
-        audio_data = recognizer.record(source)
-        # Uses Google's free public web speech API gateway to extract exact words
-        extracted_text = recognizer.recognize_google(audio_data)
-    print(f"📝 SUCCESS! Transcribed original video script: \"{extracted_text}\"")
-except Exception as e:
-    print(f"⚠️ Speech API failed or audio was silent: {e}")
-    # Fallback only if the original audio track cannot be transcribed
-    extracted_text = "Check out this amazing video!"
-    print(f"📋 Using safety text fallback: \"{extracted_text}\"")
-
-# 4d. Run Edge-TTS natively to build the professional human voice file
-print("-> Querying Edge-TTS cloud service for professional narration...")
-sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
-selected_voice = "en-US-ChristopherNeural"
-
-async def generate_edge_voice():
-    import edge_tts
-    communicate = edge_tts.Communicate(sanitized_text, selected_voice)
-    await communicate.save(NEW_VOICEOVER)
-
-asyncio.run(generate_edge_voice())
-print("✅ Professional Edge-TTS voice track generated.")
-
-# 4e. DYNAMIC SPEED CALCULATION ENGINE
-print("⚡ Calculating precise speed normalization adjustments...")
-
+# ==========================================
+# 4b. NATIVE AUDIO GENERATION & TIMELINE TRIMMING
+# ==========================================
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
     return float(subprocess.check_output(cmd, shell=True).decode().strip())
 
-# Fetch durations down to the millisecond
-orig_duration = get_duration(output_path)
-tts_duration = get_duration(NEW_VOICEOVER)
+orig_duration = get_duration(PROCESSING_INPUT_VIDEO)
+trim_target_duration = max(2.0, orig_duration - 4.0) 
+print(f"✂️ Trimming target source video timeline boundaries down to: {trim_target_duration:.2f}s")
 
-# Calculate exactly how much we need to speed up/slow down the TTS voice to match the video length
-speed_factor = tts_duration / orig_duration
+subprocess.run(["ffmpeg", "-y", "-i", PROCESSING_INPUT_VIDEO, "-t", str(trim_target_duration), "-c:v", "copy", "-c:a", "copy", TRIMMED_VIDEO], check=True, capture_output=True)
 
-# FFmpeg atempo boundaries rules: Must stay between 0.5 and 2.0
+print("🎙️ Querying Edge-TTS with clean commentary copy...")
+async def generate_edge_voice():
+    import edge_tts
+    communicate = edge_tts.Communicate(transformative_commentary_script, "en-US-ChristopherNeural")
+    await communicate.save(NEW_VOICEOVER_MP3)
+
+if os.path.exists(NEW_VOICEOVER_MP3): os.remove(NEW_VOICEOVER_MP3)
+asyncio.run(generate_edge_voice())
+
+while not os.path.exists(NEW_VOICEOVER_MP3) or os.path.getsize(NEW_VOICEOVER_MP3) == 0:
+    time.sleep(0.5)
+print("✅ Verified clean native voiceover tracking asset saved.")
+
+# ==========================================
+# 4c. DATASET CAT REACTION LOADING & SPEED CALCULATOR
+# ==========================================
+cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
+if os.path.exists(cat_dataset_dir):
+    valid_clips = [os.path.join(root, f) for root, _, files in os.walk(cat_dataset_dir) for f in files if f.endswith('.mp4')]
+    chosen_cat_file = random.choice(valid_clips) if valid_clips else PROCESSING_INPUT_VIDEO
+else:
+    chosen_cat_file = PROCESSING_INPUT_VIDEO
+print(f"🐱 Loaded Dataset Reaction Asset: {chosen_cat_file}")
+
+tts_duration = get_duration(NEW_VOICEOVER_MP3)
+total_new_duration = trim_target_duration + 4.0 
+speed_factor = tts_duration / total_new_duration
 if speed_factor < 0.5: speed_factor = 0.5
 if speed_factor > 2.0: speed_factor = 2.0
-
-print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
-print(f"⏱️ Raw Voiceover Duration: {tts_duration:.2f}s")
 print(f"⏩ Required Voiceover Speed Factor: {speed_factor:.2f}x")
 
 # ==========================================
-# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
+# 5. GPU-ACCELERATED PROCEDURAL RENDERING
 # ==========================================
-print("🎬 Stacking randomized filters and rendering vertical layout via NVIDIA NVENC GPU...")
-
+print("🎬 Rendering multi-layer canvas via NVIDIA NVENC GPU...")
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
-    "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1':r='0/0 0.5/0.42 1/1':b='0/0 0.4/0.58 1/1'",
+    "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
     "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
 ]
-chosen_style = random.choice(styles)
-
 effects = [
     "zoompan=z='min(zoom+0.003,1.12)':x='iw/2-iw/zoom/2+sin(time*2.5)*6':y='ih/2-ih/zoom/2':d=1",
     "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
     "hue='H=2.5*PI*t:s=1.03'"
 ]
-chosen_effect = random.choice(effects)
+chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main];"
-    f"[bg][main]overlay=(W-w)/2:(H-h)/2[merged];"
-    f"[merged]noise=alls=7:allf=t+u[grained];"
+    f"[bg][main]overlay=(W-w)/2:(H-h)/2,scale=1080:1920,setsar=1[processed_source];"
+    f"[2:v]scale=1080:1920,setsar=1[processed_cat];"
+    f"[processed_source][processed_cat]concat=n=2:v=1:a=0[merged_video];"
+    f"[merged_video]noise=alls=7:allf=t+u[grained];"
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v];"
     f"[1:a]atempo={speed_factor}[speed_synced_audio]"
 )
 
-# GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
 ffmpeg_cmd = [
-    "ffmpeg", "-y", 
-    "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
-    "-i", output_path,          # Original video matrix layout
-    "-i", NEW_VOICEOVER,         # Raw Edge-TTS track
-    "-filter_complex", filter_complex_string,
-    "-map", "[v]", 
-    "-map", "[speed_synced_audio]", # Map the speed-corrected narration track
-    "-c:v", "h264_nvenc",       # Force NVIDIA NVENC Hardware Video Encoder GPU
-    "-preset", "p4",            # High-performance hardware preset mapping
-    "-cq", "20",                # Maintain perfect clarity for text and borders
-    "-c:a", "aac",              
-    "-b:a", "128k",
-    "-shortest",                # Ensure no trailing dead space
+    "ffmpeg", "-y", "-hwaccel", "cuda", 
+    "-i", TRIMMED_VIDEO, "-i", NEW_VOICEOVER_MP3, "-i", chosen_cat_file,
+    "-filter_complex", filter_complex_string, "-map", "[v]", "-map", "[speed_synced_audio]",
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-b:a", "128k", "-shortest",
     OUTPUT_VIDEO
 ]
-
-res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-if res.returncode != 0:
-    print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
-    raise RuntimeError("FFmpeg Pipeline Failure")
-print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
-
+subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+print(f"🚀 GPU Compilation finished successfully: {OUTPUT_VIDEO}")
 
 # ==========================================
-# 5. UPLOAD TO YOUTUBE
+# 6. UPLOAD TO YOUTUBE SHORTS FEED
 # ==========================================
-print("📤 Uploading to YouTube...")
+print("📤 Uploading directly to YouTube Shorts engine feed...")
 yt_url = None
 upload_success = False
+
 try:
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    
     creds = Credentials(token=None, refresh_token=YT_REFRESH_TOKEN,
-                        token_uri="https://oauth2.googleapis.com/token",
+                        token_uri="https://googleapis.com",
                         client_id=YT_CLIENT_ID, client_secret=YT_CLIENT_SECRET,
-                        scopes=["https://www.googleapis.com/auth/youtube.upload"])
+                        scopes=["https://googleapis.com"])
     if creds.expired: creds.refresh(Request())
     
     youtube = build("youtube", "v3", credentials=creds)
     body = {
-        "snippet": {"title": pipeline.get("youtube_title", "AI Tip #shorts"),
-                    "description": pipeline.get("youtube_description", ""),
-                    "tags": pipeline.get("youtube_tags", ["AI", "Shorts"])},
-        "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False}
+        "snippet": {
+            "title": seo_metadata["title"],
+            "description": seo_metadata["description"] + "\n\n#shorts #asmr #satisfying #viral",
+            "tags": seo_metadata["tags"] + ["shorts", "ShortsFeed"],
+            "categoryId": "22"
+        },
+        "status": {
+            "privacyStatus": "public", 
+            "selfDeclaredMadeForKids": False
+        }
     }
     request = youtube.videos().insert(part=",".join(body.keys()), body=body, media_body=MediaFileUpload(OUTPUT_VIDEO, chunksize=-1, resumable=True))
     response = request.execute()
-    yt_url = f"https://www.youtube.com/watch?v={response['id']}"
+    yt_url = f"https://youtube.com{response['id']}"
     upload_success = True
-    print(f"🎉 YouTube Success: {yt_url}")
+    print(f"🎉 YouTube Shorts Success: {yt_url}")
 except Exception as e:
     print(f"⚠️ Upload failed (video saved locally): {e}")
 
 # ==========================================
-# 6. UPDATE GITHUB LEDGER
+# 7. UPDATE GITHUB LEDGER
 # ==========================================
-print("🔄 Updating GitHub ledger...")
+print("🔄 Updating GitHub ledger tracking lines...")
 try:
-    led_url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/reel_queue.json"
+    from datetime import datetime, timezone
+    led_url = f"https://github.com{GITHUB_USER}/{GITHUB_REPO}/contents/reel_queue.json"
     headers_gh = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     resp_gh = requests.get(led_url, headers=headers_gh)
     current = json.loads(requests.utils.b64decode(resp_gh.json()["content"]).decode())
-    
-    # Safely convert time formats
-    from datetime import datetime, timezone
     
     for entry in current.get('processed', []):
         if entry['url'] == reel_url and entry.get('status') == 'in_progress':
@@ -292,8 +352,8 @@ try:
             
     new_content = requests.utils.b64encode(json.dumps(current).encode()).decode()
     requests.put(led_url, headers=headers_gh, json={"message": "Auto: Updated reel status", "content": new_content, "sha": resp_gh.json()["sha"]})
-    print("✅ Ledger updated.")
+    print("✅ Ledger successfully updated.")
 except Exception as e:
     print(f"⚠️ Ledger warning: {e}")
 
-print("\n🏆 PIPELINE COMPLETE!")
+print("\n🏆 IN-KAGGLE PRODUCTION PIPELINE COMPLETE!")
