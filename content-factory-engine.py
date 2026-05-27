@@ -320,30 +320,81 @@ if res.returncode != 0:
 print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
-# ==========================================
-# 6. UPLOAD TO YOUTUBE SHORTS FEED
-# ==========================================
-print("🔄 Updating GitHub ledger...")
-try:
-    led_url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/reel_queue.json"
-    headers_gh = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    resp_gh = requests.get(led_url, headers=headers_gh)
-    current = json.loads(requests.utils.b64decode(resp_gh.json()["content"]).decode())
-    
-    # Safely convert time formats
-    from datetime import datetime, timezone
-    
-    for entry in current.get('processed', []):
-        if entry['url'] == reel_url and entry.get('status') == 'in_progress':
-            entry['status'] = 'success' if upload_success else 'failed'
-            if yt_url: entry['youtube_url'] = yt_url
-            entry['completed_at'] = datetime.now(timezone.utc).isoformat()
-            break
-            
-    new_content = requests.utils.b64encode(json.dumps(current).encode()).decode()
-    requests.put(led_url, headers=headers_gh, json={"message": "Auto: Updated reel status", "content": new_content, "sha": resp_gh.json()["sha"]})
-    print("✅ Ledger updated.")
-except Exception as e:
-    print(f"⚠️ Ledger warning: {e}")
 
-print("\n🏆 PIPELINE COMPLETE!")
+# ==========================================
+# 6.独立 YOUTUBE SHORTS UPLOAD MATRIX
+# ==========================================
+print("📤 Connecting to YouTube upload gateway node...")
+
+try:
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    
+    # Establish direct secure handshake credentials using your vault secrets
+    creds = Credentials(
+        token=None, 
+        refresh_token=YT_REFRESH_TOKEN,
+        token_uri="https://googleapis.com",
+        client_id=YT_CLIENT_ID, 
+        client_secret=YT_CLIENT_SECRET,
+        scopes=["https://googleapis.com"]
+    )
+    
+    # Force access token refresh if the current signature session is expired
+    if creds.expired: 
+        creds.refresh(Request())
+    
+    # Initialize the official YouTube service client framework
+    youtube = build("youtube", "v3", credentials=creds)
+    
+    # Map video variables out of the local SEO dictionary object saved by Llama
+    upload_title = seo_metadata.get("title", "Oddly Satisfying Slicing Loop! #shorts")
+    upload_desc = seo_metadata.get("description", "Check out this therapeutic loop!") + "\n\n#shorts #asmr #satisfying #viral"
+    upload_tags = seo_metadata.get("tags", ["satisfying", "asmr", "shorts"]) + ["shorts", "ShortsFeed"]
+    
+    body = {
+        "snippet": {
+            "title": upload_title,
+            "description": upload_desc,
+            "tags": upload_tags,
+            "categoryId": "22"  # Category 22 maps to 'People & Blogs' (Default Shorts)
+        },
+        "status": {
+            "privacyStatus": "public",           # Sets visibility live to the public feed
+            "selfDeclaredMadeForKids": False     # Safe setting for monetization
+        }
+    }
+    
+    print(f"📡 Uploading content package -> File: {os.path.basename(OUTPUT_VIDEO)}")
+    print(f"📌 Meta Title Locked: \"{upload_title}\"")
+    
+    # Create the media upload controller stream pointer
+    media = MediaFileUpload(
+        OUTPUT_VIDEO, 
+        mimetype="video/mp4",
+        chunksize=-1,         # Handles memory layout dynamically 
+        resumable=True
+    )
+    
+    request = youtube.videos().insert(
+        part=",".join(body.keys()), 
+        body=body, 
+        media_body=media
+    )
+    
+    # Fire data transfer across Google's upload load-balancers
+    response = request.execute()
+    
+    # Build complete public clip location routing path link string
+    yt_url = f"https://youtube.com{response['id']}"
+    upload_success = True
+    print(f"🎉 SUCCESS! Video published live to your channel Shorts shelf: {yt_url}")
+
+except Exception as youtube_error:
+    upload_success = False
+    print(f"❌ YouTube Upload System Fault: {youtube_error}")
+    # Local diagnostic footprint layer trace map tracking print blocks
+    if 'response' in locals() and hasattr(response, 'text'):
+        print(f"📋 Diagnostic Server Response Payload: {response.text}")
