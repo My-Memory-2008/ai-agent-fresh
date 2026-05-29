@@ -105,45 +105,26 @@ print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output
 
 
 # ==========================================
-# 4 & 5. T4 GPU ORIGINAL AUDIO EXTRACTION & VIDEO TIMELINE MERGE
+# 4 & 5. FREEZE-PROOF TWO-STAGE GPU CONCAT COMPILER
 # ==========================================
-print("🚀 Initiating original audio track isolation and cat timeline sync...")
+print("🚀 Initiating freeze-proof multi-video timeline assembly stack...")
 import subprocess
 import sys
 import os
 import random
 
-# Define working directory path variables
-EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
-TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
+# Define separate internal rendering layer file paths
+EDITED_SOURCE_MP4 = "/kaggle/working/edited_source_only.mp4"
+STANDARDIZED_CAT_MP4 = "/kaggle/working/standardized_cat.mp4"
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
     return float(subprocess.check_output(cmd, shell=True).decode().strip())
 
-# 1. Isolate the original unmodified audio track from the downloaded video source via FFmpeg
-print("-> Isolating original untampered audio track matrix...")
-subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
-
-# 2. Trim the source video clip timeline down by 4 seconds to make space for the reaction punchline
-orig_duration = get_duration(output_path)
-trim_target_duration = max(2.0, orig_duration - 4.0) 
-print(f"✂️ Trimming target source video timeline boundaries down to: {trim_target_duration:.2f}s")
-subprocess.run(["ffmpeg", "-y", "-i", output_path, "-t", str(trim_target_duration), "-c:v", "copy", "-c:a", "copy", TRIMMED_VIDEO], check=True, capture_output=True)
-
-# 3. Load random cat reaction video clip from your mounted Kaggle Input dataset folder
-cat_dataset_dir = "/kaggle/input/cat-reactions-vault"
-if os.path.exists(cat_dataset_dir):
-    valid_clips = [os.path.join(root, f) for root, _, files in os.walk(cat_dataset_dir) for f in files if f.endswith('.mp4')]
-    chosen_cat_file = random.choice(valid_clips) if valid_clips else output_path
-else:
-    chosen_cat_file = output_path
-print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
-
-# ==========================================
-# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK (ORIGINAL SOUND + CAT INJECTED)
-# ==========================================
-print("🎬 Rendering multi-layer canvas via NVIDIA NVENC GPU...")
+# ------------------------------------------
+# STAGE 1: RENDER ORIGINAL VIDEO IN VERTICAL MATRIX
+# ------------------------------------------
+print("🎬 Stage 1: Applying 9:16 canvas transformations to original video...")
 
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
@@ -159,42 +140,90 @@ effects = [
 ]
 chosen_effect = random.choice(effects)
 
-# Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
-# GRAPH ENGINE LAYOUT: Scales background/main shots cleanly, links the cat video file natively at the end, and overlays the watermark text
-filter_complex_string = (
+orig_duration = get_duration(output_path)
+trim_target_duration = max(2.0, orig_duration - 4.0)
+print(f"✂️ Trimming target source video timeline boundaries down to: {trim_target_duration:.2f}s")
+
+# Setup vertical template container layout graph strings safely
+filter_complex_stage1 = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
-    f"[2:v]scale=1080:1920,setsar=1[processed_cat];"
-    f"[processed_source][processed_cat]concat=n=2:v=1:a=0[merged_video];"
-    f"[merged_video]noise=alls=7:allf=t+u[grained];"
+    f"[processed_source]noise=alls=7:allf=t+u[grained];"
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
-# GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
-ffmpeg_cmd = [
-    "ffmpeg", "-y", 
-    "-hwaccel", "cuda",             # Initialize CUDA hardware acceleration gates
-    "-i", TRIMMED_VIDEO,            # Trimmed source video canvas (Index 0)
-    "-i", EXTRACTED_AUDIO_MP3,      # Original isolated loop audio track (Index 1)
-    "-i", chosen_cat_file,          # Kaggle dataset cat reaction punchline (Index 2)
-    "-filter_complex", filter_complex_string,
-    "-map", "[v]", 
-    "-map", "1:a",                  # Maps your original satisfying sound track directly across the rendering canvas
-    "-c:v", "h264_nvenc",           # Force NVIDIA NVENC Hardware Video Encoder GPU
-    "-preset", "p4",                # High-performance hardware preset mapping
-    "-cq", "20",                    # Maintain perfect clarity for text and borders
-    "-c:a", "aac",              
-    "-b:a", "128k",
-    "-shortest",                    # Cuts off trailing audio timeline elements when video files terminate
+ffmpeg_stage1 = [
+    "ffmpeg", "-y", "-hwaccel", "cuda", 
+    "-i", output_path,          
+    "-t", str(trim_target_duration), # Safely clips the timeline loop right inside Stage 1 processing
+    "-filter_complex", filter_complex_stage1, 
+    "-map", "[v]", "-map", "0:a?", 
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", 
+    "-c:a", "aac", "-b:a", "128k",
+    EDITED_SOURCE_MP4
+]
+
+res1 = subprocess.run(ffmpeg_stage1, capture_output=True, text=True)
+if res1.returncode != 0:
+    print(f"❌ Stage 1 Render crashed: {res1.stderr}")
+    raise RuntimeError("FFmpeg Stage 1 Failure")
+print("✅ Stage 1 Complete: Vertical visual layouts processed successfully.")
+
+# ------------------------------------------
+# STAGE 2: SELECT AND STANDARDIZE CAT REACTION VIDEO FILE
+# ------------------------------------------
+cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
+if os.path.exists(cat_dataset_dir):
+    valid_clips = [os.path.join(root, f) for root, _, files in os.walk(cat_dataset_dir) for f in files if f.endswith('.mp4')]
+    chosen_cat_file = random.choice(valid_clips) if valid_clips else output_path
+else:
+    chosen_cat_file = output_path
+print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
+
+print("⚙️ Stage 2: Standardizing cat video dimensions and padding silent audio...")
+# Fixes freezes by forcing the cat clip to match your edited video resolution and creating a silent audio stream
+ffmpeg_stage2 = [
+    "ffmpeg", "-y", "-hwaccel", "cuda",
+    "-i", chosen_cat_file,
+    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", 
+    "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
+    "-map", "[v]", "-map", "1:a", 
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20",
+    "-c:a", "aac", "-b:a", "128k", "-shortest",
+    STANDARDIZED_CAT_MP4
+]
+
+res2 = subprocess.run(ffmpeg_stage2, capture_output=True, text=True)
+if res2.returncode != 0:
+    print(f"❌ Stage 2 Audio/Video Standardization crashed: {res2.stderr}")
+    raise RuntimeError("FFmpeg Stage 2 Failure")
+
+# ------------------------------------------
+# STAGE 3: MERGE EDITED VIDEO + CAT PUNCHLINE LIVE
+# ------------------------------------------
+print("🤝 Stage 3: Merging video timelines directly via rapid stream copy container links...")
+
+concat_list_path = "/kaggle/working/concat_list.txt"
+with open(concat_list_path, "w") as f:
+    f.write(f"file '{EDITED_SOURCE_MP4}'\n")
+    f.write(f"file '{STANDARDIZED_CAT_MP4}'\n")
+
+# Rapid non-transcoded copy merge takes under 0.5 seconds because parameters match perfectly
+ffmpeg_stage3 = [
+    "ffmpeg", "-y",
+    "-f", "concat", "-safe", "0",
+    "-i", concat_list_path,
+    "-c", "copy", 
     OUTPUT_VIDEO
 ]
 
-res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-if res.returncode != 0:
-    print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
-    raise RuntimeError("FFmpeg Pipeline Failure")
-print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
+res3 = subprocess.run(ffmpeg_stage3, capture_output=True, text=True)
+if res3.returncode != 0:
+    print(f"❌ Stage 3 Concat Link execution crashed: {res3.stderr}")
+    raise RuntimeError("FFmpeg Stage 3 Failure")
+
+print(f"🎉 SUCCESS! Fully compiled video ready for publication: {OUTPUT_VIDEO}")
 
 
 
