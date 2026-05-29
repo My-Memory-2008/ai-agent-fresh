@@ -104,41 +104,77 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
-
 # ==========================================
-# 4 & 5. TWO-STAGE GPU RENDERING COMPILER (FULL TIMELINE + SOUND SELECTION)
+# 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
-print("🚀 Initiating timeline assembly stack with full video lengths and combined sounds...")
-import subprocess
-import sys
-import os
-import random
+print("🚀 Step 1: Initiating full visual editing transformation canvas...")
 
-# Define separate internal rendering layer file paths
-EDITED_SOURCE_MP4 = "/kaggle/working/edited_source_only.mp4"
-STANDARDIZED_CAT_MP4 = "/kaggle/working/standardized_cat.mp4"
+# Define internal rendering layer workspace file paths explicitly
+EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
+STANDARDIZED_CAT_ONLY = "/kaggle/working/standardized_cat_only.mp4"
+OUTPUT_VIDEO = "/kaggle/working/final_youtube_short.mp4"
 
-# ------------------------------------------
-# STAGE 1: RENDER ORIGINAL VIDEO IN FULL LENGTH
-# ------------------------------------------
-print("🎬 Stage 1: Applying 9:16 canvas transformations to original video...")
+# FORCED MEMORY PURGE: Clean background scraper footprints before launching heavy GPU render steps
+import gc
+try:
+    if 'L' in locals(): del L
+    if 'post' in locals(): del post
+except Exception:
+    pass
+gc.collect()
+torch.cuda.empty_cache()
 
+import cv2
+import pytesseract
+from pytesseract import Output
+
+# --- AI OCR CHECKPOINT: USERNAME WATERMARK REMOVER ---
+print("👁️ Scanning frame layers for creator username text signatures...")
+cap = cv2.VideoCapture(output_path)
+frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+text_watermark_box = None
+clean_username_target = username.lower().strip()
+
+for idx in sample_frames:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    ret, frame = cap.read()
+    if not ret: continue
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
+    
+    for i in range(len(ocr_data['text'])):
+        detected_word = str(ocr_data['text'][i]).lower().strip()
+        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
+            x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
+            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
+            break
+    if text_watermark_box: break
+cap.release()
+
+if text_watermark_box:
+    x, y, w, h = text_watermark_box
+    print(f"🎯 Watermark Matched! Scrubbing region -> X:{x}, Y:{y}, W:{w}, H:{h}")
+    CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
+    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}", "-c:a", "copy", CLEAN_INPUT_STAGE1], check=True, capture_output=True)
+else:
+    print("✨ Clean Layout Check! Bypassing OCR erasure step.")
+    CLEAN_INPUT_STAGE1 = output_path
+
+# --- APPLY 9:16 PORTRAIT VISUAL EDITING FILTER STACK ---
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
     "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
 ]
-chosen_style = random.choice(styles)
-
 effects = [
     "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
     "hue='H=0.1*PI*t:s=1.03'",
     "eq=contrast=1.1:brightness=0.02:saturation=1.05"
 ]
-chosen_effect = random.choice(effects)
+chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# Setup vertical template container layout graph strings safely
-filter_complex_stage1 = (
+filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
@@ -146,26 +182,28 @@ filter_complex_stage1 = (
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
-# FIXED: Removed the '-t' trimming parameter to process your original downloaded clip at its full length
-ffmpeg_stage1 = [
+# Render step 1: Formats your oddly satisfying clip natively to vertical frames with matching sample rates
+ffmpeg_editing = [
     "ffmpeg", "-y", "-hwaccel", "cuda", 
-    "-i", output_path,          
-    "-filter_complex", filter_complex_stage1, 
-    "-map", "[v]", "-map", "0:a?", 
+    "-i", CLEAN_INPUT_STAGE1,          
+    "-filter_complex", filter_complex_editing, 
+    "-map", "[v]", "-map", "0:a?",      
     "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", 
-    "-c:a", "aac", "-b:a", "128k",
-    EDITED_SOURCE_MP4
+    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p",
+    EDITED_SOURCE_ONLY
 ]
 
-res1 = subprocess.run(ffmpeg_stage1, capture_output=True, text=True)
+res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
 if res1.returncode != 0:
-    print(f"❌ Stage 1 Render crashed: {res1.stderr}")
-    raise RuntimeError("FFmpeg Stage 1 Failure")
-print("✅ Stage 1 Complete: Full-length vertical visual layouts processed successfully.")
+    print(f"❌ Editing Transformation phase crashed: {res1.stderr}")
+    raise RuntimeError("FFmpeg Editing Canvas Failure")
+print("✅ Step 1 Complete: Video file fully edited at full length with original sound.")
 
-# ------------------------------------------
-# STAGE 2: SELECT AND STANDARDIZE THE CAT REACTION AUDIO/VIDEO SIGNATURES
-# ------------------------------------------
+# ==========================================
+# 5. STEP 2: LOAD AND STANDARDIZE THE CAT VIDEO CLIP NEXT
+# ==========================================
+print("🎬 Step 2: Selecting random reaction clip and matching codec parameters exactly...")
+
 cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
 if os.path.exists(cat_dataset_dir):
     valid_clips = [os.path.join(root, f) for root, _, files in os.walk(cat_dataset_dir) for f in files if f.endswith('.mp4')]
@@ -174,49 +212,48 @@ else:
     chosen_cat_file = output_path
 print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
 
-print("⚙️ Stage 2: Standardizing cat video dimensions and maintaining its original audio...")
-# FIXED: Removed 'anullsrc' and mapped '0:a?' to retain the cat video's original raw sound track completely unmuted
-ffmpeg_stage2 = [
+# Enforces identical properties (yuv420p color palette, 44100Hz dual audio channels) to prevent any stitching errors
+ffmpeg_standardize_cat = [
     "ffmpeg", "-y", "-hwaccel", "cuda",
     "-i", chosen_cat_file,
     "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
     "-map", "[v]", "-map", "0:a?", 
     "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20",
-    "-c:a", "aac", "-b:a", "128k",
-    STANDARDIZED_CAT_MP4
+    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p",
+    STANDARDIZED_CAT_ONLY
 ]
 
-res2 = subprocess.run(ffmpeg_stage2, capture_output=True, text=True)
+res2 = subprocess.run(ffmpeg_standardize_cat, capture_output=True, text=True)
 if res2.returncode != 0:
-    print(f"❌ Stage 2 Audio/Video Standardization crashed: {res2.stderr}")
-    raise RuntimeError("FFmpeg Stage 2 Failure")
-print("✅ Stage 2 Complete: Cat reaction audio and video parameters successfully scaled.")
+    print(f"❌ Cat video format standardization crashed: {res2.stderr}")
+    raise RuntimeError("FFmpeg Cat Standardization Failure")
+print("✅ Cat video standardized successfully.")
 
-# ------------------------------------------
-# STAGE 3: DIRECT CONCAT JOIN (INSTANT SPEED-COPY LAYER)
-# ------------------------------------------
-print("🤝 Stage 3: Merging video timelines directly via rapid stream copy container links...")
+# ==========================================
+# 5b. STEP 3: DIRECT CONCAT JOIN (INSTANT SPEED-COPY BLOCK)
+# ==========================================
+print("🤝 Step 3: Stitching cat reaction to the end of the fully edited video timeline...")
 
+# Safe demuxer container listing bypasses filter graph freezes completely
 concat_list_path = "/kaggle/working/concat_list.txt"
 with open(concat_list_path, "w") as f:
-    f.write(f"file '{EDITED_SOURCE_MP4}'\n")
-    f.write(f"file '{STANDARDIZED_CAT_MP4}'\n")
+    f.write(f"file '{EDITED_SOURCE_ONLY}'\n")
+    f.write(f"file '{STANDARDIZED_CAT_ONLY}'\n")
 
-# Connects your edited clip and your unmuted cat video back-to-back in under 0.2 seconds via native stream duplication
-ffmpeg_stage3 = [
+# Connects the clips back-to-back using raw stream copies in under 0.2 seconds
+ffmpeg_concat = [
     "ffmpeg", "-y",
     "-f", "concat", "-safe", "0",
     "-i", concat_list_path,
-    "-c", "copy", 
+    "-c", "copy", # Fast container copy prevents background re-rendering hangs
     OUTPUT_VIDEO
 ]
 
-res3 = subprocess.run(ffmpeg_stage3, capture_output=True, text=True)
+res3 = subprocess.run(ffmpeg_concat, capture_output=True, text=True)
 if res3.returncode != 0:
-    print(f"❌ Stage 3 Concat Link execution crashed: {res3.stderr}")
-    raise RuntimeError("FFmpeg Stage 3 Failure")
-
-print(f"🎉 SUCCESS! Fully compiled video ready for publication: {OUTPUT_VIDEO}")
+    print(f"❌ Timeline merger phase crashed: {res3.stderr}")
+    raise RuntimeError("FFmpeg Concat Timeline Failure")
+print(f"🎉 SUCCESS! Video completely compiled with no freezes or length errors: {OUTPUT_VIDEO}")
 
 
 
