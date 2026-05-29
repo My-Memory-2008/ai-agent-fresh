@@ -13,7 +13,8 @@ packages = [
     "google-auth-oauthlib",
     "google-auth-httplib2",
     "instaloader",
-    "edge-tts"
+    "edge-tts",
+    "groq"
 ]
 
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q"] + packages)
@@ -203,6 +204,70 @@ if res1.returncode != 0:
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 print("✅ Step 1 Complete: Visual layers processed successfully.")
 
+
+
+# ==========================================
+# 4b. INJECTED FEATURE: LLAMA 3.3 HIGH-PERFORMANCE SEO OPTIMIZER
+# ==========================================
+
+SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
+
+print("🧠 Launching Llama 3.3 algorithmic text-analysis via Groq Cloud Gateway...")
+groq_key = secrets.get_secret("GROQ_API_KEY")
+
+# Resilient default fallback dictionaries to protect execution threads from API limits
+seo_metadata = {
+    "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
+    "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
+    "tags": ["satisfying", "asmr", "shorts", "relaxing"]
+}
+
+if groq_key:
+    try:
+        from groq import Groq
+        client = Groq(api_key=groq_key.strip())
+        
+        # Algorithmic engine prompt engineering optimized for maximum YouTube Short Feed placement metrics
+        seo_prompt = (
+            f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
+            f"An engaging video clip by creator @{username} has just been transformed into an edited vertical loop canvas. "
+            f"A funny cat reaction video punchline will be attached right to the end of the clip.\n\n"
+            f"Tasks:\n"
+            f"1. YOUTUBE_TITLE: Write a clickable title (Max 65 characters) focusing entirely on high-relevance satisfying value. End strictly with #shorts.\n"
+            f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about the loop or the cat reaction at the end. "
+            f"Sentence 2 states why this unique ASMR loop content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
+            f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords in this niche.\n\n"
+            f"Return response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks or introductory text."
+        )
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a precise YouTube SEO generation microservice that outputs data exclusively as raw JSON objects."},
+                {"role": "user", "content": seo_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.65,
+            max_tokens=250
+        )
+        
+        # Clean response boundaries of potential markdown wrappers cleanly before unpacking
+        clean_json_text = chat_completion.choices[0].message.content.strip().replace('```json', '').replace('```', '').strip()
+        ai_seo_data = json.loads(clean_json_text)
+        
+        seo_metadata = {
+            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+        }
+        print(f"🎉 Llama SEO Matrix Generation Verified: \"{seo_metadata['title']}\"")
+    except Exception as e:
+        print(f"⚠️ Groq analyzer fallback activated (API connection bypass): {e}")
+
+# Save the generated metadata map to workspace files for Section 6 upload mappings
+with open(SEO_MANIFEST_PATH, 'w') as f:
+    json.dump(seo_metadata, f, indent=2)
+
+
 # ==========================================
 # 5. STEP 2: SELECT AND CONVERT THE CAT VIDEO STRUCTURE
 # ==========================================
@@ -297,9 +362,12 @@ try:
     
     youtube = build("youtube", "v3", credentials=creds)
     body = {
-        "snippet": {"title": pipeline.get("youtube_title", "AI Tip #shorts"),
-                    "description": pipeline.get("youtube_description", ""),
-                    "tags": pipeline.get("youtube_tags", ["AI", "Shorts"])},
+        "snippet": {
+            "title": seo_metadata["title"],
+            "description": seo_metadata["description"] + "\n\n#shorts #asmr #satisfying #viral",
+            "tags": seo_metadata["tags"] + ["shorts", "ShortsFeed"],
+            "categoryId": "22"
+        },
         "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False}
     }
     request = youtube.videos().insert(part=",".join(body.keys()), body=body, media_body=MediaFileUpload(OUTPUT_VIDEO, chunksize=-1, resumable=True))
