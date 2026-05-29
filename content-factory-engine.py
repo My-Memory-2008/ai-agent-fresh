@@ -115,7 +115,11 @@ EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
 STANDARDIZED_CAT_ONLY = "/kaggle/working/standardized_cat_only.mp4"
 OUTPUT_VIDEO = "/kaggle/working/final_youtube_short.mp4"
 
-# FORCED MEMORY PURGE: Clean background fingerprints before heavy GPU processing
+# Raw audio tracking layers to force absolute sound mapping parameters
+AUDIO1_WAV = "/kaggle/working/track1.wav"
+AUDIO2_WAV = "/kaggle/working/track2.wav"
+MERGED_AUDIO_WAV = "/kaggle/working/merged_audio.wav"
+
 import gc
 try:
     if 'L' in locals(): del L
@@ -183,14 +187,13 @@ filter_complex_editing = (
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
-# 🔥 CRITICAL SYNC FIX: Added '-r 30' and explicit stream normalizers to clamp the video stream container parameters tightly
+# Render Step 1: Fully process video transformations into constant 30fps container lanes
 ffmpeg_editing = [
     "ffmpeg", "-y", "-hwaccel", "cuda", 
     "-i", CLEAN_INPUT_STAGE1,          
     "-filter_complex", filter_complex_editing, 
-    "-map", "[v]", "-map", "0:a?",      
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30",
-    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p",
+    "-map", "[v]",      
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30", "-pix_fmt", "yuv420p",
     EDITED_SOURCE_ONLY
 ]
 
@@ -198,12 +201,12 @@ res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
 if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
-print("✅ Step 1 Complete: Video file fully edited at full original length.")
+print("✅ Step 1 Complete: Visual layers processed successfully.")
 
 # ==========================================
-# 5. STEP 2: LOAD AND RE-TIME THE CAT VIDEO FILE
+# 5. STEP 2: SELECT AND CONVERT THE CAT VIDEO STRUCTURE
 # ==========================================
-print("🎬 Step 2: Selecting random reaction clip and matching codec parameters exactly...")
+print("🎬 Step 2: Selecting random reaction clip and matching visual parameters exactly...")
 
 cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
 if os.path.exists(cat_dataset_dir):
@@ -213,65 +216,70 @@ else:
     chosen_cat_file = output_path
 print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
 
-# 🔥 CRITICAL SYNC FIX: Added explicit stream filters to flatten variable frame rates down to constant '30 fps'
-# This forces the cat video container to perfectly match the parameters of your edited video!
+# Normalize the cat video track alone down to constant 30fps frames 
 ffmpeg_standardize_cat = [
     "ffmpeg", "-y", "-hwaccel", "cuda",
     "-i", chosen_cat_file,
-    "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v]; [0:a]aresample=44100,pan=stereo[a]",
-    "-map", "[v]", "-map", "[a]", 
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30",
-    "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+    "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+    "-an", # Drop audio stream temporarily from the video container to bypass format locks
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30", "-pix_fmt", "yuv420p",
     STANDARDIZED_CAT_ONLY
 ]
-
-res2 = subprocess.run(ffmpeg_standardize_cat, capture_output=True, text=True)
-
-# Safe Fallback: If a specific cat file has a broken or missing audio track, generate a matching 4s flat track to prevent a freeze
-if res2.returncode != 0:
-    print("-> Audio stream missing in selected cat clip. Injecting standardized silent track...")
-    ffmpeg_standardize_cat_silent = [
-        "ffmpeg", "-y", "-hwaccel", "cuda",
-        "-i", chosen_cat_file,
-        "-f", "lavfi", "-t", "4", "-i", "anullsrc=r=44100:cl=stereo",
-        "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v]",
-        "-map", "[v]", "-map", "1:a", 
-        "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30",
-        "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p", "-shortest",
-        STANDARDIZED_CAT_ONLY
-    ]
-    res2 = subprocess.run(ffmpeg_standardize_cat_silent, capture_output=True, text=True)
-
-if res2.returncode != 0:
-    print(f"❌ Cat standardization crashed: {res2.stderr}")
-    raise RuntimeError("FFmpeg Cat Standardization Failure")
-print("✅ Cat video standardized successfully.")
+subprocess.run(ffmpeg_standardize_cat, check=True, capture_output=True)
+print("✅ Step 2 Complete: Visual video frame timelines safely standardized.")
 
 # ==========================================
-# 5b. STEP 3: DIRECT CONCAT JOIN (EXECUTES IN 0.2 SECONDS)
+# 5b. STEP 3: EXTRACT RAW UNCOMPRESSED AUDIO TRACKS
 # ==========================================
-print("🤝 Step 3: Stitching cat reaction cleanly to the end of the fully edited video timeline...")
+print("🎙️ Step 3: Extracting raw uncompressed PCM audio matrices to prevent muting faults...")
 
-# Direct stream demuxer list block
+def get_duration(file_path):
+    cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
+    return float(subprocess.check_output(cmd, shell=True).decode().strip())
+
+duration1 = get_duration(EDITED_SOURCE_ONLY)
+duration2 = get_duration(STANDARDIZED_CAT_ONLY)
+
+# Convert track 1 audio into raw uncompressed WAV layout
+subprocess.run(["ffmpeg", "-y", "-i", CLEAN_INPUT_STAGE1, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-t", str(duration1), AUDIO1_WAV], check=True, capture_output=True)
+
+# Convert track 2 audio (cat video) into raw uncompressed WAV layout. If it lacks sound, it pads with silent track layers natively.
+try:
+    subprocess.run(["ffmpeg", "-y", "-i", chosen_cat_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-t", str(duration2), AUDIO2_WAV], check=True, capture_output=True)
+except Exception:
+    print("-> Selected cat clip is audio-less. Generating explicit silent track matrix loop...")
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-acodec", "pcm_s16le", "-t", str(duration2), AUDIO2_WAV], check=True, capture_output=True)
+
+# Concat the raw WAV audio arrays back-to-back inside system space
+print("🤝 Fusing audio arrays cleanly inside system buffers...")
+subprocess.run(["ffmpeg", "-y", "-i", AUDIO1_WAV, "-i", AUDIO2_WAV, "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[a]", "-map", "[a]", "-acodec", "pcm_s16le", MERGED_AUDIO_WAV], check=True, capture_output=True)
+print("✅ Step 3 Complete: Raw audio tracks securely linked without data drops.")
+
+# ==========================================
+# 5c. STEP 4: STITCH TIMELINES VIA MULTIPLEX STREAM CONTAINER MAPPING
+# ==========================================
+print("🎬 Step 4: Stitching completed video containers and injecting the unmuted sound track track loop...")
+
+# Join video blocks cleanly via demuxer tracking list
 concat_list_path = "/kaggle/working/concat_list.txt"
 with open(concat_list_path, "w") as f:
     f.write(f"file '{EDITED_SOURCE_ONLY}'\n")
     f.write(f"file '{STANDARDIZED_CAT_ONLY}'\n")
 
-# Connects both uncropped video tracks back-to-back instantly via native stream copy container mapping
-ffmpeg_concat = [
+TEMP_SILENT_MP4 = "/kaggle/working/temp_silent_output.mp4"
+subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list_path, "-c", "copy", TEMP_SILENT_MP4], check=True, capture_output=True)
+
+# Multiplex the combined uncompressed sound track loop and the video together instantly (Takes 0.4 seconds)
+ffmpeg_final_mux = [
     "ffmpeg", "-y",
-    "-f", "concat", "-safe", "0",
-    "-i", concat_list_path,
-    "-c", "copy", # Absolute stream copy mode prevents background re-rendering halts completely
+    "-i", TEMP_SILENT_MP4,
+    "-i", MERGED_AUDIO_WAV,
+    "-map", "0:v", "-map", "1:a", # Map the full video timeline and the unmuted linked audio track back-to-back
+    "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
     OUTPUT_VIDEO
 ]
-
-res3 = subprocess.run(ffmpeg_concat, capture_output=True, text=True)
-if res3.returncode != 0:
-    print(f"❌ Timeline merger phase crashed: {res3.stderr}")
-    raise RuntimeError("FFmpeg Concat Timeline Failure")
-print(f"🎉 SUCCESS! Video completely compiled with no freezes or length errors: {OUTPUT_VIDEO}")
+subprocess.run(ffmpeg_final_mux, check=True, capture_output=True)
+print(f"🎉 SUCCESS! Video completely compiled at its exact length with unmuted cat audio: {OUTPUT_VIDEO}")
 
 
 # ==========================================
