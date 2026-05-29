@@ -104,6 +104,7 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
+
 # ==========================================
 # 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
@@ -114,7 +115,7 @@ EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
 STANDARDIZED_CAT_ONLY = "/kaggle/working/standardized_cat_only.mp4"
 OUTPUT_VIDEO = "/kaggle/working/final_youtube_short.mp4"
 
-# FORCED MEMORY PURGE: Clean background scraper footprints before launching heavy GPU render steps
+# FORCED MEMORY PURGE: Clean background fingerprints before heavy GPU processing
 import gc
 try:
     if 'L' in locals(): del L
@@ -182,25 +183,25 @@ filter_complex_editing = (
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
-# Render step 1: Formats your oddly satisfying clip natively to vertical frames with matching sample rates
+# 🔥 CRITICAL SYNC FIX: Added '-r 30' and explicit stream normalizers to clamp the video stream container parameters tightly
 ffmpeg_editing = [
     "ffmpeg", "-y", "-hwaccel", "cuda", 
     "-i", CLEAN_INPUT_STAGE1,          
     "-filter_complex", filter_complex_editing, 
     "-map", "[v]", "-map", "0:a?",      
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", 
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30",
     "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p",
     EDITED_SOURCE_ONLY
 ]
 
 res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
 if res1.returncode != 0:
-    print(f"❌ Editing Transformation phase crashed: {res1.stderr}")
+    print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
-print("✅ Step 1 Complete: Video file fully edited at full length with original sound.")
+print("✅ Step 1 Complete: Video file fully edited at full original length.")
 
 # ==========================================
-# 5. STEP 2: LOAD AND STANDARDIZE THE CAT VIDEO CLIP NEXT
+# 5. STEP 2: LOAD AND RE-TIME THE CAT VIDEO FILE
 # ==========================================
 print("🎬 Step 2: Selecting random reaction clip and matching codec parameters exactly...")
 
@@ -212,40 +213,57 @@ else:
     chosen_cat_file = output_path
 print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
 
-# Enforces identical properties (yuv420p color palette, 44100Hz dual audio channels) to prevent any stitching errors
+# 🔥 CRITICAL SYNC FIX: Added explicit stream filters to flatten variable frame rates down to constant '30 fps'
+# This forces the cat video container to perfectly match the parameters of your edited video!
 ffmpeg_standardize_cat = [
     "ffmpeg", "-y", "-hwaccel", "cuda",
     "-i", chosen_cat_file,
-    "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
-    "-map", "[v]", "-map", "0:a?", 
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20",
-    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p",
+    "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v]; [0:a]aresample=44100,pan=stereo[a]",
+    "-map", "[v]", "-map", "[a]", 
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30",
+    "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
     STANDARDIZED_CAT_ONLY
 ]
 
 res2 = subprocess.run(ffmpeg_standardize_cat, capture_output=True, text=True)
+
+# Safe Fallback: If a specific cat file has a broken or missing audio track, generate a matching 4s flat track to prevent a freeze
 if res2.returncode != 0:
-    print(f"❌ Cat video format standardization crashed: {res2.stderr}")
+    print("-> Audio stream missing in selected cat clip. Injecting standardized silent track...")
+    ffmpeg_standardize_cat_silent = [
+        "ffmpeg", "-y", "-hwaccel", "cuda",
+        "-i", chosen_cat_file,
+        "-f", "lavfi", "-t", "4", "-i", "anullsrc=r=44100:cl=stereo",
+        "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v]",
+        "-map", "[v]", "-map", "1:a", 
+        "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30",
+        "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p", "-shortest",
+        STANDARDIZED_CAT_ONLY
+    ]
+    res2 = subprocess.run(ffmpeg_standardize_cat_silent, capture_output=True, text=True)
+
+if res2.returncode != 0:
+    print(f"❌ Cat standardization crashed: {res2.stderr}")
     raise RuntimeError("FFmpeg Cat Standardization Failure")
 print("✅ Cat video standardized successfully.")
 
 # ==========================================
-# 5b. STEP 3: DIRECT DEMUXER CONCAT JOIN (INSTANT MULTIPLEX STITCHING)
+# 5b. STEP 3: DIRECT CONCAT JOIN (EXECUTES IN 0.2 SECONDS)
 # ==========================================
 print("🤝 Step 3: Stitching cat reaction cleanly to the end of the fully edited video timeline...")
 
-# Direct stream demuxer block prevents encoding halts completely
+# Direct stream demuxer list block
 concat_list_path = "/kaggle/working/concat_list.txt"
 with open(concat_list_path, "w") as f:
     f.write(f"file '{EDITED_SOURCE_ONLY}'\n")
     f.write(f"file '{STANDARDIZED_CAT_ONLY}'\n")
 
-# Combines both uncropped video tracks back-to-back in under 0.2 seconds via native container mapping
+# Connects both uncropped video tracks back-to-back instantly via native stream copy container mapping
 ffmpeg_concat = [
     "ffmpeg", "-y",
     "-f", "concat", "-safe", "0",
     "-i", concat_list_path,
-    "-c", "copy", # Absolute stream copy mode skips filter processing to prevent freeze locks
+    "-c", "copy", # Absolute stream copy mode prevents background re-rendering halts completely
     OUTPUT_VIDEO
 ]
 
