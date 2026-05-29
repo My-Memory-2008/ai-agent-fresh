@@ -104,10 +104,11 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
+
 # ==========================================
-# 4 & 5. FREEZE-PROOF TWO-STAGE GPU CONCAT COMPILER
+# 4 & 5. TWO-STAGE GPU RENDERING COMPILER (FULL TIMELINE + SOUND SELECTION)
 # ==========================================
-print("🚀 Initiating freeze-proof multi-video timeline assembly stack...")
+print("🚀 Initiating timeline assembly stack with full video lengths and combined sounds...")
 import subprocess
 import sys
 import os
@@ -117,12 +118,8 @@ import random
 EDITED_SOURCE_MP4 = "/kaggle/working/edited_source_only.mp4"
 STANDARDIZED_CAT_MP4 = "/kaggle/working/standardized_cat.mp4"
 
-def get_duration(file_path):
-    cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
-    return float(subprocess.check_output(cmd, shell=True).decode().strip())
-
 # ------------------------------------------
-# STAGE 1: RENDER ORIGINAL VIDEO IN VERTICAL MATRIX
+# STAGE 1: RENDER ORIGINAL VIDEO IN FULL LENGTH
 # ------------------------------------------
 print("🎬 Stage 1: Applying 9:16 canvas transformations to original video...")
 
@@ -140,10 +137,6 @@ effects = [
 ]
 chosen_effect = random.choice(effects)
 
-orig_duration = get_duration(output_path)
-trim_target_duration = max(2.0, orig_duration - 4.0)
-print(f"✂️ Trimming target source video timeline boundaries down to: {trim_target_duration:.2f}s")
-
 # Setup vertical template container layout graph strings safely
 filter_complex_stage1 = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
@@ -153,10 +146,10 @@ filter_complex_stage1 = (
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
+# FIXED: Removed the '-t' trimming parameter to process your original downloaded clip at its full length
 ffmpeg_stage1 = [
     "ffmpeg", "-y", "-hwaccel", "cuda", 
     "-i", output_path,          
-    "-t", str(trim_target_duration), # Safely clips the timeline loop right inside Stage 1 processing
     "-filter_complex", filter_complex_stage1, 
     "-map", "[v]", "-map", "0:a?", 
     "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", 
@@ -168,10 +161,10 @@ res1 = subprocess.run(ffmpeg_stage1, capture_output=True, text=True)
 if res1.returncode != 0:
     print(f"❌ Stage 1 Render crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Stage 1 Failure")
-print("✅ Stage 1 Complete: Vertical visual layouts processed successfully.")
+print("✅ Stage 1 Complete: Full-length vertical visual layouts processed successfully.")
 
 # ------------------------------------------
-# STAGE 2: SELECT AND STANDARDIZE CAT REACTION VIDEO FILE
+# STAGE 2: SELECT AND STANDARDIZE THE CAT REACTION AUDIO/VIDEO SIGNATURES
 # ------------------------------------------
 cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
 if os.path.exists(cat_dataset_dir):
@@ -181,16 +174,15 @@ else:
     chosen_cat_file = output_path
 print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
 
-print("⚙️ Stage 2: Standardizing cat video dimensions and padding silent audio...")
-# 🔥 FIX: Replaced '-duration:a' with '-t 4' and placed it right before the virtual audio source to limit the track precisely
+print("⚙️ Stage 2: Standardizing cat video dimensions and maintaining its original audio...")
+# FIXED: Removed 'anullsrc' and mapped '0:a?' to retain the cat video's original raw sound track completely unmuted
 ffmpeg_stage2 = [
     "ffmpeg", "-y", "-hwaccel", "cuda",
     "-i", chosen_cat_file,
-    "-f", "lavfi", "-t", "4", "-i", "anullsrc=r=44100:cl=stereo", 
     "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
-    "-map", "[v]", "-map", "1:a", 
+    "-map", "[v]", "-map", "0:a?", 
     "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20",
-    "-c:a", "aac", "-b:a", "128k", "-shortest",
+    "-c:a", "aac", "-b:a", "128k",
     STANDARDIZED_CAT_MP4
 ]
 
@@ -198,10 +190,10 @@ res2 = subprocess.run(ffmpeg_stage2, capture_output=True, text=True)
 if res2.returncode != 0:
     print(f"❌ Stage 2 Audio/Video Standardization crashed: {res2.stderr}")
     raise RuntimeError("FFmpeg Stage 2 Failure")
-print("✅ Stage 2 Complete: Cat reaction parameters successfully locked to 4 seconds.")
+print("✅ Stage 2 Complete: Cat reaction audio and video parameters successfully scaled.")
 
 # ------------------------------------------
-# STAGE 3: MERGE EDITED VIDEO + CAT PUNCHLINE LIVE
+# STAGE 3: DIRECT CONCAT JOIN (INSTANT SPEED-COPY LAYER)
 # ------------------------------------------
 print("🤝 Stage 3: Merging video timelines directly via rapid stream copy container links...")
 
@@ -210,6 +202,7 @@ with open(concat_list_path, "w") as f:
     f.write(f"file '{EDITED_SOURCE_MP4}'\n")
     f.write(f"file '{STANDARDIZED_CAT_MP4}'\n")
 
+# Connects your edited clip and your unmuted cat video back-to-back in under 0.2 seconds via native stream duplication
 ffmpeg_stage3 = [
     "ffmpeg", "-y",
     "-f", "concat", "-safe", "0",
