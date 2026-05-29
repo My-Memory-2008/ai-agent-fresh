@@ -1,4 +1,5 @@
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -104,182 +105,141 @@ with open(output_path, 'wb') as f:
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
 
-
 # ==========================================
-# 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
+# 4 & 5. T4 GPU AUDIO EXTRACTION, SPEECH TRANSCRIPTION & SPEED-SYNC RENDERING
 # ==========================================
-print("🚀 Step 1: Initiating full visual editing transformation canvas...")
+print("🚀 Initiating dynamic dependency checks & audio extraction sequence...")
+import subprocess
+import sys
+import os
+import random
+import asyncio
 
-# Define internal rendering layer workspace file paths explicitly
-EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
-STANDARDIZED_CAT_ONLY = "/kaggle/working/standardized_cat_only.mp4"
-OUTPUT_VIDEO = "/kaggle/working/final_youtube_short.mp4"
-
-# Raw audio tracking layers to force absolute sound mapping parameters
-AUDIO1_WAV = "/kaggle/working/track1.wav"
-AUDIO2_WAV = "/kaggle/working/track2.wav"
-MERGED_AUDIO_WAV = "/kaggle/working/merged_audio.wav"
-
-import gc
+# 4a. Dynamic Dependency Injector (Ensures SpeechRecognition is installed on boot)
 try:
-    if 'L' in locals(): del L
-    if 'post' in locals(): del post
-except Exception:
-    pass
-gc.collect()
-torch.cuda.empty_cache()
+    import speech_recognition as sr
+except ImportError:
+    print("-> speech_recognition package missing. Forcing local environment injection...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "SpeechRecognition"])
+    import speech_recognition as sr
+    print("✅ Package loaded successfully.")
 
-import cv2
-import pytesseract
-from pytesseract import Output
+# Define absolute workspace audio tracking paths
+EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
+EXTRACTED_AUDIO_WAV = "/kaggle/working/extracted_audio.wav"
+NEW_VOICEOVER = "/kaggle/working/new_ai_voiceover.wav"
 
-# --- AI OCR CHECKPOINT: USERNAME WATERMARK REMOVER ---
-print("👁️ Scanning frame layers for creator username text signatures...")
-cap = cv2.VideoCapture(output_path)
-frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-text_watermark_box = None
-clean_username_target = username.lower().strip()
+# 4b. Extract the true audio track from the downloaded Reel via FFmpeg
+print("-> Isolating original audio track matrix...")
+subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
 
-for idx in sample_frames:
-    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-    ret, frame = cap.read()
-    if not ret: continue
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
-    
-    for i in range(len(ocr_data['text'])):
-        detected_word = str(ocr_data['text'][i]).lower().strip()
-        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
-            x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
-            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
-            break
-    if text_watermark_box: break
-cap.release()
+# Convert to standard uncompressed WAV format for the local transcription engine
+subprocess.run(["ffmpeg", "-y", "-i", EXTRACTED_AUDIO_MP3, EXTRACTED_AUDIO_WAV], check=True, capture_output=True)
 
-if text_watermark_box:
-    x, y, w, h = text_watermark_box
-    print(f"🎯 Watermark Matched! Scrubbing region -> X:{x}, Y:{y}, W:{w}, H:{h}")
-    CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
-    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}", "-c:a", "copy", CLEAN_INPUT_STAGE1], check=True, capture_output=True)
-else:
-    print("✨ Clean Layout Check! Bypassing OCR erasure step.")
-    CLEAN_INPUT_STAGE1 = output_path
+# 4c. Transcribe the original speech using local CPU execution (Bypasses CUDA bugs)
+print("-> Initializing CPU speech-to-text transcription engine...")
+recognizer = sr.Recognizer()
+extracted_text = ""
 
-# --- APPLY 9:16 PORTRAIT VISUAL EDITING FILTER STACK ---
-styles = [
-    "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
-    "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
-    "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
-]
-effects = [
-    "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
-    "hue='H=0.1*PI*t:s=1.03'",
-    "eq=contrast=1.1:brightness=0.02:saturation=1.05"
-]
-chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
+try:
+    with sr.AudioFile(EXTRACTED_AUDIO_WAV) as source:
+        audio_data = recognizer.record(source)
+        # Uses Google's free public web speech API gateway to extract exact words
+        extracted_text = recognizer.recognize_google(audio_data)
+    print(f"📝 SUCCESS! Transcribed original video script: \"{extracted_text}\"")
+except Exception as e:
+    print(f"⚠️ Speech API failed or audio was silent: {e}")
+    # Fallback only if the original audio track cannot be transcribed
+    extracted_text = "Check out this amazing video!"
+    print(f"📋 Using safety text fallback: \"{extracted_text}\"")
 
-filter_complex_editing = (
-    f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
-    f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
-    f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
-    f"[processed_source]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
-)
+# 4d. Run Edge-TTS natively to build the professional human voice file
+print("-> Querying Edge-TTS cloud service for professional narration...")
+sanitized_text = extracted_text.replace('"', '').replace("'", "").strip()
+selected_voice = "en-US-ChristopherNeural"
 
-# Render Step 1: Fully process video transformations into constant 30fps container lanes
-ffmpeg_editing = [
-    "ffmpeg", "-y", "-hwaccel", "cuda", 
-    "-i", CLEAN_INPUT_STAGE1,          
-    "-filter_complex", filter_complex_editing, 
-    "-map", "[v]",      
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30", "-pix_fmt", "yuv420p",
-    EDITED_SOURCE_ONLY
-]
+async def generate_edge_voice():
+    import edge_tts
+    communicate = edge_tts.Communicate(sanitized_text, selected_voice)
+    await communicate.save(NEW_VOICEOVER)
 
-res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
-if res1.returncode != 0:
-    print(f"❌ Editing phase crashed: {res1.stderr}")
-    raise RuntimeError("FFmpeg Editing Canvas Failure")
-print("✅ Step 1 Complete: Visual layers processed successfully.")
+asyncio.run(generate_edge_voice())
+print("✅ Professional Edge-TTS voice track generated.")
 
-# ==========================================
-# 5. STEP 2: SELECT AND CONVERT THE CAT VIDEO STRUCTURE
-# ==========================================
-print("🎬 Step 2: Selecting random reaction clip and matching visual parameters exactly...")
-
-cat_dataset_dir = "/kaggle/input/datasets/muhammadasjad2008/cat-reactions-vault"
-if os.path.exists(cat_dataset_dir):
-    valid_clips = [os.path.join(root, f) for root, _, files in os.walk(cat_dataset_dir) for f in files if f.endswith('.mp4')]
-    chosen_cat_file = random.choice(valid_clips) if valid_clips else output_path
-else:
-    chosen_cat_file = output_path
-print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
-
-# Normalize the cat video track alone down to constant 30fps frames 
-ffmpeg_standardize_cat = [
-    "ffmpeg", "-y", "-hwaccel", "cuda",
-    "-i", chosen_cat_file,
-    "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
-    "-an", # Drop audio stream temporarily from the video container to bypass format locks
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30", "-pix_fmt", "yuv420p",
-    STANDARDIZED_CAT_ONLY
-]
-subprocess.run(ffmpeg_standardize_cat, check=True, capture_output=True)
-print("✅ Step 2 Complete: Visual video frame timelines safely standardized.")
-
-# ==========================================
-# 5b. STEP 3: EXTRACT RAW UNCOMPRESSED AUDIO TRACKS
-# ==========================================
-print("🎙️ Step 3: Extracting raw uncompressed PCM audio matrices to prevent muting faults...")
+# 4e. DYNAMIC SPEED CALCULATION ENGINE
+print("⚡ Calculating precise speed normalization adjustments...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
     return float(subprocess.check_output(cmd, shell=True).decode().strip())
 
-duration1 = get_duration(EDITED_SOURCE_ONLY)
-duration2 = get_duration(STANDARDIZED_CAT_ONLY)
+# Fetch durations down to the millisecond
+orig_duration = get_duration(output_path)
+tts_duration = get_duration(NEW_VOICEOVER)
 
-# Convert track 1 audio into raw uncompressed WAV layout
-subprocess.run(["ffmpeg", "-y", "-i", CLEAN_INPUT_STAGE1, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-t", str(duration1), AUDIO1_WAV], check=True, capture_output=True)
+# Calculate exactly how much we need to speed up/slow down the TTS voice to match the video length
+speed_factor = tts_duration / orig_duration
 
-# Convert track 2 audio (cat video) into raw uncompressed WAV layout. If it lacks sound, it pads with silent track layers natively.
-try:
-    subprocess.run(["ffmpeg", "-y", "-i", chosen_cat_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", "-t", str(duration2), AUDIO2_WAV], check=True, capture_output=True)
-except Exception:
-    print("-> Selected cat clip is audio-less. Generating explicit silent track matrix loop...")
-    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-acodec", "pcm_s16le", "-t", str(duration2), AUDIO2_WAV], check=True, capture_output=True)
+# FFmpeg atempo boundaries rules: Must stay between 0.5 and 2.0
+if speed_factor < 0.5: speed_factor = 0.5
+if speed_factor > 2.0: speed_factor = 2.0
 
-# Concat the raw WAV audio arrays back-to-back inside system space
-print("🤝 Fusing audio arrays cleanly inside system buffers...")
-subprocess.run(["ffmpeg", "-y", "-i", AUDIO1_WAV, "-i", AUDIO2_WAV, "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[a]", "-map", "[a]", "-acodec", "pcm_s16le", MERGED_AUDIO_WAV], check=True, capture_output=True)
-print("✅ Step 3 Complete: Raw audio tracks securely linked without data drops.")
+print(f"⏱️ Original Video Duration: {orig_duration:.2f}s")
+print(f"⏱️ Raw Voiceover Duration: {tts_duration:.2f}s")
+print(f"⏩ Required Voiceover Speed Factor: {speed_factor:.2f}x")
 
 # ==========================================
-# 5c. STEP 4: STITCH TIMELINES VIA MULTIPLEX STREAM CONTAINER MAPPING
+# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
 # ==========================================
-print("🎬 Step 4: Stitching completed video containers and injecting the unmuted sound track track loop...")
+print("🎬 Stacking randomized filters and rendering vertical layout via NVIDIA NVENC GPU...")
 
-# Join video blocks cleanly via demuxer tracking list
-concat_list_path = "/kaggle/working/concat_list.txt"
-with open(concat_list_path, "w") as f:
-    f.write(f"file '{EDITED_SOURCE_ONLY}'\n")
-    f.write(f"file '{STANDARDIZED_CAT_ONLY}'\n")
+styles = [
+    "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
+    "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1':r='0/0 0.5/0.42 1/1':b='0/0 0.4/0.58 1/1'",
+    "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
+]
+chosen_style = random.choice(styles)
 
-TEMP_SILENT_MP4 = "/kaggle/working/temp_silent_output.mp4"
-subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list_path, "-c", "copy", TEMP_SILENT_MP4], check=True, capture_output=True)
+effects = [
+    "zoompan=z='min(zoom+0.003,1.12)':x='iw/2-iw/zoom/2+sin(time*2.5)*6':y='ih/2-ih/zoom/2':d=1",
+    "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
+    "hue='H=2.5*PI*t:s=1.03'"
+]
+chosen_effect = random.choice(effects)
 
-# Multiplex the combined uncompressed sound track loop and the video together instantly (Takes 0.4 seconds)
-ffmpeg_final_mux = [
-    "ffmpeg", "-y",
-    "-i", TEMP_SILENT_MP4,
-    "-i", MERGED_AUDIO_WAV,
-    "-map", "0:v", "-map", "1:a", # Map the full video timeline and the unmuted linked audio track back-to-back
-    "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+# Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
+filter_complex_string = (
+    f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
+    f"[0:v]scale=918:1632,{chosen_style}[main];"
+    f"[bg][main]overlay=(W-w)/2:(H-h)/2[merged];"
+    f"[merged]noise=alls=7:allf=t+u[grained];"
+    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v];"
+    f"[1:a]atempo={speed_factor}[speed_synced_audio]"
+)
+
+# GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
+ffmpeg_cmd = [
+    "ffmpeg", "-y", 
+    "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
+    "-i", output_path,          # Original video matrix layout
+    "-i", NEW_VOICEOVER,         # Raw Edge-TTS track
+    "-filter_complex", filter_complex_string,
+    "-map", "[v]", 
+    "-map", "[speed_synced_audio]", # Map the speed-corrected narration track
+    "-c:v", "h264_nvenc",       # Force NVIDIA NVENC Hardware Video Encoder GPU
+    "-preset", "p4",            # High-performance hardware preset mapping
+    "-cq", "20",                # Maintain perfect clarity for text and borders
+    "-c:a", "aac",              
+    "-b:a", "128k",
+    "-shortest",                # Ensure no trailing dead space
     OUTPUT_VIDEO
 ]
-subprocess.run(ffmpeg_final_mux, check=True, capture_output=True)
-print(f"🎉 SUCCESS! Video completely compiled at its exact length with unmuted cat audio: {OUTPUT_VIDEO}")
+
+res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+if res.returncode != 0:
+    print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
+    raise RuntimeError("FFmpeg Pipeline Failure")
+print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
 
 
 # ==========================================
