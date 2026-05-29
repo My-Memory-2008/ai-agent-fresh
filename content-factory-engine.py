@@ -103,10 +103,11 @@ with open(output_path, 'wb') as f:
         if chunk: f.write(chunk)
 print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
 
+
 # ==========================================
-# 4 & 5. T4 GPU AUDIO EXTRACTION & GPU-ACCELERATED PROCESSING STACK
+# 4 & 5. T4 GPU ORIGINAL AUDIO EXTRACTION & VIDEO TIMELINE MERGE
 # ==========================================
-print("🚀 Initiating original audio track isolation sequence...")
+print("🚀 Initiating original audio track isolation and cat timeline sync...")
 import subprocess
 import sys
 import os
@@ -114,16 +115,35 @@ import random
 
 # Define working directory path variables
 EXTRACTED_AUDIO_MP3 = "/kaggle/working/extracted_audio.mp3"
+TRIMMED_VIDEO = "/kaggle/working/trimmed_source.mp4"
 
-# 4b. Extract the pure, unmodified original audio track from the downloaded video source via FFmpeg
+def get_duration(file_path):
+    cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
+    return float(subprocess.check_output(cmd, shell=True).decode().strip())
+
+# 1. Isolate the original unmodified audio track from the downloaded video source via FFmpeg
 print("-> Isolating original untampered audio track matrix...")
 subprocess.run(["ffmpeg", "-y", "-i", output_path, "-q:a", "0", "-map", "a", EXTRACTED_AUDIO_MP3], check=True, capture_output=True)
-print("✅ Original audio track successfully isolated without voiceover alterations.")
+
+# 2. Trim the source video clip timeline down by 4 seconds to make space for the reaction punchline
+orig_duration = get_duration(output_path)
+trim_target_duration = max(2.0, orig_duration - 4.0) 
+print(f"✂️ Trimming target source video timeline boundaries down to: {trim_target_duration:.2f}s")
+subprocess.run(["ffmpeg", "-y", "-i", output_path, "-t", str(trim_target_duration), "-c:v", "copy", "-c:a", "copy", TRIMMED_VIDEO], check=True, capture_output=True)
+
+# 3. Load random cat reaction video clip from your mounted Kaggle Input dataset folder
+cat_dataset_dir = "/kaggle/input/cat-reactions-vault"
+if os.path.exists(cat_dataset_dir):
+    valid_clips = [os.path.join(root, f) for root, _, files in os.walk(cat_dataset_dir) for f in files if f.endswith('.mp4')]
+    chosen_cat_file = random.choice(valid_clips) if valid_clips else output_path
+else:
+    chosen_cat_file = output_path
+print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
 
 # ==========================================
-# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK
+# 5. GPU-ACCELERATED PROCEDURAL VISUAL EDITING STACK (ORIGINAL SOUND + CAT INJECTED)
 # ==========================================
-print("🎬 Stacking randomized filters and rendering vertical layout via NVIDIA NVENC GPU...")
+print("🎬 Rendering multi-layer canvas via NVIDIA NVENC GPU...")
 
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
@@ -140,30 +160,33 @@ effects = [
 chosen_effect = random.choice(effects)
 
 # Setup 9:16 portrait layout canvas (Safe unmirrored captions + blurred backdrop wallpaper + transparent dust/grain noise + custom brand watermark)
-# FIXED GRAPH INTERFACE: Scaled variables are calculated safely BEFORE the canvas overlay step to prevent engine freeze
+# GRAPH ENGINE LAYOUT: Scales background/main shots cleanly, links the cat video file natively at the end, and overlays the watermark text
 filter_complex_string = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
-    f"[processed_source]noise=alls=7:allf=t+u[grained];"
+    f"[2:v]scale=1080:1920,setsar=1[processed_cat];"
+    f"[processed_source][processed_cat]concat=n=2:v=1:a=0[merged_video];"
+    f"[merged_video]noise=alls=7:allf=t+u[grained];"
     f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
 # GPU ACCELERATION: Leverages NVIDIA NVENC T4 Hardware Video Encoder directly
 ffmpeg_cmd = [
     "ffmpeg", "-y", 
-    "-hwaccel", "cuda",         # Initialize CUDA hardware acceleration gates
-    "-i", output_path,          # Original video matrix layout input (Index 0)
-    "-i", EXTRACTED_AUDIO_MP3,  # Original isolated audio track input (Index 1)
+    "-hwaccel", "cuda",             # Initialize CUDA hardware acceleration gates
+    "-i", TRIMMED_VIDEO,            # Trimmed source video canvas (Index 0)
+    "-i", EXTRACTED_AUDIO_MP3,      # Original isolated loop audio track (Index 1)
+    "-i", chosen_cat_file,          # Kaggle dataset cat reaction punchline (Index 2)
     "-filter_complex", filter_complex_string,
     "-map", "[v]", 
-    "-map", "1:a",              # Map the original extracted sound track directly back into the canvas
-    "-c:v", "h264_nvenc",       # Force NVIDIA NVENC Hardware Video Encoder GPU
-    "-preset", "p4",            # High-performance hardware preset mapping
-    "-cq", "20",                # Maintain perfect clarity for text and borders
+    "-map", "1:a",                  # Maps your original satisfying sound track directly across the rendering canvas
+    "-c:v", "h264_nvenc",           # Force NVIDIA NVENC Hardware Video Encoder GPU
+    "-preset", "p4",                # High-performance hardware preset mapping
+    "-cq", "20",                    # Maintain perfect clarity for text and borders
     "-c:a", "aac",              
     "-b:a", "128k",
-    "-shortest",                # Ensure no trailing dead space
+    "-shortest",                    # Cuts off trailing audio timeline elements when video files terminate
     OUTPUT_VIDEO
 ]
 
@@ -172,6 +195,7 @@ if res.returncode != 0:
     print(f"❌ FFmpeg transformative execution crashed: {res.stderr}")
     raise RuntimeError("FFmpeg Pipeline Failure")
 print(f"🚀 GPU Render Complete! Video Saved: {OUTPUT_VIDEO}")
+
 
 
 
