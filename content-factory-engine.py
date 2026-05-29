@@ -230,22 +230,22 @@ if res2.returncode != 0:
 print("✅ Cat video standardized successfully.")
 
 # ==========================================
-# 5b. STEP 3: DIRECT CONCAT JOIN (INSTANT SPEED-COPY BLOCK)
+# 5b. STEP 3: DIRECT DEMUXER CONCAT JOIN (INSTANT MULTIPLEX STITCHING)
 # ==========================================
-print("🤝 Step 3: Stitching cat reaction to the end of the fully edited video timeline...")
+print("🤝 Step 3: Stitching cat reaction cleanly to the end of the fully edited video timeline...")
 
-# Safe demuxer container listing bypasses filter graph freezes completely
+# Direct stream demuxer block prevents encoding halts completely
 concat_list_path = "/kaggle/working/concat_list.txt"
 with open(concat_list_path, "w") as f:
     f.write(f"file '{EDITED_SOURCE_ONLY}'\n")
     f.write(f"file '{STANDARDIZED_CAT_ONLY}'\n")
 
-# Connects the clips back-to-back using raw stream copies in under 0.2 seconds
+# Combines both uncropped video tracks back-to-back in under 0.2 seconds via native container mapping
 ffmpeg_concat = [
     "ffmpeg", "-y",
     "-f", "concat", "-safe", "0",
     "-i", concat_list_path,
-    "-c", "copy", # Fast container copy prevents background re-rendering hangs
+    "-c", "copy", # Absolute stream copy mode skips filter processing to prevent freeze locks
     OUTPUT_VIDEO
 ]
 
@@ -254,7 +254,6 @@ if res3.returncode != 0:
     print(f"❌ Timeline merger phase crashed: {res3.stderr}")
     raise RuntimeError("FFmpeg Concat Timeline Failure")
 print(f"🎉 SUCCESS! Video completely compiled with no freezes or length errors: {OUTPUT_VIDEO}")
-
 
 
 # ==========================================
