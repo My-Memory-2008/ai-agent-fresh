@@ -182,11 +182,11 @@ else:
 print(f"🐱 Selected Cat Reaction Asset: {chosen_cat_file}")
 
 print("⚙️ Stage 2: Standardizing cat video dimensions and padding silent audio...")
-# Fixes freezes by forcing the cat clip to match your edited video resolution and creating a silent audio stream
+# 🔥 FIX: Replaced '-duration:a' with '-t 4' and placed it right before the virtual audio source to limit the track precisely
 ffmpeg_stage2 = [
     "ffmpeg", "-y", "-hwaccel", "cuda",
     "-i", chosen_cat_file,
-    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", 
+    "-f", "lavfi", "-t", "4", "-i", "anullsrc=r=44100:cl=stereo", 
     "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[v]",
     "-map", "[v]", "-map", "1:a", 
     "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20",
@@ -198,6 +198,7 @@ res2 = subprocess.run(ffmpeg_stage2, capture_output=True, text=True)
 if res2.returncode != 0:
     print(f"❌ Stage 2 Audio/Video Standardization crashed: {res2.stderr}")
     raise RuntimeError("FFmpeg Stage 2 Failure")
+print("✅ Stage 2 Complete: Cat reaction parameters successfully locked to 4 seconds.")
 
 # ------------------------------------------
 # STAGE 3: MERGE EDITED VIDEO + CAT PUNCHLINE LIVE
@@ -209,7 +210,6 @@ with open(concat_list_path, "w") as f:
     f.write(f"file '{EDITED_SOURCE_MP4}'\n")
     f.write(f"file '{STANDARDIZED_CAT_MP4}'\n")
 
-# Rapid non-transcoded copy merge takes under 0.5 seconds because parameters match perfectly
 ffmpeg_stage3 = [
     "ffmpeg", "-y",
     "-f", "concat", "-safe", "0",
@@ -224,7 +224,6 @@ if res3.returncode != 0:
     raise RuntimeError("FFmpeg Stage 3 Failure")
 
 print(f"🎉 SUCCESS! Fully compiled video ready for publication: {OUTPUT_VIDEO}")
-
 
 
 
