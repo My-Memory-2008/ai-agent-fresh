@@ -331,12 +331,10 @@ if res1.returncode != 0:
 print("✅ Step 1 Complete: Watermarks erased and portrait layout transformations processed successfully.")
 
 
-
-
-## ==========================================
-# 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (NO REPEATS)
 # ==========================================
-print("🧠 Activating Cloud Vision AI Engine via Google GenAI...")
+# 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (RESILIENT DUAL-AI MATRIX)
+# ==========================================
+print("🧠 Activating Resilient Multimodal Vision SEO Generation Matrix...")
 import cv2
 import json
 import os
@@ -345,86 +343,105 @@ from PIL import Image
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
-# Safety default fallback metadata structure
+# Baseline default fallback metadata matrix
 seo_metadata = {
     "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
     "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
     "tags": ["satisfying", "asmr", "shorts", "relaxing"]
 }
 
-# Fetch your secure environment token out of Kaggle User Secrets Vault
-# Make sure you have a secret named "GEMINI_API_KEY" set up in your Kaggle notebook!
 gemini_key = secrets.get_secret("GEMINI_API_KEY")
+groq_key = secrets.get_secret("GROQ_API_KEY")
 
-if gemini_key:
+# Extract a video frame layer matrix directly from your edited loop source file
+print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
+cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
+frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45))
+ret, frame = cap.read()
+cap.release()
+
+seo_prompt = (
+    f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
+    f"Analyze this loop video details created by creator @{username} containing an oddly satisfying visual layout and a funny cat reaction attached right at the end.\n\n"
+    f"Tasks:\n"
+    f"1. YOUTUBE_TITLE: Write a highly clickable title (Max 65 characters) focusing entirely on high-relevance satisfying value. End strictly with #shorts.\n"
+    f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about the loop or the cat reaction at the end. "
+    f"Sentence 2 states why this unique ASMR loop content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
+    f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords in this niche.\n\n"
+    f"Return response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks, 'json' headers, or introductory conversational filler text."
+)
+
+ai_generation_success = False
+
+# --- ENGINE LAYER 1: GEMINI CLOUD VISION CORE ---
+if gemini_key and ret:
+    print("📡 Attempting Primary Engine: Gemini-2.5-Flash Multimodal Cluster...")
     try:
         from google import genai
-        from google.genai import types
+        client_gemini = genai.Client(api_key=gemini_key.strip())
         
-        # Initialize the official secure Google GenAI Client
-        client = genai.Client(api_key=gemini_key.strip())
+        cv2.imwrite(TEMP_FRAME_PATH, frame)
+        pil_image = Image.open(TEMP_FRAME_PATH)
         
-        # 1. Capture a mid-timeline frame directly from your edited source video file
-        print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
-        cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45)) # Grab frame right in the middle of action
-        ret, frame = cap.read()
-        cap.release()
+        response = client_gemini.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[pil_image, seo_prompt]
+        )
+        
+        clean_json_text = response.text.strip().replace('```json', '').replace('```', '').strip()
+        ai_seo_data = json.loads(clean_json_text)
+        
+        seo_metadata = {
+            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+        }
+        print(f"🎉 Primary Gemini Engine Successful -> Title: \"{seo_metadata['title']}\"")
+        ai_generation_success = True
+        
+        if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
+    except Exception as gemini_error:
+        print(f"⚠️ Gemini Quota Exhausted or Challenged: {gemini_error}")
 
-        if ret:
-            # Save the frame image locally to pass to the Vision API node
-            cv2.imwrite(TEMP_FRAME_PATH, frame)
-            pil_image = Image.open(TEMP_FRAME_PATH)
-            
-            print("📡 Uploading video frame to Gemini-2.5 Vision cluster for deep analysis...")
-            
-            seo_prompt = (
-                f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
-                f"Analyze this visual frame screenshot taken from a vertical loop video created by @{username}.\n\n"
-                f"Tasks:\n"
-                f"1. YOUTUBE_TITLE: Write a highly clickable title (Max 65 characters) describing the satisfying action visible in the image. End strictly with #shorts.\n"
-                f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about what is happening in this loop. "
-                f"Sentence 2 states why this unique ASMR content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
-                f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords describing the objects or materials visible in the image.\n\n"
-                f"Return your response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks, 'json' headings, or introductory conversational filler text."
-            )
+# --- ENGINE LAYER 2: LLAMA 3.3 CORE TEXT FALLBACK ---
+if not ai_generation_success and groq_key:
+    print("🔄 Initializing Layer 2 Fallback: Llama-3.3-70b Engine via Groq Gateway...")
+    try:
+        from groq import Groq
+        client_groq = Groq(api_key=groq_key.strip())
+        
+        chat_completion = client_groq.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a precise YouTube SEO generation microservice that outputs data exclusively as raw JSON objects."},
+                {"role": "user", "content": seo_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.65,
+            max_tokens=250
+        )
+        
+        clean_json_text = chat_completion.choices[0].message.content.strip().replace('```json', '').replace('```', '').strip()
+        ai_seo_data = json.loads(clean_json_text)
+        
+        seo_metadata = {
+            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+        }
+        print(f"🎉 Fallback Llama Engine Successful -> Title: \"{seo_metadata['title']}\"")
+        ai_generation_success = True
+    except Exception as groq_error:
+        print(f"⚠️ Llama fallback gateway challenged: {groq_error}")
 
-            # Fire the high-speed multimodal generation query
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=[pil_image, seo_prompt]
-            )
-            
-            # Clean response boundaries of potential text wrappers cleanly before unpacking
-            clean_json_text = response.text.strip().replace('```json', '').replace('```', '').strip()
-            ai_seo_data = json.loads(clean_json_text)
-            
-            seo_metadata = {
-                "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
-                "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
-                "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
-            }
-            print(f"🎉 SUCCESS! Fresh Visual SEO Generated via Gemini -> Title: \"{seo_metadata['title']}\"")
-            
-            # Cleanup temp file from disk partition
-            if os.path.exists(TEMP_FRAME_PATH):
-                os.remove(TEMP_FRAME_PATH)
-        else:
-            raise RuntimeError("Frame capture extraction failed.")
-
-    except Exception as vision_error:
-        print(f"⚠️ Cloud vision block failed, using system fallback arrays: {vision_error}")
-else:
-    print("⚠️ GEMINI_API_KEY secret missing in Kaggle vault. Bypassing cloud vision block.")
-
-# Force a memory purge to ensure the GPU is 100% clean for your upcoming video processing stages
+# Force a system memory purge to clear textures out of the GPU layout area
 import torch
 torch.cuda.empty_cache()
 
 # Save metadata manifest file to drive partition for Section 6 upload mapping
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
+print("✅ Section 4b Processing Finished Safely.")
 
 
 
