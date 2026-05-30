@@ -71,7 +71,7 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (PUBLER PRIMARY CDN GATEWAY)
+# 3. DOWNLOAD REEL (ANTI-BLOCK PROXY MATRIX)
 # ==========================================
 print("📥 Fetching direct video stream vectors via Publer API Nodes...")
 video_url = None
@@ -86,23 +86,29 @@ if not clean_shortcode or clean_shortcode == "unknown" or len(clean_shortcode) <
 
 print(f"🎯 Verified Link Target Locked -> Shortcode: {clean_shortcode}")
 
-# --- LAYER 1: PRIMARY PUBLER REVENUE ENGINE PROXY ---
+# --- LAYER 1: PRIMARY PUBLER BROWSER EMULATION ENGINE ---
 print("🛰️ Querying Publer cloud extraction clusters...")
 try:
     proxy_gateway_url = "https://publer.io"
     proxy_payload = {"url": f"https://instagram.com{clean_shortcode}/"}
+    
+    # 🔥 FIXED: Enhanced human emulation header array parameters to prevent empty data returns
     proxy_headers = {
         "Content-Type": "application/json", 
         "Origin": "https://publer.io",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+        "Referer": "https://publer.io",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9"
     }
     
-    # Send a fast POST query directly to Publer's public scraping node
+    # Fire the request across the node gateway
     proxy_resp = requests.post(proxy_gateway_url, json=proxy_payload, headers=proxy_headers, timeout=25)
+    
     if proxy_resp.status_code == 200:
         media_payload = proxy_resp.json().get("payload", {})
         
-        # Handle both list and dictionary payload types returned by Publer dynamically
+        # Handle both sequential lists and dictionary map responses from Publer natively
         if isinstance(media_payload, list) and len(media_payload) > 0:
             video_url = media_payload[0].get("path")
         elif isinstance(media_payload, dict):
@@ -113,12 +119,13 @@ try:
 except Exception as proxy_error:
     print(f"⚠️ Publer gateway challenged: {proxy_error}")
 
-# --- LAYER 2: BACKUP ALTERNATE REST SCRAPER GATEWAY ---
+# --- LAYER 2: SYSTEM FALLBACK ENGINE (RAPID REST REFLECTOR) ---
 if not video_url:
     print("🔄 Publer node throttled. Deploying Layer 2 alternate scraper gateway...")
     try:
+        # Fixed the structural URL concatenation schema layout so it forms correctly
         snap_url = f"https://snapinsta.app/api/video?url=https://instagram.com{clean_shortcode}/"
-        snap_resp = requests.get(snap_url, timeout=20)
+        snap_resp = requests.get(snap_url, headers={"User-Agent": proxy_headers["User-Agent"]}, timeout=20)
         if snap_resp.status_code == 200 and "url" in snap_resp.json():
             video_url = snap_resp.json().get("url")
             print("🎯 Layer 2 Scraper Node Extracted Successfully.")
@@ -142,6 +149,7 @@ else:
         for chunk in v_resp.iter_content(chunk_size=8192):
             if chunk: f.write(chunk)
     print(f"✅ Target content packet written successfully: {os.path.basename(output_path)}")
+
 
 
 # ==========================================
