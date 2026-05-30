@@ -207,6 +207,8 @@ if res1.returncode != 0:
 print("✅ Step 1 Complete: Visual layers processed successfully.")
 
 
+
+
 # ==========================================
 # 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (NO REPEATS)
 # ==========================================
@@ -229,16 +231,20 @@ seo_metadata = {
 try:
     from transformers import AutoModelForCausalLM, AutoTokenizer
     model_id = "vikhyatk/moondream2"
-    revision = "2024-08-26" # Fast, stable production checkpoint for T4 card memory bounds
+    revision = "2024-08-26" # Stable production checkpoint for T4 card memory bounds
     
     print("📥 Loading vision-language weights into NVIDIA T4 VRAM maps...")
-    # Map the model cleanly to GPU processing lanes
-    tokenizer = AutoTokenizer.from_pretrained(model_id, revision=revision)
+    
+    # 🔥 FIXED: Added trust_remote_code=True here to eliminate the interactive [y/N] script hang prompt
+    tokenizer = AutoTokenizer.from_pretrained(model_id, revision=revision, trust_remote_code=True)
+    
+    # 🔥 FIXED: Initialized model using native AutoModelForCausalLM config layers to avoid the pad_token_id exception
     model = AutoModelForCausalLM.from_pretrained(
         model_id, 
         revision=revision, 
         trust_remote_code=True,
-        torch_dtype=torch.float16
+        low_cpu_mem_usage=True,
+        attn_implementation="eager"
     ).to("cuda")
     model.eval()
     print("🎯 Vision engine is live and listening.")
@@ -258,18 +264,20 @@ try:
         
         # 2. Fire structural analysis query to describe the unique visual elements of this specific clip
         print("📡 Inspecting video frame visuals...")
-        image_embeds = model.encode_image(pil_image)
-        visual_analysis = model.answer_question(
-            image_embeds, 
-            "Describe exactly what action, objects, colors, or materials are visible in this scene in 1 sentence. Be highly specific.", 
-            tokenizer
-        )
+        
+        # Run vision encoder sequence maps natively
+        with torch.no_grad():
+            image_embeds = model.encode_image(pil_image)
+            visual_analysis = model.answer_question(
+                image_embeds, 
+                "Describe exactly what action, objects, colors, or materials are visible in this scene in 1 sentence. Be highly specific.", 
+                tokenizer
+            )
         print(f"📸 Vision Scanner result: \"{visual_analysis}\"")
 
         # 3. Use the visual description to construct completely custom SEO metrics dynamically
         print("✍️ Extrapolating trending metadata structures...")
         
-        # Algorithmic text builder loop creates completely unique text blocks per run based on what it saw
         clean_desc = visual_analysis.replace('"', '').replace('.', '').strip()
         
         generated_title = f"This {clean_desc} Is So Addictive! 🤯 #shorts"
