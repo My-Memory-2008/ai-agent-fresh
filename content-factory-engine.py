@@ -157,6 +157,7 @@ output_path = execute_unmangled_ytdlp_download()
 
 
 
+
 # ==========================================
 # 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
@@ -189,11 +190,14 @@ from pytesseract import Output
 import subprocess
 
 # --------------------------------------------------
-# PHASE A: HIGH-PERFORMANCE MULTI-FRAME AI WATERMARK ERASER
+# PHASE A: MULTI-FRAME AI WATERMARK LOCATOR & CLEANER
 # --------------------------------------------------
 print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
+orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+fps = cap.get(cv2.CAP_PROP_FPS)
 
 sample_frames = [
     int(frame_count * 0.10), 
@@ -223,27 +227,50 @@ for idx in sample_frames:
             h = ocr_data['height'][i]
             
             # Pad the bounding tracking parameters outward to fully isolate text glows
-            padding_box = (max(0, x - 20), max(0, y - 15), w + 40, h + 30)
+            padding_box = (max(0, x - 10), max(0, y - 5), w + 20, h + 10)
             watermark_bounding_boxes.append(padding_box)
 
 cap.release()
 unique_boxes = list(set(watermark_bounding_boxes))
 
-# We initialize a global coordinate fallback so our text effects know exactly where to render on screen!
+# Default alignment values if no watermark is found
+final_x, final_y, final_w, final_h = 420, 160, 240, 70
+
 if unique_boxes:
-    # Use the first identified target box layout parameters as our masking canvas coordinates
     bx, by, bw, bh = unique_boxes[0]
-    print(f"🎯 AI Scanner localized watermark. Mask coordinates locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+    print(f"🎯 Watermark localized in raw video layout -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+    
+    # --------------------------------------------------
+    # 🔥 THE PROJECTION ENGINE CORE
+    # Translates raw video coordinates onto the final 1080x1920 scaled vertical canvas
+    # --------------------------------------------------
+    # Calculate the dynamic downscaling ratios matching your FFmpeg scale profile (max size 918x1632)
+    scale_factor = min(918.0 / orig_width, 1632.0 / orig_height)
+    
+    scaled_w = bw * scale_factor
+    scaled_h = bh * scale_factor
+    
+    # Calculate the exact center offset offset values where the overlay script places the main clip
+    offset_x = (1080.0 - (orig_width * scale_factor)) / 2.0
+    offset_y = (1920.0 - (orig_height * scale_factor)) / 2.0
+    
+    # Project the bounding coordinates cleanly onto the true 1080x1920 pixel grid space
+    proj_x = (bx * scale_factor) + offset_x
+    proj_y = (by * scale_factor) + offset_y
+    
+    # Cast parameters to strict integers for the final FFmpeg drawtext configuration flags
+    final_x = int(proj_x)
+    final_y = int(proj_y)
+    final_w = int(scaled_w)
+    final_h = int(scaled_h)
+    
+    print(f"🚀 Canvas Matrix Shift Successful! Projected coordinates -> X:{final_x}, Y:{final_y}, W:{final_w}, H:{final_h}")
     
     print("🎨 Initializing OpenCV Fast-Marching Pixel Inpainter...")
     cap = cv2.VideoCapture(output_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    
     TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (width, height))
+    video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
     
     while cap.isOpened():
         ret, frame = cap.read()
@@ -252,7 +279,6 @@ if unique_boxes:
         raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
         
-        # Execute base texture marching to clear out the original letters completely
         healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
         video_writer.write(healed_frame)
         
@@ -268,16 +294,12 @@ if unique_boxes:
     
     if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 else:
-    print("✨ Clean Layout Check! Zero handle watermarks discovered. Assigning center-top brand fallback coordinates.")
-    # Safe fallback box parameters (centered near the upper third margin line)
-    bx, by, bw, bh = 420, 160, 240, 70
+    print("✨ Clean Layout Check! Zero watermarks found. Using center-top defaults.")
     CLEAN_INPUT_STAGE1 = output_path
 
 # --------------------------------------------------
-# PHASE B: APPLY Advanced PORTRAIT Canvas & SEAMLESS OVERLAY CLOAK
+# PHASE B: APPLY FILTER STACK & CENTER BRAND TEXT BOX OVER BLUR
 # --------------------------------------------------
-print("🎬 Injecting stylized branding accent box directly over the healed region coordinates...")
-
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
@@ -290,20 +312,17 @@ effects = [
 ]
 chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# Calculate text alignment metrics based on our locked bounding coordinates
-text_x = f"{bx} + ({bw} - tw)/2"
-text_y = f"{by} + ({bh} - th)/2"
+# Mathematically centers your text handle perfectly inside the box on the final 1080x1920 layout
+text_alignment_x = f"{final_x} + ({final_w} - tw)/2"
+text_alignment_y = f"{final_y} + ({final_h} - th)/2"
 
-# 🔥 THE PRO ACCENT LAYER ENGINE:
-# 1. draws a sleek semi-transparent charcoal box (box=1:boxcolor=black@0.65) directly over the old blurred box parameters
-# 2. Adds an elegant, high-contrast white text layout with a smooth text border outline (borderw=2:bordercolor=black)
-# This completely hides the blur and redirects the viewer's eyes entirely to your brand!
+# Generates a sleek, custom box over the exact blurred coordinates, completely covering any smudge artifacts
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
     f"[processed_source]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x={text_x}:y={text_y}:fontsize=42:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.75:boxborderw=10[v]"
+    f"[grained]drawtext=text='@AWRAM':x={text_alignment_x}:y={text_alignment_y}:fontsize=42:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.75:boxborderw=10[v]"
 )
 
 # Render Step 1: Fully process video transformations into constant 30fps container lanes
