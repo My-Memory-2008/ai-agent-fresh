@@ -74,12 +74,12 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (DIRECT HARD IP BYPASS MATRIX)
+# 3. DOWNLOAD REEL (UNMANGLED URLLIB3 SOCKET BYPASS)
 # ==========================================
-print("📥 Initializing direct hard-IP socket download matrix...")
+print("📥 Initializing un-mangled low-level socket download matrix...")
 
-def execute_hard_ip_download_bypass():
-    # Clear out internal proxy configuration environment settings entirely
+def execute_urllib_clean_download():
+    # Purge any toxic environmental proxy blocks hidden in the Kaggle context
     proxy_keys = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"]
     for key in proxy_keys:
         if key in os.environ:
@@ -106,90 +106,85 @@ def execute_hard_ip_download_bypass():
     secret_sessionid = secrets.get_secret("IG_SESSIONID")
     secret_userid = secrets.get_secret("IG_USERID")
     
+    import urllib3
+    # Initialize a clean, un-proxied connection pool manager instance natively
+    http = urllib3.PoolManager(cert_reqs='CERT_NONE') # Prevents SSL handshake drops behind cloud firewalls
+    
     # ------------------------------------------
-    # LAYER 1: AUTHENTICATED NATIVE INSTAGRAM API (IP BYPASS)
+    # LAYER 1: DECOUPLED INDEPENDENT REST GATEWAY
     # ------------------------------------------
-    if secret_sessionid and secret_userid:
-        print("🔐 Injecting high-reputation session cookies straight into shell network layers...")
-        cookie_header = f"sessionid={secret_sessionid.strip()}; ds_user_id={secret_userid.strip()}"
-        mobile_api_url = f"https://instagram.com{l_code}/info/"
+    # We query the decoupled REST mirror using strict, pre-encoded dictionary parameters to stop URL squishing
+    print("🛰️ Layer 1: Querying independent REST data ingestion nodes...")
+    try:
+        rest_endpoint = "https://api.co"
+        query_fields = {'shortcode': str(l_code).strip()}
         
-        try:
-            # 🔥 HARD RESOLVE BYPASS: Map the domain to an absolute verified public Instagram load-balancer IP address array
-            # This completely avoids Kaggle's broken DNS engine, forcing an instant socket handshake!
-            curl_auth_cmd = [
-                "curl", "-s", "-L", "--noproxy", "*",
-                "--resolve", "://instagram.com:157.240.23.174",
-                "--resolve", "instagram.com:443:157.240.23.174",
-                "-A", "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-                "-H", f"Cookie: {cookie_header}",
-                "-H", "X-IG-App-ID: 936619743392459",
-                "-H", "X-Requested-With: XMLHttpRequest",
-                mobile_api_url
-            ]
-            
-            shell_output = subprocess.check_output(curl_auth_cmd, text=True, timeout=25)
-            
-            json_data = json.loads(shell_output)
-            items = json_data.get("items", [])
-            if items and len(items) > 0:
-                video_versions = items.get("video_versions", []) or items[0].get("video_versions", [])
-                if isinstance(video_versions, list) and len(video_versions) > 0:
-                    download_url = video_versions[0].get("url")
-                elif isinstance(video_versions, dict):
-                    download_url = video_versions.get("url")
-                    
-                if download_url:
-                    print("🎯 Layer 1 Authenticated App Extractor Successful via hard-IP mapping.")
-        except Exception as auth_error:
-            print(f"⚠️ Layer 1 authenticated shell challenge encountered: {auth_error}")
-
-    # ------------------------------------------
-    # LAYER 2: DECOUPLED ALTERNATE REST SCRAPER GATEWAY (IP BYPASS)
-    # ------------------------------------------
-    if not download_url:
-        print("🔄 Layer 1 bypassed or secrets empty. Deploying Layer 2 alternate network route...")
-        try:
-            rest_target_url = f"https://api.v0.api.co/instagram/media?shortcode={l_code}"
-            
-            # 🔥 HARD RESOLVE BYPASS: Map the public API mirror destination domain straight to its hosting node IP parameters
-            curl_rest_cmd = [
-                "curl", "-s", "-L", "--noproxy", "*",
-                "--resolve", "api.v0.api.co:443:104.21.31.226",
-                "--resolve", "api.v0.api.co:443:172.67.189.9",
-                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                rest_target_url
-            ]
-            rest_output = subprocess.check_output(curl_rest_cmd, text=True, timeout=25)
-            rest_data = json.loads(rest_output)
+        headers_rest = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+        }
+        
+        response = http.request('GET', rest_endpoint, fields=query_fields, headers=headers_rest, timeout=15.0)
+        
+        if response.status == 200:
+            import json
+            rest_data = json.loads(response.data.decode('utf-8'))
             if isinstance(rest_data, dict) and 'url' in rest_data:
                 download_url = rest_data.get('url')
-                print("🎯 Layer 2 REST Ingestion Track Successful via hard-IP mapping.")
-        except Exception as rest_error:
-            print(f"⚠️ Layer 2 alternate shell query bypassed: {rest_error}")
+                print("🎯 Layer 1 REST Ingestion Track Successful.")
+    except Exception as rest_error:
+        print(f"⚠️ Layer 1 socket layer query challenged: {rest_error}")
 
     # ------------------------------------------
-    # DATA WRITER LOOP: DOWNLOAD FLAT BINARIES VIA CURL (IP BYPASS)
+    # LAYER 2: AUTHENTICATED INTERNAL MOBILE API 
+    # ------------------------------------------
+    if not download_url and secret_sessionid and secret_userid:
+        print("🔄 Layer 1 challenged. Deploying Layer 2 Authenticated Session Handshake...")
+        try:
+            cookie_string = f"sessionid={secret_sessionid.strip()}; ds_user_id={secret_userid.strip()}"
+            auth_endpoint = f"https://instagram.com{str(l_code).strip()}/info/"
+            
+            headers_auth = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+                "Cookie": cookie_header_string if 'cookie_header_string' in locals() else cookie_string,
+                "X-IG-App-ID": "936619743392459",
+                "X-Requested-With": "XMLHttpRequest"
+            }
+            
+            response_auth = http.request('GET', auth_endpoint, headers=headers_auth, timeout=15.0)
+            
+            if response_auth.status == 200:
+                import json
+                json_data = json.loads(response_auth.data.decode('utf-8'))
+                items = json_data.get("items", [])
+                if items and len(items) > 0:
+                    video_versions = items[0].get("video_versions", [])
+                    if video_versions and len(video_versions) > 0:
+                        download_url = video_versions[0].get("url")
+                        print("🎯 Layer 2 Authenticated App Extractor Successful.")
+        except Exception as auth_error:
+            print(f"⚠️ Layer 2 authenticated socket query bypassed: {auth_error}")
+
+    # ------------------------------------------
+    # DATA WRITER LOOP: DOWNLOAD FLAT BINARIES VIA URLLIB3
     # ------------------------------------------
     if download_url:
         try:
             print("⬇️ Streaming raw video binaries natively into workspace partition...")
+            response_binary = http.request('GET', download_url, preload_content=False, timeout=60.0)
             
-            # Extract the raw host string layout from the returning signature to let cURL bridge the connection cleanly
-            domain_match = re.search(r'https://([^/]+)', download_url)
-            cdn_host = domain_match.group(1) if domain_match else "instagram.fmaa1-1.fna.fbcdn.net"
-            
-            curl_download_cmd = [
-                "curl", "-s", "-L", "--noproxy", "*",
-                "--resolve", f"{cdn_host}:443:157.240.23.18", # Fallback direct FB/Instagram CDN edge network node routing
-                "-o", final_output_path,
-                download_url
-            ]
-            subprocess.run(curl_download_cmd, check=True, timeout=90)
-            
-            if os.path.exists(final_output_path) and os.path.getsize(final_output_path) > 1000:
-                print(f"✅ Download Matrix Complete: {os.path.basename(final_output_path)}")
-                return final_output_path
+            if response_binary.status == 200:
+                with open(final_output_path, "wb") as file_pointer:
+                    while True:
+                        data_chunk = response_binary.read(8192)
+                        if not data_chunk:
+                            break
+                        file_pointer.write(data_chunk)
+                response_binary.release_conn()
+                
+                if os.path.exists(final_output_path) and os.path.getsize(final_output_path) > 1000:
+                    print(f"✅ Download Matrix Complete: {os.path.basename(final_output_path)}")
+                    return final_output_path
         except Exception as file_write_error:
             print(f"⚠️ Binary tracking stream loop encountered terminal errors: {file_write_error}")
 
@@ -204,8 +199,8 @@ def execute_hard_ip_download_bypass():
     print(f"⚠️ Safety fallback buffer deployed at location: {final_output_path}")
     return final_output_path
 
-# Execute the isolated local shell bypass function to set global pipeline tracks cleanly
-output_path = execute_hard_ip_download_bypass()
+# Execute the isolated local urllib3 bypass function to set global variables safely
+output_path = execute_urllib_clean_download()
 
 
 
