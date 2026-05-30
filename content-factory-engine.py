@@ -158,9 +158,9 @@ output_path = execute_unmangled_ytdlp_download()
 
 
 # ==========================================
-# 4. STEP 1: EXECUTE SEAMLESS CLOAKING & ADVANCED VIDEO EDITING
+# 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
-print("🚀 Step 1: Initiating professional seamless cloaking and visual FX canvas...")
+print("🚀 Step 1: Initiating professional seamless cloaking and brand accent visual canvas...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -182,12 +182,14 @@ gc.collect()
 torch.cuda.empty_cache()
 
 import cv2
+import random
 import numpy as np
 import pytesseract
 from pytesseract import Output
+import subprocess
 
 # --------------------------------------------------
-# PHASE A: HIGH-PERFORMANCE SEAMLESS CLOAKING MATRIX
+# PHASE A: HIGH-PERFORMANCE MULTI-FRAME AI WATERMARK ERASER
 # --------------------------------------------------
 print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
@@ -227,9 +229,13 @@ for idx in sample_frames:
 cap.release()
 unique_boxes = list(set(watermark_bounding_boxes))
 
+# We initialize a global coordinate fallback so our text effects know exactly where to render on screen!
 if unique_boxes:
-    print(f"🎯 AI Scanner localized {len(unique_boxes)} watermark regions. Activating Cloaking Matrix...")
+    # Use the first identified target box layout parameters as our masking canvas coordinates
+    bx, by, bw, bh = unique_boxes[0]
+    print(f"🎯 AI Scanner localized watermark. Mask coordinates locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
     
+    print("🎨 Initializing OpenCV Fast-Marching Pixel Inpainter...")
     cap = cv2.VideoCapture(output_path)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -243,34 +249,12 @@ if unique_boxes:
         ret, frame = cap.read()
         if not ret: break
         
-        # 1. Generate core raw mask channel
         raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-        for box in unique_boxes:
-            bx, by, bw, bh = box
-            cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
+        cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
         
-        # 2. 🔥 UPGRADE: Morphological Dilate & Feathering
-        # Expands and softens mask edges so the color gradient transitions blend smoothly
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-        dilated_mask = cv2.dilate(raw_mask, kernel, iterations=1)
-        feathered_mask = cv2.GaussianBlur(dilated_mask, (11, 11), 0)
-        
-        # 3. 🔥 UPGRADE: Navier-Stokes Texture Marching Flow
-        # Bypasses hard geometric cuts by matching color gradients along fluid equations
-        healed_frame = cv2.inpaint(frame, dilated_mask, inpaintRadius=8, flags=cv2.INPAINT_NS)
-        
-        # 4. 🔥 UPGRADE: Localized Smart Grain Injection
-        # Extracts native frame noise variations and layers matching grain back onto the smooth patch
-        noise_layer = np.random.normal(0, 3.8, frame.shape).astype(np.int16)
-        grained_frame = healed_frame.astype(np.int16) + noise_layer
-        grained_frame = np.clip(grained_frame, 0, 255).astype(np.uint8)
-        
-        # Merge the noise-stabilized patch only over the masked area to keep the rest crisp
-        mask_normalized = dilated_mask.astype(float) / 255.0
-        mask_3d = cv2.merge([mask_normalized, mask_normalized, mask_normalized])
-        
-        final_patched_frame = (grained_frame * mask_3d + frame * (1.0 - mask_3d)).astype(np.uint8)
-        video_writer.write(final_patched_frame)
+        # Execute base texture marching to clear out the original letters completely
+        healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
+        video_writer.write(healed_frame)
         
     cap.release()
     video_writer.release()
@@ -283,15 +267,16 @@ if unique_boxes:
     ], check=True, capture_output=True)
     
     if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-    print("✨ Visual Cloaking Complete! Watermarks completely erased from video tracking paths.")
 else:
-    print("✨ Clean Layout Check! Zero handle watermarks discovered on canvas frames. Bypassing cloaker.")
+    print("✨ Clean Layout Check! Zero handle watermarks discovered. Assigning center-top brand fallback coordinates.")
+    # Safe fallback box parameters (centered near the upper third margin line)
+    bx, by, bw, bh = 420, 160, 240, 70
     CLEAN_INPUT_STAGE1 = output_path
 
 # --------------------------------------------------
-# PHASE B: APPLY Advanced 9:16 PORTRAIT CANVAS FILTERS
+# PHASE B: APPLY Advanced PORTRAIT Canvas & SEAMLESS OVERLAY CLOAK
 # --------------------------------------------------
-print("🎬 Applying cinematic visual filters, grain stack, and branding overlays...")
+print("🎬 Injecting stylized branding accent box directly over the healed region coordinates...")
 
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
@@ -305,12 +290,20 @@ effects = [
 ]
 chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
+# Calculate text alignment metrics based on our locked bounding coordinates
+text_x = f"{bx} + ({bw} - tw)/2"
+text_y = f"{by} + ({bh} - th)/2"
+
+# 🔥 THE PRO ACCENT LAYER ENGINE:
+# 1. draws a sleek semi-transparent charcoal box (box=1:boxcolor=black@0.65) directly over the old blurred box parameters
+# 2. Adds an elegant, high-contrast white text layout with a smooth text border outline (borderw=2:bordercolor=black)
+# This completely hides the blur and redirects the viewer's eyes entirely to your brand!
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
     f"[processed_source]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
+    f"[grained]drawtext=text='@AWRAM':x={text_x}:y={text_y}:fontsize=42:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.75:boxborderw=10[v]"
 )
 
 # Render Step 1: Fully process video transformations into constant 30fps container lanes
@@ -328,7 +321,8 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("✅ Step 1 Complete: Watermarks erased and portrait layout transformations processed successfully.")
+print("✅ Step 1 Complete: Watermark covered with professional brand accent canvas successfully.")
+
 
 
 # ==========================================
