@@ -1,7 +1,6 @@
 # %% [code]
 # %% [code]
 # %% [code]
-# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -71,104 +70,78 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 
-
 # ==========================================
-# 3. DOWNLOAD REEL (BRONZE BULLET ANTI-LIMIT MATRIX)
+# 3. DOWNLOAD REEL (PUBLER PRIMARY CDN GATEWAY)
 # ==========================================
-print("📥 Initializing 3-layer anti-rate limit video download matrix...")
+print("📥 Fetching direct video stream vectors via Publer API Nodes...")
 video_url = None
 
-# DEFENSIVE RE-VALIDATION ENGINE: Prevents "unknown" shortcode path execution drops
+# DEFENSIVE RE-VALIDATION ENGINE: Guarantees shortcode extraction maps safely
 clean_shortcode = str(shortcode).strip() if 'shortcode' in locals() and shortcode else ""
 current_reel_url = str(pipeline.get("reel_url", "")).strip()
 
 if not clean_shortcode or clean_shortcode == "unknown" or len(clean_shortcode) < 3:
-    print("⚠️ Shortcode missing or marked unknown. Scraping raw link parameters manually...")
     url_match = re.search(r'/(?:reel|p|tv|share/reel)/([^/?#&]+)', current_reel_url)
-    if url_match:
-        clean_shortcode = url_match.group(1)
-    else:
-        clean_shortcode = pipeline.get("shortcode", "").strip()
+    clean_shortcode = url_match.group(1) if url_match else pipeline.get("shortcode", "").strip()
 
 print(f"🎯 Verified Link Target Locked -> Shortcode: {clean_shortcode}")
 
-if not clean_shortcode or clean_shortcode == "unknown":
-    print("⚠️ Link coordinates unresolvable. Using high-availability fallback asset...")
-    clean_shortcode = "Cq3CSUXLoXU" 
-
-# High-reputation mobile browser emulation signature mapping
-headers_ig = {
-    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-    "Accept": "*/*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Sec-Fetch-Mode": "cors",
-    "X-IG-App-ID": "936619743392459"
-}
-
-# --- LAYER 1: DIRECT INSTAGRAM PUBLIC API ENVELOPE ---
-print("🛰️ Layer 1: Querying Instagram core public REST node servers...")
+# --- LAYER 1: PRIMARY PUBLER REVENUE ENGINE PROXY ---
+print("🛰️ Querying Publer cloud extraction clusters...")
 try:
-    api_url = f"https://instagram.com{clean_shortcode}/?__a=1&__d=dis"
-    resp = requests.get(api_url, headers=headers_ig, timeout=20)
-    if resp.status_code == 200 and 'items' in resp.json() and len(resp.json()['items']) > 0:
-        item = resp.json()['items'][0]
-        if 'video_versions' in item and len(item['video_versions']) > 0:
-            video_url = item['video_versions'][0].get('url')
-            print("🎯 Layer 1 Download Signature Extracted Successfully.")
-except Exception as e:
-    print(f"⚠️ Layer 1 bypassed (Network Challenge Lock): {e}")
-
-# --- LAYER 2: SYSTEM SERVICE GATEWAY PROXY (PUBLER API AGENT) ---
-if not video_url:
-    print("🔄 Layer 1 bypassed. Deploying Layer 2 off-datacenter proxy instance...")
-    try:
-        proxy_gateway_url = "https://publer.io"
-        proxy_payload = {"url": f"https://instagram.com{clean_shortcode}/"}
-        proxy_headers = {"Content-Type": "application/json", "Origin": "https://publer.io"}
+    proxy_gateway_url = "https://publer.io"
+    proxy_payload = {"url": f"https://instagram.com{clean_shortcode}/"}
+    proxy_headers = {
+        "Content-Type": "application/json", 
+        "Origin": "https://publer.io",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    # Send a fast POST query directly to Publer's public scraping node
+    proxy_resp = requests.post(proxy_gateway_url, json=proxy_payload, headers=proxy_headers, timeout=25)
+    if proxy_resp.status_code == 200:
+        media_payload = proxy_resp.json().get("payload", {})
         
-        proxy_resp = requests.post(proxy_gateway_url, json=proxy_payload, headers=proxy_headers, timeout=25)
-        if proxy_resp.status_code == 200:
-            media_payload = proxy_resp.json().get("payload", [])
-            if isinstance(media_payload, list) and len(media_payload) > 0:
-                video_url = media_payload[0].get("path")
-            elif isinstance(media_payload, dict):
-                video_url = media_payload.get("path")
-            if video_url:
-                print("🎯 Layer 2 Proxy Handshake Extracted Successfully.")
-    except Exception as proxy_error:
-        print(f"⚠️ Layer 2 proxy endpoint challenged: {proxy_error}")
+        # Handle both list and dictionary payload types returned by Publer dynamically
+        if isinstance(media_payload, list) and len(media_payload) > 0:
+            video_url = media_payload[0].get("path")
+        elif isinstance(media_payload, dict):
+            video_url = media_payload.get("path")
+            
+        if video_url:
+            print("🎯 SUCCESS! Publer bypassed Instagram block and returned raw stream coordinates.")
+except Exception as proxy_error:
+    print(f"⚠️ Publer gateway challenged: {proxy_error}")
 
-# --- LAYER 3: ALTERNATE PUBLIC WEB SCRAPER REFLECTOR ---
+# --- LAYER 2: BACKUP ALTERNATE REST SCRAPER GATEWAY ---
 if not video_url:
-    print("🔄 Layer 2 bypassed. Deploying Layer 3 secondary reflection nodes...")
+    print("🔄 Publer node throttled. Deploying Layer 2 alternate scraper gateway...")
     try:
         snap_url = f"https://snapinsta.app/api/video?url=https://instagram.com{clean_shortcode}/"
-        snap_resp = requests.get(snap_url, headers={"User-Agent": headers_ig["User-Agent"]}, timeout=20)
+        snap_resp = requests.get(snap_url, timeout=20)
         if snap_resp.status_code == 200 and "url" in snap_resp.json():
             video_url = snap_resp.json().get("url")
-            print("🎯 Layer 3 Scraper Node Extracted Successfully.")
+            print("🎯 Layer 2 Scraper Node Extracted Successfully.")
     except Exception as snap_error:
-        print(f"⚠️ Layer 3 challenged: {snap_error}")
+        print(f"⚠️ Layer 2 fallback challenged: {snap_error}")
 
-# --- CONTAINER WORKSPACE INSULATION CRITICAL GATEWAY ---
+# --- TIMELINE CONTAINER WORKSPACE INSULATION GATEWAY ---
 if not video_url:
-    print("❌ Critical Alert: Instagram blocked all scraper tunnels across this datacenter cluster node.")
-    print("📋 Triggering local cache safety loop to keep pipeline tracking paths open...")
+    print("❌ Critical Alarm: All external proxy nodes are experiencing connection drops.")
+    print("📋 Deploying emergency local cache safety buffer...")
     output_path = os.path.join(RAW_DIR, "placeholder_safety_buffer.mp4")
     if not os.path.exists(output_path):
-        # Generates a standard baseline file so the pipeline filters don't crash from an empty input file pointer
         subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "libx264", "-c:a", "aac", "-shortest", output_path], check=True, capture_output=True)
-    print(f"⚠️ Safety fallback buffer deployed at location: {output_path}")
 else:
-    print(f"⬇️ Streaming video asset packet vectors down from verified CDN endpoint...")
-    v_resp = requests.get(video_url, stream=True, timeout=120, headers={"User-Agent": headers_ig["User-Agent"]})
+    # Stream the raw video data blocks securely into your Kaggle workspace storage partition
+    print(f"⬇️ Downloading video binary assets from direct CDN endpoint...")
+    v_resp = requests.get(video_url, stream=True, timeout=120)
     v_resp.raise_for_status()
     output_path = os.path.join(RAW_DIR, f"{username}_{clean_shortcode}.mp4")
     with open(output_path, 'wb') as f:
         for chunk in v_resp.iter_content(chunk_size=8192):
             if chunk: f.write(chunk)
-    print(f"✅ Target content packet written successfully: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
-
+    print(f"✅ Target content packet written successfully: {os.path.basename(output_path)}")
 
 
 # ==========================================
