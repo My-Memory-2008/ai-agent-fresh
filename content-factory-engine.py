@@ -157,10 +157,11 @@ output_path = execute_unmangled_ytdlp_download()
 
 
 
+
 # ==========================================
-# 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
+# 4. STEP 1: EXECUTE SEAMLESS AI CLOAK & NATIVE FRAME BAKING
 # ==========================================
-print("🚀 Step 1: Initiating subtle professional cloaking and light brand accent visual canvas...")
+print("🚀 Step 1: Initiating pixel-perfect visual cloaking and brand integration canvas...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -189,7 +190,7 @@ from pytesseract import Output
 import subprocess
 
 # --------------------------------------------------
-# PHASE A: MULTI-FRAME AI WATERMARK LOCATOR & CLEANER
+# PHASE A: MULTI-FRAME WATERMARK DETECTOR & SEAMLESS FRAME BAKER
 # --------------------------------------------------
 print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
@@ -225,71 +226,90 @@ for idx in sample_frames:
             w = ocr_data['width'][i]
             h = ocr_data['height'][i]
             
-            # Pad the bounding tracking parameters outward to fully isolate text glows
-            padding_box = (max(0, x - 10), max(0, y - 5), w + 20, h + 10)
+            # Lock the exact original bounding boundaries with tight padding parameters
+            padding_box = (max(0, x - 12), max(0, y - 8), w + 24, h + 16)
             watermark_bounding_boxes.append(padding_box)
 
 cap.release()
 unique_boxes = list(set(watermark_bounding_boxes))
 
-# Default alignment values if no watermark is found
-final_x, final_y, final_w, final_h = 420, 160, 240, 70
+print("🎨 Initializing Native Pixel Inpainter & Localized Brand Overlay Engine...")
+cap = cv2.VideoCapture(output_path)
+TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
+
+# Define native branding metrics
+font_face = cv2.FONT_HERSHEY_SIMPLEX
+font_scale = 0.55
+font_thickness = 1
 
 if unique_boxes:
     bx, by, bw, bh = unique_boxes[0]
-    print(f"🎯 Watermark localized in raw video layout -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+    print(f"🎯 Exact native coordinate match locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
     
-    # Calculate the dynamic downscaling ratios matching your FFmpeg scale profile (max size 918x1632)
-    scale_factor = min(918.0 / orig_width, 1632.0 / orig_height)
-    
-    # Project the bounding coordinates cleanly onto the true 1080x1920 pixel grid space
-    scaled_w = bw * scale_factor
-    scaled_h = bh * scale_factor
-    offset_x = (1080.0 - (orig_width * scale_factor)) / 2.0
-    offset_y = (1920.0 - (orig_height * scale_factor)) / 2.0
-    
-    # Cast parameters to strict integers and add 15% safety padding for absolute physical coverage
-    final_x = int((bx * scale_factor) + offset_x - 10)
-    final_y = int((by * scale_factor) + offset_y - 5)
-    final_w = int(scaled_w + 20)
-    final_h = int(scaled_h + 10)
-    
-    print(f"🚀 Projected coordinates locked -> X:{final_x}, Y:{final_y}, W:{final_w}, H:{final_h}")
-    
-    print("🎨 Initializing OpenCV Fast-Marching Pixel Inpainter...")
-    cap = cv2.VideoCapture(output_path)
-    TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
+    # Calculate perfect textual centering coordinates within the native box boundaries
+    (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    tx = bx + int((bw - text_w) / 2)
+    ty = by + int((bh + text_h) / 2)
     
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: break
         
+        # 1. Clear out original text completely via fast texture marching
         raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
+        healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
         
-        healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
+        # 2. 🔥 THE NATIVE OVERLAY ENGINE: Extracts the healed patch and darkens it lightly
+        overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (0, 0, 0), -1) # Dynamic charcoal block
+        
+        # Alpha-blend the darkened matte box to keep it completely see-through and non-intrusive
+        alpha_box = 0.40
+        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_box, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_box, 0)
+        
+        # 3. 🔥 Light, high-readability dimmed branding text layout injection
+        # Draws a very subtle text dropshadow outline first, followed by semi-transparent white text
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, (10, 10, 10), font_thickness + 1, cv2.LINE_AA) # Shadow
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, (230, 230, 230), font_thickness, cv2.LINE_AA) # Light Text
+        
         video_writer.write(healed_frame)
-        
-    cap.release()
-    video_writer.release()
-    
-    CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
-        "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
-        CLEAN_INPUT_STAGE1
-    ], check=True, capture_output=True)
-    
-    if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 else:
-    print("✨ Clean Layout Check! Zero watermarks found. Using center-top defaults.")
-    CLEAN_INPUT_STAGE1 = output_path
+    print("✨ Clean Layout Check! Zero handle watermarks found. Rendering fallback branding overlays...")
+    # Safe top-center default patch layout if no watermark was detected in the stream
+    bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
+    (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    tx, ty = bx + int((bw - text_w) / 2), by + int((bh + text_h) / 2)
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+        overlay_roi = frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (0, 0, 0), -1)
+        frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.35, frame[by:by+bh, bx:bx+bw], 0.65, 0)
+        cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (240, 240, 240), font_thickness, cv2.LINE_AA)
+        video_writer.write(frame)
+
+cap.release()
+video_writer.release()
+
+CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
+subprocess.run([
+    "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
+    "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
+    CLEAN_INPUT_STAGE1
+], check=True, capture_output=True)
+
+if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
+print("✅ Phase A Complete: Watermark covered natively inside local pixel arrays.")
 
 # --------------------------------------------------
-# PHASE B: APPLY FILTER STACK & CENTER BRAND TEXT BOX OVER BLUR
+# PHASE B: APPLY Advanced 9:16 PORTRAIT CANVAS FILTERS
 # --------------------------------------------------
+print("🎬 Applying cinematic visual filters, grain stack, and portrait layouts...")
+
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
@@ -302,28 +322,19 @@ effects = [
 ]
 chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# Mathematically centers your text handle perfectly inside the box on the final 1080x1920 layout
-text_alignment_x = f"{final_x} + ({final_w} - tw)/2"
-text_alignment_y = f"{final_y} + ({final_h} - th)/2"
-
-# 🔥 THE SUBTLE INTENTIONAL COVER UP ENGINE:
-# 1. drawbox: Draws an absolute solid geometric box (t=fill) using semi-transparent black (black@0.40) over the exact blur coordinates.
-# 2. drawtext: Places a light, highly subtle semi-transparent text watermark layer (white@0.45) cleanly centered on top.
+# Completely removed drawtext and drawbox from FFmpeg to prevent scaling and displacement bugs!
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
-    f"[processed_source]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawbox=x={final_x}:y={final_y}:w={final_w}:h={final_h}:color=black@0.40:t=fill[covered];"
-    f"[covered]drawtext=text='@AWRAM':x={text_alignment_x}:y={text_alignment_y}:fontsize=38:fontcolor=white@0.45:borderw=1:bordercolor=black@0.20[v]"
+    f"[processed_source]noise=alls=7:allf=t+u[v]"
 )
 
-# Render Step 1: Fully process video transformations into constant 30fps container lanes
 ffmpeg_editing = [
     "ffmpeg", "-y", "-hwaccel", "cuda", 
     "-i", CLEAN_INPUT_STAGE1,          
     "-filter_complex", filter_complex_editing, 
-    "-map", "[v]",      
+    "-map", "[v]", "-map", "0:a?",     
     "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30", "-pix_fmt", "yuv420p",
     EDITED_SOURCE_ONLY
 ]
@@ -333,7 +344,8 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("✅ Step 1 Complete: Watermark covered flawlessly with a subtle, non-intrusive brand accent overlay.")
+print("🏆 SUCCESS! Step 1 Complete: Millimeter-accurate native brand patch rendered flawlessly.")
+
 
 
 
