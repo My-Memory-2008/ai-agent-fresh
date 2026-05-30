@@ -209,17 +209,17 @@ print("✅ Step 1 Complete: Visual layers processed successfully.")
 
 
 
-# ==========================================
+## ==========================================
 # 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (NO REPEATS)
 # ==========================================
-print("🧠 Activating Local Multimodal Vision AI Engine on GPU...")
-import torch
+print("🧠 Activating Cloud Vision AI Engine via Google GenAI...")
 import cv2
 import json
 import os
 from PIL import Image
 
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
+TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
 # Safety default fallback metadata structure
 seo_metadata = {
@@ -228,88 +228,74 @@ seo_metadata = {
     "tags": ["satisfying", "asmr", "shorts", "relaxing"]
 }
 
-try:
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    model_id = "vikhyatk/moondream2"
-    revision = "2024-08-26" # Stable production checkpoint for T4 card memory bounds
-    
-    print("📥 Loading vision-language weights into NVIDIA T4 VRAM maps...")
-    
-    # 🔥 FIXED: Added trust_remote_code=True here to eliminate the interactive [y/N] script hang prompt
-    tokenizer = AutoTokenizer.from_pretrained(model_id, revision=revision, trust_remote_code=True)
-    
-    # 🔥 FIXED: Initialized model using native AutoModelForCausalLM config layers to avoid the pad_token_id exception
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id, 
-        revision=revision, 
-        trust_remote_code=True,
-        low_cpu_mem_usage=True,
-        attn_implementation="eager"
-    ).to("cuda")
-    model.eval()
-    print("🎯 Vision engine is live and listening.")
+# Fetch your secure environment token out of Kaggle User Secrets Vault
+# Make sure you have a secret named "GEMINI_API_KEY" set up in your Kaggle notebook!
+gemini_key = secrets.get_secret("GEMINI_API_KEY")
 
-    # 1. Capture a mid-timeline frame directly from your edited source video file
-    print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
-    cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45)) # Grab frame right in the middle of action
-    ret, frame = cap.read()
-    cap.release()
+if gemini_key:
+    try:
+        from google import genai
+        from google.genai import types
+        
+        # Initialize the official secure Google GenAI Client
+        client = genai.Client(api_key=gemini_key.strip())
+        
+        # 1. Capture a mid-timeline frame directly from your edited source video file
+        print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
+        cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45)) # Grab frame right in the middle of action
+        ret, frame = cap.read()
+        cap.release()
 
-    if ret:
-        # Convert raw CV2 BGR layout to Standard PIL RGB for the neural vision layers
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(rgb_frame)
-        
-        # 2. Fire structural analysis query to describe the unique visual elements of this specific clip
-        print("📡 Inspecting video frame visuals...")
-        
-        # Run vision encoder sequence maps natively
-        with torch.no_grad():
-            image_embeds = model.encode_image(pil_image)
-            visual_analysis = model.answer_question(
-                image_embeds, 
-                "Describe exactly what action, objects, colors, or materials are visible in this scene in 1 sentence. Be highly specific.", 
-                tokenizer
-            )
-        print(f"📸 Vision Scanner result: \"{visual_analysis}\"")
-
-        # 3. Use the visual description to construct completely custom SEO metrics dynamically
-        print("✍️ Extrapolating trending metadata structures...")
-        
-        clean_desc = visual_analysis.replace('"', '').replace('.', '').strip()
-        
-        generated_title = f"This {clean_desc} Is So Addictive! 🤯 #shorts"
-        if len(generated_title) > 65:
-            generated_title = f"Oddly Satisfying {clean_desc[:30]}! 🔥 #shorts"
+        if ret:
+            # Save the frame image locally to pass to the Vision API node
+            cv2.imwrite(TEMP_FRAME_PATH, frame)
+            pil_image = Image.open(TEMP_FRAME_PATH)
             
-        generated_desc = (
-            f"Can't stop watching this satisfying video showing {clean_desc.lower()}. "
-            f"The precision and flow in this loop is completely mesmerizing and therapeutic. "
-            f"Stick around for the surprise funny cat reaction loop at the end! Inspired by @{username}. Subscribe for more!"
-        )
-        
-        # Dynamically build tag vectors matching the video content strings
-        base_tags = ["satisfying", "asmr", "shorts", "viral"]
-        visual_keywords = [word.lower().strip(",.") for word in clean_desc.split() if len(word) > 4][:2]
-        generated_tags = base_tags + visual_keywords
-        
-        seo_metadata = {
-            "title": generated_title,
-            "description": generated_desc,
-            "tags": generated_tags[:6]
-        }
-        print(f"🎉 SUCCESS! Fresh Visual SEO Generated -> Title: \"{seo_metadata['title']}\"")
-    else:
-        raise RuntimeError("Frame capture extraction failed.")
+            print("📡 Uploading video frame to Gemini-2.5 Vision cluster for deep analysis...")
+            
+            seo_prompt = (
+                f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
+                f"Analyze this visual frame screenshot taken from a vertical loop video created by @{username}.\n\n"
+                f"Tasks:\n"
+                f"1. YOUTUBE_TITLE: Write a highly clickable title (Max 65 characters) describing the satisfying action visible in the image. End strictly with #shorts.\n"
+                f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about what is happening in this loop. "
+                f"Sentence 2 states why this unique ASMR content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
+                f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords describing the objects or materials visible in the image.\n\n"
+                f"Return your response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks, 'json' headings, or introductory conversational filler text."
+            )
 
-except Exception as vision_error:
-    print(f"⚠️ Local vision block failed, using system fallback arrays: {vision_error}")
+            # Fire the high-speed multimodal generation query
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[pil_image, seo_prompt]
+            )
+            
+            # Clean response boundaries of potential text wrappers cleanly before unpacking
+            clean_json_text = response.text.strip().replace('```json', '').replace('```', '').strip()
+            ai_seo_data = json.loads(clean_json_text)
+            
+            seo_metadata = {
+                "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+                "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+                "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+            }
+            print(f"🎉 SUCCESS! Fresh Visual SEO Generated via Gemini -> Title: \"{seo_metadata['title']}\"")
+            
+            # Cleanup temp file from disk partition
+            if os.path.exists(TEMP_FRAME_PATH):
+                os.remove(TEMP_FRAME_PATH)
+        else:
+            raise RuntimeError("Frame capture extraction failed.")
 
-# Clean up GPU tracking tensors from VRAM to prevent downstream rendering halts
-if 'model' in locals(): del model
-if 'tokenizer' in locals(): del tokenizer
+    except Exception as vision_error:
+        print(f"⚠️ Cloud vision block failed, using system fallback arrays: {vision_error}")
+else:
+    print("⚠️ GEMINI_API_KEY secret missing in Kaggle vault. Bypassing cloud vision block.")
+
+# Force a memory purge to ensure the GPU is 100% clean for your upcoming video processing stages
+import torch
 torch.cuda.empty_cache()
 
 # Save metadata manifest file to drive partition for Section 6 upload mapping
