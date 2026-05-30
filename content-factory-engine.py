@@ -156,10 +156,11 @@ def execute_unmangled_ytdlp_download():
 output_path = execute_unmangled_ytdlp_download()
 
 
+
 # ==========================================
-# 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
+# 4. STEP 1: EXECUTE AI WATERMARK ERASURE & ADVANCED VIDEO EDITING
 # ==========================================
-print("🚀 Step 1: Initiating full visual editing transformation canvas...")
+print("🚀 Step 1: Initiating AI watermark erasure engine and visual FX transformations...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -181,43 +182,108 @@ gc.collect()
 torch.cuda.empty_cache()
 
 import cv2
+import numpy as np
 import pytesseract
 from pytesseract import Output
 
-# --- AI OCR CHECKPOINT: USERNAME WATERMARK REMOVER ---
-print("👁️ Scanning frame layers for creator username text signatures...")
+# --------------------------------------------------
+# PHASE A: HIGH-PERFORMANCE MULTI-FRAME AI WATERMARK ERASER
+# --------------------------------------------------
+print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-text_watermark_box = None
-clean_username_target = username.lower().strip()
+
+# Multi-frame scanning matrix to catch any moving, fading, or stationary handles across the timeline
+sample_frames = [
+    int(frame_count * 0.10), 
+    int(frame_count * 0.30), 
+    int(frame_count * 0.50), 
+    int(frame_count * 0.70), 
+    int(frame_count * 0.90)
+]
+watermark_bounding_boxes = []
 
 for idx in sample_frames:
     cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
     ret, frame = cap.read()
     if not ret: continue
+    
+    # Pre-process frame layouts to maximize OCR character edge recognition precision
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
     
     for i in range(len(ocr_data['text'])):
-        detected_word = str(ocr_data['text'][i]).lower().strip()
-        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
-            x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
-            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
-            break
-    if text_watermark_box: break
+        detected_word = str(ocr_data['text'][i]).strip().lower()
+        clean_target = str(username).strip().lower()
+        
+        # Lock target boundary if it contains the '@' symbol or matches known creator usernames
+        if '@' in detected_word or (len(detected_word) > 2 and (detected_word in clean_target or clean_target in detected_word)):
+            x = ocr_data['left'][i]
+            y = ocr_data['top'][i]
+            w = ocr_data['width'][i]
+            h = ocr_data['height'][i]
+            
+            # Pad the mask coordinates slightly outward to prevent character text edge pixel bleed ghosts
+            padding_box = (max(0, x - 18), max(0, y - 12), w + 36, h + 24)
+            watermark_bounding_boxes.append(padding_box)
+
 cap.release()
 
-if text_watermark_box:
-    x, y, w, h = text_watermark_box
-    print(f"🎯 Watermark Matched! Scrubbing region -> X:{x}, Y:{y}, W:{w}, H:{h}")
+# Eliminate duplicate coordinates to optimize hardware rendering pipelines
+unique_boxes = list(set(watermark_bounding_boxes))
+
+if unique_boxes:
+    print(f"🎯 AI Scanner localized {len(unique_boxes)} watermark text structures.")
+    print("🎨 Initializing OpenCV Fast-Marching Pixel Inpainter...")
+    
+    cap = cv2.VideoCapture(output_path)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    
+    TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (width, height))
+    
+    # Process the entire video file frame-for-frame to heal underlying text blocks natively
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+        
+        # Build a blank single-channel mask grid matching current container metrics
+        mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+        
+        # Draw hard filled block indicators inside the mask matrix matching the text boxes
+        for box in unique_boxes:
+            bx, by, bw, bh = box
+            cv2.rectangle(mask, (bx, by), (bx + bw, by + bh), 255, -1)
+        
+        # Execute pixel healing layout. Marching inward from adjacent edges makes text disappear smoothly
+        healed_frame = cv2.inpaint(frame, mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
+        video_writer.write(healed_frame)
+        
+    cap.release()
+    video_writer.release()
+    
+    # Remux original uncompressed sound tracks back onto the healed video asset container smoothly
     CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
-    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}", "-c:a", "copy", CLEAN_INPUT_STAGE1], check=True, capture_output=True)
+    subprocess.run([
+        "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
+        "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
+        CLEAN_INPUT_STAGE1
+    ], check=True, capture_output=True)
+    
+    if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
+    print("✨ AI Character Healing Complete! Watermarks completely erased from video tracking paths.")
 else:
-    print("✨ Clean Layout Check! Bypassing OCR erasure step.")
+    print("✨ Clean Layout Check! Zero handle watermarks discovered on canvas frames. Bypassing eraser.")
     CLEAN_INPUT_STAGE1 = output_path
 
-# --- APPLY 9:16 PORTRAIT VISUAL EDITING FILTER STACK ---
+# --------------------------------------------------
+# PHASE B: APPLY Advanced 9:16 PORTRAIT CANVAS FILTERS
+# --------------------------------------------------
+print("🎬 Applying cinematic visual filters, grain stack, and branding overlays...")
+
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
@@ -252,7 +318,9 @@ res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
 if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
-print("✅ Step 1 Complete: Visual layers processed successfully.")
+
+print("✅ Step 1 Complete: Watermarks erased and portrait layout transformations processed successfully.")
+
 
 
 
