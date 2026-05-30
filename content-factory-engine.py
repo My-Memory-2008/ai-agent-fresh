@@ -106,11 +106,10 @@ print(f"✅ Downloaded: {os.path.basename(output_path)} ({os.path.getsize(output
 
 
 
-
 # ==========================================
-# 4. STEP 1: EXECUTE ADVANCED VISUALS & EDITING TRANSFORMATIONS
+# 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
-print("🚀 Step 1: Initiating advanced visual fx editing canvas...")
+print("🚀 Step 1: Initiating full visual editing transformation canvas...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -168,56 +167,34 @@ else:
     print("✨ Clean Layout Check! Bypassing OCR erasure step.")
     CLEAN_INPUT_STAGE1 = output_path
 
-# --- ADVANCED PORTRAIT EFFECTS MATRIX STACK ---
-# 1. Randomized Color Grading Profiles (Cinematic Styles)
+# --- APPLY 9:16 PORTRAIT VISUAL EDITING FILTER STACK ---
 styles = [
-    "eq=contrast=1.12:brightness=0.02:saturation=1.22:gamma=0.95",  # Vibrant Cinematic Pop
-    "curves=m='0/0 0.22/0.15 0.5/0.5 0.78/0.85 1/1',eq=contrast=1.05", # Deep Tone S-Curve
-    "eq=contrast=1.02:brightness=0.01:saturation=1.15:gamma=1.02,curves=r='0/0 0.5/0.54 1/1':b='0/0 0.5/0.46 1/1'" # Teal & Orange Warmth
+    "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
+    "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
+    "eq=contrast=0.95:brightness=0.02:saturation=0.92:gamma=1.04"
 ]
-
-# 2. Advanced Overlay Textures & Sharpness Filters
 effects = [
-    "unsharp=3:3:0.7:3:3:0.7,eq=contrast=1.08", # Ultra-Crisp High Definition Textures
-    "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=saturation=1.1", # Tactical Edge Sharpener
-    "vignette=PI/4,eq=contrast=1.05:saturation=1.08" # Cinematic Vignette Focus
+    "convolution='-1 -1 -1 -1 9 -1 -1 -1 -1',eq=contrast=1.06:brightness=0.01",
+    "hue='H=0.1*PI*t:s=1.03'",
+    "eq=contrast=1.1:brightness=0.02:saturation=1.05"
 ]
-
 chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# 3. 🔥 FIXED: GPU-Compatible Cinematic Slow-Zoom Layout
-# Instead of a complex dynamic time crop, we pre-scale to a high canvas boundary and slowly transition inward via matching matrix arrays
-gpu_lens_zoom = "scale=1620:2880,zoompan=z='min(zoom+0.0015,1.25)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=918x1632"
-
-# 4. End-of-Clip Flash Transition Trigger (0.3-second cinematic exposure flash)
-flash_transition = "eq=brightness='if(gte(t,p_dur-0.3), (t-(p_dur-0.3))*1.5, 0)':contrast='if(gte(t,p_dur-0.3), 1+((t-(p_dur-0.3))*2), 1)'"
-
-def get_duration(file_path):
-    cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
-    return float(subprocess.check_output(cmd, shell=True).decode().strip())
-
-try:
-    p_duration = get_duration(CLEAN_INPUT_STAGE1)
-except Exception:
-    p_duration = 10.0 # Resilient fallback value
-
-# Unified graph map links streams smoothly using static output node tags
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
-    f"[0:v]{gpu_lens_zoom}[main_zoomed];"
-    f"[main_zoomed]{chosen_style}[main_styled];"
-    f"[bg][main_styled]overlay=(W-w)/2:(H-h)/2,setsar=1[merged_canvas];"
-    f"[merged_canvas]noise=alls=7:allf=t+u,{flash_transition.replace('p_dur', str(p_duration))}[grained];"
-    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=42:fontcolor=white@0.65:box=1:boxcolor=black@0.30[v]"
+    f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
+    f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
+    f"[processed_source]noise=alls=7:allf=t+u[grained];"
+    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
-# Render Step 1: Processes transitions and cinematic fx natively on NVIDIA NVENC hardware
+# Render Step 1: Fully process video transformations into constant 30fps container lanes
 ffmpeg_editing = [
     "ffmpeg", "-y", "-hwaccel", "cuda", 
     "-i", CLEAN_INPUT_STAGE1,          
     "-filter_complex", filter_complex_editing, 
     "-map", "[v]",      
-    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "18", "-r", "30", "-pix_fmt", "yuv420p",
+    "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-r", "30", "-pix_fmt", "yuv420p",
     EDITED_SOURCE_ONLY
 ]
 
@@ -225,7 +202,8 @@ res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
 if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
-print("✅ Step 1 Complete: Advanced visual zoom, transitions, and cinematic textures processed successfully.")
+print("✅ Step 1 Complete: Visual layers processed successfully.")
+
 
 
 # ==========================================
