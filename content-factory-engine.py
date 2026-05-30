@@ -69,10 +69,11 @@ username = pipeline.get("username", "unknown")
 print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
+
 # ==========================================
-# 3. DOWNLOAD REEL (FIXED LINK STRUCTURE MATRIX)
+# 3. DOWNLOAD REEL (DIRECT PUBLER API EXTRACTION GALAXY)
 # ==========================================
-print("📥 Initializing 3-layer anti-rate limit video download matrix...")
+print("📥 Querying Publer cloud extraction clusters for direct video stream link...")
 video_url = None
 
 # DEFENSIVE RE-VALIDATION ENGINE: Guarantees shortcode extraction maps safely
@@ -80,68 +81,59 @@ clean_shortcode = str(shortcode).strip() if 'shortcode' in locals() and shortcod
 current_reel_url = str(pipeline.get("reel_url", "")).strip()
 
 if not clean_shortcode or clean_shortcode == "unknown" or len(clean_shortcode) < 3:
-    print("⚠️ Shortcode string missing or marked unknown. Scraping raw link parameters manually...")
     url_match = re.search(r'/(?:reel|p|tv|share/reel)/([^/?#&]+)', current_reel_url)
-    if url_match:
-        clean_shortcode = url_match.group(1)
-    else:
-        clean_shortcode = pipeline.get("shortcode", "").strip()
+    clean_shortcode = url_match.group(1) if url_match else pipeline.get("shortcode", "").strip()
 
-print(f"🎯 Verified Link Target Locked -> Shortcode: {clean_shortcode}")
+print(f"🎯 Target Locked -> Shortcode: {clean_shortcode}")
 
-# Fix the base string map layout explicitly to remove variable path squishing errors
+# Format the clean absolute link structure layout
 TARGET_INSTAGRAM_LINK = f"https://instagram.com{clean_shortcode}/"
 
-headers_browser = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json"
+# Public Human Emulation Headers to prevent blockades
+publer_gateway_url = "https://publer.io"
+publer_payload = {"url": TARGET_INSTAGRAM_LINK}
+publer_headers = {
+    "Content-Type": "application/json",
+    "Origin": "https://publer.io",
+    "Referer": "https://publer.io",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 }
 
-# --- LAYER 1: DIRECT HIGH-AVAILABILITY DECOUPLED SCRAPER ---
-print("🛰️ Layer 1: Querying decoupled public REST ingestion clusters...")
 try:
-    # High-reputation public reflection gateway that bypasses session blockages natively
-    scraper_gateway_url = f"https://api.co{clean_shortcode}"
-    resp = requests.get(scraper_gateway_url, headers={"User-Agent": headers_browser["User-Agent"]}, timeout=20)
+    # Fire the exact POST payload tracking request to Publer's engine
+    resp = requests.post(publer_gateway_url, json=publer_payload, headers=publer_headers, timeout=30)
     
-    if resp.status_code == 200 and 'url' in resp.json():
-        video_url = resp.json().get('url')
-        print("🎯 Layer 1 Download Signature Extracted Successfully.")
-except Exception as layer1_error:
-    print(f"⚠️ Layer 1 bypassed (Network Gateway Challenge): {layer1_error}")
-
-# --- LAYER 2: CORRECTED SNAPINSTA WEB SCRAPER GATEWAY ---
-if not video_url:
-    print("🔄 Layer 1 challenged. Deploying Layer 2 alternate network route...")
-    try:
-        # 🔥 FIXED URL SCHEMA: Clean slashes applied across the string formatting configuration parameters
-        snap_url = f"https://snapinsta.app{TARGET_INSTAGRAM_LINK}"
-        snap_resp = requests.get(snap_url, headers={"User-Agent": headers_browser["User-Agent"]}, timeout=20)
+    if resp.status_code == 200:
+        raw_data = resp.json()
+        # Extract the interior payload mapping array
+        payload_data = raw_data.get("payload", [])
         
-        if snap_resp.status_code == 200 and "url" in snap_resp.json():
-            video_url = snap_resp.json().get("url")
-            print("🎯 Layer 2 Core CDN Scraper extraction successful.")
-    except Exception as snap_error:
-        print(f"⚠️ Layer 2 bypassed: {snap_error}")
+        # 🔥 FIXED ARCHITECTURE: Unpack the nested list first before querying the 'path' string coordinate!
+        if isinstance(payload_data, list) and len(payload_data) > 0:
+            video_url = payload_data[0].get("path") # Grab index 0 of the list array maps
+        elif isinstance(payload_data, dict):
+            video_url = payload_data.get("path")
+            
+        if video_url:
+            print(f"🎯 SUCCESS! Publer extracted raw stream URL pointer -> {video_url}")
+except Exception as publer_error:
+    print(f"⚠️ Publer pipeline handshake crashed: {publer_error}")
 
-# --- CONTAINER WORKSPACE INSULATION CRITICAL GATEWAY ---
-if not video_url:
-    print("❌ Critical Alarm: All external processing paths are experiencing connectivity drops.")
-    print("📋 Deploying emergency local cache safety buffer...")
-    output_path = os.path.join(RAW_DIR, "placeholder_safety_buffer.mp4")
-    if not os.path.exists(output_path):
-        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", output_path], check=True, capture_output=True)
-    print(f"⚠️ Safety fallback buffer deployed at location: {output_path}")
-else:
-    # Stream the raw video data blocks securely into your Kaggle workspace storage partition
-    print(f"⬇️ Downloading video binary assets directly from direct CDN endpoint...")
+# --- DOWNLOAD STREAMS DATA CARRIER GATEWAY ---
+if video_url:
+    print(f"⬇️ Downloading video binary assets directly from Publer CDN storage node...")
     v_resp = requests.get(video_url, stream=True, timeout=120)
     v_resp.raise_for_status()
     output_path = os.path.join(RAW_DIR, f"{username}_{clean_shortcode}.mp4")
     with open(output_path, 'wb') as f:
         for chunk in v_resp.iter_content(chunk_size=8192):
             if chunk: f.write(chunk)
-    print(f"✅ Target content packet written successfully: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
+    print(f"✅ Target content packet written successfully: {os.path.basename(output_path)}")
+else:
+    print("❌ Error: Publer endpoint failed to extract video URL. Running emergency safety loop...")
+    output_path = os.path.join(RAW_DIR, "placeholder_safety_buffer.mp4")
+    if not os.path.exists(output_path):
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", output_path], check=True, capture_output=True)
 
 
 # ==========================================
