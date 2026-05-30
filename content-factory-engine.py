@@ -74,12 +74,12 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (DIRECT NATIVE REQUESTS COOKIE INJECTOR)
+# 3. DOWNLOAD REEL (PLAYWRIGHT HEADLESS BROWSER BYPASS MATRIX)
 # ==========================================
-print("📥 Initializing secure public-to-authenticated direct request download matrix...")
+print("📥 Activating Headless Browser Layer to bypass proxy blocks and string corruption...")
 video_url = None
 
-# Force character scrubbing to strip hidden trailing carriage returns (\r) and newlines (\n)
+# Scrub the shortcode clean of hidden carriage returns (\r) or newlines (\n)
 clean_shortcode = ""
 if 'shortcode' in locals() and shortcode:
     clean_shortcode = str(shortcode).replace('\r', '').replace('\n', '').strip()
@@ -87,96 +87,107 @@ if 'shortcode' in locals() and shortcode:
 if 'pipeline' in locals() and pipeline.get("reel_url"):
     url_str = str(pipeline.get("reel_url", "")).replace('\r', '').replace('\n', '').strip()
     m = re.search(r'/(?:reel|p|tv|share/reel)/([^/?#&]+)', url_str)
-    if m: 
-        clean_shortcode = m.group(1).strip()
+    if m: clean_shortcode = m.group(1).strip()
 
 if not clean_shortcode or clean_shortcode == "unknown" or len(clean_shortcode) < 3:
     clean_shortcode = "DY42lC6AN3U"
 
-print(f"🎯 Target Locked and Character-Sanitized -> Shortcode: [{clean_shortcode}]")
+print(f"🎯 Target Link Pointer Verified -> Shortcode: [{clean_shortcode}]")
 
-# Absolute high-reputation mobile browser emulation signature mapping
-headers_mobile = {
-    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-    "Accept": "*/*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "X-IG-App-ID": "936619743392459",  # Official App ID tracking coordinate
-    "X-Requested-With": "XMLHttpRequest"
-}
-
-# --- METHOD 1: DIRECT ENCRYPTED SECRETS VAULT COOKIE INJECTOR ---
-print("🔐 Method 1: Injecting high-reputation vault cookies straight into clean network sessions...")
+# Ensure playwright system dependencies are injected into the kernel instantly
 try:
-    secret_sessionid = secrets.get_secret("IG_SESSIONID")
-    secret_userid = secrets.get_secret("IG_USERID")
-    
-    if secret_sessionid and secret_userid:
-        # Open an isolated session to prevent Kaggle's network settings from intercepting the traffic
-        session_authenticated = requests.Session()
-        session_authenticated.trust_env = False
-        
-        # Load your verified browser cookie state directly into the request cookie jar
-        cookie_jar = {
-            "sessionid": secret_sessionid.strip(),
-            "ds_user_id": secret_userid.strip()
-        }
-        
-        # Query the official mobile info endpoint using character parts to bypass upstream string hijacking
-        auth_endpoint_parts = ["https://", "://instagram.com", "/api/v1/media/", str(clean_shortcode).strip(), "/info/"]
-        auth_endpoint = "".join(api_endpoint_parts if 'api_endpoint_parts' in locals() else auth_endpoint_parts)
-        
-        resp_auth = session_authenticated.get(auth_endpoint, headers=headers_mobile, cookies=cookie_jar, timeout=20)
-        
-        if resp_auth.status_code == 200 and 'items' in resp_auth.json() and len(resp_auth.json()['items']) > 0:
-            items_list = resp_auth.json()['items'][0]
-            if 'video_versions' in items_list and len(items_list['video_versions']) > 0:
-                video_url = items_list['video_versions'][0].get('url')
-                print("🎯 Method 1 SUCCESS! Video CDN link unlocked via verified session cookies.")
-        else:
-            print(f"⚠️ Method 1 challenged by firewall blocks: Server Status Code {resp_auth.status_code}")
-    else:
-        print("⚠️ Secrets Missing: Please add IG_SESSIONID and IG_USERID tokens inside your Secrets Add-ons panel.")
-except Exception as method1_error:
-    print(f"⚠️ Method 1 authenticated vault handshake failed: {method1_error}")
+    import playwright
+except ImportError:
+    print("📥 Ingesting Playwright browser layer packages...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "playwright"])
+    subprocess.run(["playwright", "install", "chromium"], check=True, capture_output=True)
+    subprocess.run(["playwright", "install-deps"], check=True, capture_output=True)
 
-# --- METHOD 2: DECOUPLED INDEPENDENT REST GATEWAY ---
-if video_url is None:
-    print("🔄 Method 1 throttled or bypassed. Deploying Method 2 alternate data extractor nodes...")
+from playwright.sync_api import sync_playwright
+
+secret_sessionid = secrets.get_secret("IG_SESSIONID")
+secret_userid = secrets.get_secret("IG_USERID")
+
+# --- LAYER 1: HEADLESS EMULATION Handshake MATRIX ---
+if secret_sessionid and secret_userid:
+    print("🛰️ Layer 1: Launching pristine Chromium workspace cell on T4 node...")
     try:
-        session_public = requests.Session()
-        session_public.trust_env = False
-        
-        # Public open REST mirror tracking path that serves flat binary paths instantly
+        with sync_playwright() as p:
+            # Boot a completely isolated, un-proxied browser instance
+            browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+            
+            # Configure perfect human-device emulation context mappings
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 720}
+            )
+            
+            # Inject your verified browser cookies directly into the browser's cookie storage vault
+            context.add_cookies([
+                {"name": "sessionid", "value": secret_sessionid.strip(), "domain": ".instagram.com", "path": "/"},
+                {"name": "ds_user_id", "value": secret_userid.strip(), "domain": ".instagram.com", "path": "/"}
+            ])
+            
+            page = context.new_page()
+            
+            # Construct target address out of plain parts to stay hidden from upstream python regex bugs
+            target_embed_parts = ["https://", "www.instagram.com", "/p/", str(clean_shortcode).strip(), "/embed/captioned/"]
+            target_embed_url = "".join(target_embed_parts)
+            
+            print("📡 Loading public caption embed frameworks inside virtual window...")
+            # Navigate to the embed frame. Playwright handles the DNS lookup inside its own browser engine smoothly!
+            page.goto(target_embed_url, timeout=30000, wait_until="networkidle")
+            
+            # Scrape the raw page HTML source code text directly out of the active window frame
+            html_content = page.content()
+            browser.close()
+            
+            # Extract the raw video stream CDN link directly from the browser's memory footprint via custom regex scans
+            video_matches = re.search(r'"video_url":"([^"]+)"', html_content)
+            if video_matches:
+                download_url = video_matches.group(1).replace(r'\u0026', '&').replace('\\u0026', '&')
+                print("🎯 Layer 1 Browser Extractor SUCCESS! Direct CDN path retrieved.")
+                video_url = download_url
+    except Exception as browser_error:
+        print(f"⚠️ Layer 1 browser extraction challenged: {browser_error}")
+
+# --- LAYER 2: DECOUPLED ALTERNATE REST INGESTION NODE ---
+if video_url is None:
+    print("🔄 Layer 1 challenged. Deploying Layer 2 independent REST proxy query...")
+    try:
+        # High-reputation public mirror that serves direct text links instantly
         rest_parts = ["https://", "api.v0.api.co", "/instagram/media", "?shortcode=", str(clean_shortcode).strip()]
         rest_target_url = "".join(rest_parts)
         
-        resp_public = session_public.get(rest_target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
-        if resp_public.status_code == 200 and 'url' in resp_public.json():
-            video_url = resp_public.json().get('url')
-            print("🎯 Method 2 REST Ingestion Track Successful.")
-    except Exception as method2_error:
-        print(f"⚠️ Method 2 bypassed: {method2_error}")
+        # Open an isolated session to prevent Kaggle's local variables from intercepting traffic
+        with requests.Session() as session:
+            session.trust_env = False
+            resp = session.get(rest_target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            if resp.status_code == 200 and 'url' in resp.json():
+                video_url = resp.json().get('url')
+                print("🎯 Layer 2 REST Ingestion Track Successful.")
+    except Exception as rest_error:
+        print(f"⚠️ Layer 2 bypassed: {rest_error}")
 
-# --- CONTAINER DATA STREAM DOWNLOAD HANDLING LAYER ---
+# --- BINARY FILE DOWNLOAD CONTEXT WRITER ---
 output_path = os.path.join(RAW_DIR, f"{username}_{clean_shortcode}.mp4")
 write_complete = False
 
 if video_url:
     try:
-        print(f"⬇️ Downloading video binary assets directly from verified CDN endpoint...")
-        session_downloader = requests.Session()
-        session_downloader.trust_env = False
-        
-        # Light human pacing delay to stay entirely hidden from automated scanning firewalls
+        print("⬇️ Streaming raw video binaries natively into workspace partition...")
+        # Add random human delay layout boundaries right before downloading packets to blend in natively
         time.sleep(random.uniform(1.5, 3.0))
         
-        v_resp = session_downloader.get(video_url, stream=True, timeout=120)
-        v_resp.raise_for_status()
-        
-        with open(output_path, 'wb') as f:
-            for chunk in v_resp.iter_content(chunk_size=8192):
-                if chunk: f.write(chunk)
-                
+        with requests.Session() as session:
+            session.trust_env = False
+            v_resp = session.get(video_url, stream=True, timeout=120)
+            v_resp.raise_for_status()
+            
+            with open(output_path, 'wb') as f:
+                for chunk in v_resp.iter_content(chunk_size=8192):
+                    if chunk: f.write(chunk)
+                    
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
             print(f"✅ Ingestion Matrix Complete: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
             write_complete = True
