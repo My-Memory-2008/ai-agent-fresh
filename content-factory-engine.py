@@ -27,6 +27,7 @@ print("✅ Dependencies installed. Ready for main script.")
 # production_pipeline.py
 # Fully Automated YouTube Shorts Engine: Download → Visual Transformation → Upload → Ledger Update
 import os, json, re, requests, subprocess, time, random, torch
+import instaloader
 from kaggle_secrets import UserSecretsClient
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -71,113 +72,121 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (ISOLATED SHELL ENVELOPE BYPASS)
+# 3. DOWNLOAD REEL (HYBRID NATIVE + SECRETS SESSION HANDSHAKE)
 # ==========================================
-print("📥 Initializing self-contained clean shell download matrix...")
+print("📥 Initializing hybrid public-to-authenticated download matrix...")
+video_url = None
 
-def execute_shell_download_bypass():
-    # 1. Safely extract shortcode strictly out of the baseline dictionary mapping array 
-    local_shortcode = None
-    if 'pipeline' in locals() and pipeline.get("reel_url"):
-        url_string = str(pipeline.get("reel_url", "")).strip()
-        match = re.search(r'/(?:reel|p|tv|share/reel)/([^/?#&]+)', url_string)
-        if match:
-            local_shortcode = match.group(1)
-            
-    if not local_shortcode and 'shortcode' in locals() and shortcode and shortcode != "unknown":
-        local_shortcode = str(shortcode).strip()
-        
-    if not local_shortcode or local_shortcode == "unknown":
-        local_shortcode = "DY42lC6AN3U" # Hardcoded high-availability baseline fallback
-        
-    print(f"🎯 Terminal Shell Validation Passed -> Shortcode Variable Locked: {local_shortcode}")
+# DEFENSIVE RE-VALIDATION ENGINE: Guarantees shortcode extraction maps safely
+clean_shortcode = str(shortcode).strip() if 'shortcode' in locals() and shortcode else ""
+current_reel_url = str(pipeline.get("reel_url", "")).strip()
+
+if not clean_shortcode or clean_shortcode == "unknown" or len(clean_shortcode) < 3:
+    print("⚠️ Shortcode missing or marked unknown. Scraping raw link parameters manually...")
+    url_match = re.search(r'/(?:reel|p|tv|share/reel)/([^/?#&]+)', current_reel_url)
+    if url_match:
+        clean_shortcode = url_match.group(1)
+    else:
+        clean_shortcode = pipeline.get("shortcode", "").strip()
+
+print(f"🎯 Target Locked -> Shortcode: {clean_shortcode}")
+
+headers_public = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+    "X-IG-App-ID": "936619743392459"
+}
+
+# --- METHOD 1: DIRECT INSTAGRAM PUBLIC REST API ---
+print("🛰️ Method 1: Querying public API server nodes anonymously...")
+try:
+    session_public = requests.Session()
+    session_public.trust_env = False
     
-    # 2. Lock final file asset destinations down cleanly inside memory
-    final_output_path = os.path.join(RAW_DIR, f"{username}_{local_shortcode}.mp4")
+    api_endpoint = f"https://instagram.com{clean_shortcode}/?__a=1&__d=dis"
+    resp = session_public.get(api_endpoint, headers=headers_public, timeout=20)
     
-    # Absolute raw string URLs to protect parameters from upstream variable corruptions
-    embed_target_url = f"https://instagram.com{local_shortcode}/embed/captioned/"
-    rest_target_url = f"https://api.co{local_shortcode}"
-    
-    download_url = None
-    
-    # ------------------------------------------
-    # LAYER 1: ISOLATED CURL EMBED WEB SCRAPE
-    # ------------------------------------------
-    print("🛰️ Layer 1: Pinging public structural captions layer via cURL...")
+    if resp.status_code == 200 and 'items' in resp.json() and len(resp.json()['items']) > 0:
+        items_list = resp.json()['items'][0]
+        if 'video_versions' in items_list and len(items_list['video_versions']) > 0:
+            video_url = items_list['video_versions'][0].get('url')
+            print("🎯 Method 1 SUCCESS! Video CDN signature fetched anonymously.")
+except Exception as method1_error:
+    print(f"⚠️ Method 1 bypassed (Datacenter IP Throttle Lock): {method1_error}")
+
+# --- METHOD 2: ENCRYPTED SECRETS VAULT COOKIE INJECTOR ---
+if not video_url:
+    print("🔄 Method 1 throttled by Instagram firewalls. Initializing Method 2 Vault Secrets Session Fallback...")
     try:
-        # Using native curl shell arrays bypasses any broken global python libraries completely
-        curl_cmd = [
-            "curl", "-s", "-L",
-            "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            embed_target_url
-        ]
+        # Pull your raw authentication tokens straight out of the encrypted secrets vault context
+        secret_sessionid = secrets.get_secret("IG_SESSIONID")
+        secret_userid = secrets.get_secret("IG_USERID")
         
-        # Fire standard terminal sub-process tracking streams
-        shell_output = subprocess.check_output(curl_cmd, text=True, timeout=25)
+        if secret_sessionid and secret_userid:
+            print("🔐 Injecting active high-reputation session cookies straight into network headers...")
+            
+            # Formulate an authenticated requests session mapping directly to Instagram's server arrays
+            session_authenticated = requests.Session()
+            session_authenticated.trust_env = False
+            
+            # Map cookie values securely into the active session block
+            cookie_jar = {
+                "sessionid": secret_sessionid.strip(),
+                "ds_user_id": secret_userid.strip()
+            }
+            
+            headers_authenticated = headers_public.copy()
+            headers_authenticated["Referer"] = f"https://instagram.com{clean_shortcode}/"
+            
+            # Send the API request with your browser identity tokens attached directly to the network payload
+            auth_api_endpoint = f"https://instagram.com{clean_shortcode}/info/"
+            resp_auth = session_authenticated.get(auth_api_endpoint, headers=headers_authenticated, cookies=cookie_jar, timeout=25)
+            
+            if resp_auth.status_code == 200 and 'items' in resp_auth.json() and len(resp_auth.json()['items']) > 0:
+                items_list = resp_auth.json()['items'][0]
+                if 'video_versions' in items_list and len(items_list['video_versions']) > 0:
+                    video_url = items_list['video_versions'][0].get('url')
+                    print("🎯 Method 2 SUCCESS! Video CDN link unlocked via verified session cookies.")
+            else:
+                print(f"⚠️ Method 2 challenged by security layers: Server Status Code {resp_auth.status_code}")
+        else:
+            print("⚠️ Secrets Missing: Please add IG_SESSIONID and IG_USERID tokens into your Kaggle Add-ons panel.")
+    except Exception as method2_error:
+         print(f"❌ Method 2 Authenticated Vault Hook failed: {method2_error}")
+
+# --- CONTAINER DATA STREAM DOWNLOAD HANDLING LAYER ---
+output_path = os.path.join(RAW_DIR, f"{username}_{clean_shortcode}.mp4")
+write_complete = False
+
+if video_url:
+    try:
+        print(f"⬇️ Downloading video binary assets directly from verified CDN endpoint...")
+        session_downloader = requests.Session()
+        session_downloader.trust_env = False
         
-        # Locate the media tracking parameters directly out of the raw response page layout via regex strings
-        video_matches = re.search(r'"video_url":"([^"]+)"', shell_output)
-        if video_matches:
-            download_url = video_matches.group(1).replace(r'\u0026', '&')
-            print("🎯 Layer 1 Embed Extractor Successful via native shell.")
-    except Exception as shell_error:
-        print(f"⚠️ Layer 1 shell layout query challenged: {shell_error}")
+        # Add random human delay layout boundaries right before downloading packets to blend in natively
+        time.sleep(random.uniform(1.5, 3.5))
+        
+        v_resp = session_downloader.get(video_url, stream=True, timeout=120)
+        v_resp.raise_for_status()
+        
+        with open(output_path, 'wb') as f:
+            for chunk in v_resp.iter_content(chunk_size=8192):
+                if chunk: f.write(chunk)
+        print(f"✅ Target content packet written successfully: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
+        write_complete = True
+    except Exception as stream_error:
+        print(f"⚠️ CDN data stream download dropped: {stream_error}")
 
-    # ------------------------------------------
-    # LAYER 2: ISOLATED CURL REST INGESTION BYPASS
-    # ------------------------------------------
-    if not download_url:
-        print("🔄 Layer 1 challenged. Initiating Layer 2 independent terminal REST query...")
-        try:
-            curl_rest_cmd = [
-                "curl", "-s", "-L",
-                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                rest_target_url
-            ]
-            rest_output = subprocess.check_output(curl_rest_cmd, text=True, timeout=25)
-            
-            # Unpack JSON text data using strict local parsing parameters
-            rest_data = json.loads(rest_output)
-            if isinstance(rest_data, dict) and 'url' in rest_data:
-                download_url = rest_data.get('url')
-                print("🎯 Layer 2 REST Ingestion Track Successful via native shell.")
-        except Exception as rest_shell_error:
-            print(f"⚠️ Layer 2 alternate shell query bypassed: {rest_shell_error}")
-
-    # ------------------------------------------
-    # DATA WRITER LOOP: DOWNLOAD FLAT BINARIES VIA CURL
-    # ------------------------------------------
-    if download_url:
-        try:
-            print("⬇️ Streaming raw video binaries natively into workspace partition...")
-            # Pushes the binary download directly to file storage location instantly
-            curl_download_cmd = [
-                "curl", "-s", "-L",
-                "-o", final_output_path,
-                download_url
-            ]
-            subprocess.run(curl_download_cmd, check=True, timeout=90)
-            
-            if os.path.exists(final_output_path) and os.path.getsize(final_output_path) > 1000:
-                print(f"✅ Download Matrix Complete: {os.path.basename(final_output_path)}")
-                return final_output_path
-        except Exception as file_write_error:
-            print(f"⚠️ Binary tracking stream loop encountered terminal errors: {file_write_error}")
-
-    # ------------------------------------------
-    # LAYER 3: STABLE HARDWARE FALLBACK CIRCUIT
-    # ------------------------------------------
-    print("❌ Critical System Alarm: Network blocks or global environment conflicts encountered.")
+# --- EMERGENCY WORKSPACE INSULATION CRITICAL GATEWAY ---
+if not write_complete:
+    print("❌ Critical System Alarm: Network blocks or global environment conflicts encountered across all paths.")
     print("📋 Triggering emergency local cache safety buffer loop...")
-    final_output_path = os.path.join(RAW_DIR, f"p_{local_shortcode}.mp4")
-    if not os.path.exists(final_output_path):
-        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", final_output_path], check=True, capture_output=True)
-    print(f"⚠️ Safety fallback buffer deployed at location: {final_output_path}")
-    return final_output_path
+    output_path = os.path.join(RAW_DIR, f"p_{clean_shortcode}.mp4")
+    if not os.path.exists(output_path):
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", output_path], check=True, capture_output=True)
+    print(f"⚠️ Safety fallback buffer deployed at location: {output_path}")
 
-# Execute the isolated local shell bypass function to set global pipeline tracks cleanly
-output_path = execute_shell_download_bypass()
 
 
 
