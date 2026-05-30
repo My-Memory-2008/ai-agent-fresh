@@ -1,5 +1,6 @@
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -206,67 +207,107 @@ if res1.returncode != 0:
 print("✅ Step 1 Complete: Visual layers processed successfully.")
 
 
-
 # ==========================================
-# 4b. INJECTED FEATURE: LLAMA 3.3 HIGH-PERFORMANCE SEO OPTIMIZER
+# 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (NO REPEATS)
 # ==========================================
+print("🧠 Activating Local Multimodal Vision AI Engine on GPU...")
+import torch
+import cv2
+import json
+import os
+from PIL import Image
 
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 
-print("🧠 Launching Llama 3.3 algorithmic text-analysis via Groq Cloud Gateway...")
-groq_key = secrets.get_secret("GROQ_API_KEY")
-
-# Resilient default fallback dictionaries to protect execution threads from API limits
+# Safety default fallback metadata structure
 seo_metadata = {
     "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
     "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
     "tags": ["satisfying", "asmr", "shorts", "relaxing"]
 }
 
-if groq_key:
-    try:
-        from groq import Groq
-        client = Groq(api_key=groq_key.strip())
-        
-        # Algorithmic engine prompt engineering optimized for maximum YouTube Short Feed placement metrics
-        seo_prompt = (
-            f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
-            f"An engaging video clip by creator @{username} has just been transformed into an edited vertical loop canvas. "
-            f"A funny cat reaction video punchline will be attached right to the end of the clip.\n\n"
-            f"Tasks:\n"
-            f"1. YOUTUBE_TITLE: Write a clickable title (Max 65 characters) focusing entirely on high-relevance satisfying value. End strictly with #shorts.\n"
-            f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about the loop or the cat reaction at the end. "
-            f"Sentence 2 states why this unique ASMR loop content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
-            f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords in this niche.\n\n"
-            f"Return response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks or introductory text."
-        )
+try:
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    model_id = "vikhyatk/moondream2"
+    revision = "2024-08-26" # Fast, stable production checkpoint for T4 card memory bounds
+    
+    print("📥 Loading vision-language weights into NVIDIA T4 VRAM maps...")
+    # Map the model cleanly to GPU processing lanes
+    tokenizer = AutoTokenizer.from_pretrained(model_id, revision=revision)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id, 
+        revision=revision, 
+        trust_remote_code=True,
+        torch_dtype=torch.float16
+    ).to("cuda")
+    model.eval()
+    print("🎯 Vision engine is live and listening.")
 
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a precise YouTube SEO generation microservice that outputs data exclusively as raw JSON objects."},
-                {"role": "user", "content": seo_prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.65,
-            max_tokens=250
+    # 1. Capture a mid-timeline frame directly from your edited source video file
+    print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
+    cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45)) # Grab frame right in the middle of action
+    ret, frame = cap.read()
+    cap.release()
+
+    if ret:
+        # Convert raw CV2 BGR layout to Standard PIL RGB for the neural vision layers
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(rgb_frame)
+        
+        # 2. Fire structural analysis query to describe the unique visual elements of this specific clip
+        print("📡 Inspecting video frame visuals...")
+        image_embeds = model.encode_image(pil_image)
+        visual_analysis = model.answer_question(
+            image_embeds, 
+            "Describe exactly what action, objects, colors, or materials are visible in this scene in 1 sentence. Be highly specific.", 
+            tokenizer
+        )
+        print(f"📸 Vision Scanner result: \"{visual_analysis}\"")
+
+        # 3. Use the visual description to construct completely custom SEO metrics dynamically
+        print("✍️ Extrapolating trending metadata structures...")
+        
+        # Algorithmic text builder loop creates completely unique text blocks per run based on what it saw
+        clean_desc = visual_analysis.replace('"', '').replace('.', '').strip()
+        
+        generated_title = f"This {clean_desc} Is So Addictive! 🤯 #shorts"
+        if len(generated_title) > 65:
+            generated_title = f"Oddly Satisfying {clean_desc[:30]}! 🔥 #shorts"
+            
+        generated_desc = (
+            f"Can't stop watching this satisfying video showing {clean_desc.lower()}. "
+            f"The precision and flow in this loop is completely mesmerizing and therapeutic. "
+            f"Stick around for the surprise funny cat reaction loop at the end! Inspired by @{username}. Subscribe for more!"
         )
         
-        # Clean response boundaries of potential markdown wrappers cleanly before unpacking
-        clean_json_text = chat_completion.choices[0].message.content.strip().replace('```json', '').replace('```', '').strip()
-        ai_seo_data = json.loads(clean_json_text)
+        # Dynamically build tag vectors matching the video content strings
+        base_tags = ["satisfying", "asmr", "shorts", "viral"]
+        visual_keywords = [word.lower().strip(",.") for word in clean_desc.split() if len(word) > 4][:2]
+        generated_tags = base_tags + visual_keywords
         
         seo_metadata = {
-            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
-            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
-            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+            "title": generated_title,
+            "description": generated_desc,
+            "tags": generated_tags[:6]
         }
-        print(f"🎉 Llama SEO Matrix Generation Verified: \"{seo_metadata['title']}\"")
-    except Exception as e:
-        print(f"⚠️ Groq analyzer fallback activated (API connection bypass): {e}")
+        print(f"🎉 SUCCESS! Fresh Visual SEO Generated -> Title: \"{seo_metadata['title']}\"")
+    else:
+        raise RuntimeError("Frame capture extraction failed.")
 
-# Save the generated metadata map to workspace files for Section 6 upload mappings
+except Exception as vision_error:
+    print(f"⚠️ Local vision block failed, using system fallback arrays: {vision_error}")
+
+# Clean up GPU tracking tensors from VRAM to prevent downstream rendering halts
+if 'model' in locals(): del model
+if 'tokenizer' in locals(): del tokenizer
+torch.cuda.empty_cache()
+
+# Save metadata manifest file to drive partition for Section 6 upload mapping
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
+
 
 
 # ==========================================
