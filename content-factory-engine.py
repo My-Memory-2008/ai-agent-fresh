@@ -157,11 +157,10 @@ output_path = execute_unmangled_ytdlp_download()
 
 
 
-
 # ==========================================
 # 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
-print("🚀 Step 1: Initiating professional seamless cloaking and brand accent visual canvas...")
+print("🚀 Step 1: Initiating subtle professional cloaking and light brand accent visual canvas...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -240,31 +239,22 @@ if unique_boxes:
     bx, by, bw, bh = unique_boxes[0]
     print(f"🎯 Watermark localized in raw video layout -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
     
-    # --------------------------------------------------
-    # 🔥 THE PROJECTION ENGINE CORE
-    # Translates raw video coordinates onto the final 1080x1920 scaled vertical canvas
-    # --------------------------------------------------
     # Calculate the dynamic downscaling ratios matching your FFmpeg scale profile (max size 918x1632)
     scale_factor = min(918.0 / orig_width, 1632.0 / orig_height)
     
+    # Project the bounding coordinates cleanly onto the true 1080x1920 pixel grid space
     scaled_w = bw * scale_factor
     scaled_h = bh * scale_factor
-    
-    # Calculate the exact center offset offset values where the overlay script places the main clip
     offset_x = (1080.0 - (orig_width * scale_factor)) / 2.0
     offset_y = (1920.0 - (orig_height * scale_factor)) / 2.0
     
-    # Project the bounding coordinates cleanly onto the true 1080x1920 pixel grid space
-    proj_x = (bx * scale_factor) + offset_x
-    proj_y = (by * scale_factor) + offset_y
+    # Cast parameters to strict integers and add 15% safety padding for absolute physical coverage
+    final_x = int((bx * scale_factor) + offset_x - 10)
+    final_y = int((by * scale_factor) + offset_y - 5)
+    final_w = int(scaled_w + 20)
+    final_h = int(scaled_h + 10)
     
-    # Cast parameters to strict integers for the final FFmpeg drawtext configuration flags
-    final_x = int(proj_x)
-    final_y = int(proj_y)
-    final_w = int(scaled_w)
-    final_h = int(scaled_h)
-    
-    print(f"🚀 Canvas Matrix Shift Successful! Projected coordinates -> X:{final_x}, Y:{final_y}, W:{final_w}, H:{final_h}")
+    print(f"🚀 Projected coordinates locked -> X:{final_x}, Y:{final_y}, W:{final_w}, H:{final_h}")
     
     print("🎨 Initializing OpenCV Fast-Marching Pixel Inpainter...")
     cap = cv2.VideoCapture(output_path)
@@ -316,13 +306,16 @@ chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 text_alignment_x = f"{final_x} + ({final_w} - tw)/2"
 text_alignment_y = f"{final_y} + ({final_h} - th)/2"
 
-# Generates a sleek, custom box over the exact blurred coordinates, completely covering any smudge artifacts
+# 🔥 THE SUBTLE INTENTIONAL COVER UP ENGINE:
+# 1. drawbox: Draws an absolute solid geometric box (t=fill) using semi-transparent black (black@0.40) over the exact blur coordinates.
+# 2. drawtext: Places a light, highly subtle semi-transparent text watermark layer (white@0.45) cleanly centered on top.
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
     f"[processed_source]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawtext=text='@AWRAM':x={text_alignment_x}:y={text_alignment_y}:fontsize=42:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.75:boxborderw=10[v]"
+    f"[grained]drawbox=x={final_x}:y={final_y}:w={final_w}:h={final_h}:color=black@0.40:t=fill[covered];"
+    f"[covered]drawtext=text='@AWRAM':x={text_alignment_x}:y={text_alignment_y}:fontsize=38:fontcolor=white@0.45:borderw=1:bordercolor=black@0.20[v]"
 )
 
 # Render Step 1: Fully process video transformations into constant 30fps container lanes
@@ -340,7 +333,7 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("✅ Step 1 Complete: Watermark covered with professional brand accent canvas successfully.")
+print("✅ Step 1 Complete: Watermark covered flawlessly with a subtle, non-intrusive brand accent overlay.")
 
 
 
