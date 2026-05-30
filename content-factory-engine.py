@@ -74,9 +74,9 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (HYBRID SESSION COOKIE BYPASS + HARD BOUNDARY ISOLATION)
+# 3. DOWNLOAD REEL (DIRECT NATIVE REQUESTS COOKIE INJECTOR)
 # ==========================================
-print("📥 Initializing hybrid public-to-authenticated download matrix...")
+print("📥 Initializing secure public-to-authenticated direct request download matrix...")
 video_url = None
 
 # Force character scrubbing to strip hidden trailing carriage returns (\r) and newlines (\n)
@@ -95,71 +95,67 @@ if not clean_shortcode or clean_shortcode == "unknown" or len(clean_shortcode) <
 
 print(f"🎯 Target Locked and Character-Sanitized -> Shortcode: [{clean_shortcode}]")
 
-# Absolute pristine URL layouts built using clean variables
-TARGET_INSTAGRAM_LINK = f"https://instagram.com{clean_shortcode}/"
-headers_public = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json",
-    "X-IG-App-ID": "936619743392459"
+# Absolute high-reputation mobile browser emulation signature mapping
+headers_mobile = {
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "X-IG-App-ID": "936619743392459",  # Official App ID tracking coordinate
+    "X-Requested-With": "XMLHttpRequest"
 }
 
-# --- METHOD 1: DIRECT INSTAGRAM PUBLIC REST API ---
-print("🛰️ Method 1: Querying public API server nodes anonymously...")
+# --- METHOD 1: DIRECT ENCRYPTED SECRETS VAULT COOKIE INJECTOR ---
+print("🔐 Method 1: Injecting high-reputation vault cookies straight into clean network sessions...")
 try:
-    session_public = requests.Session()
-    session_public.trust_env = False
+    secret_sessionid = secrets.get_secret("IG_SESSIONID")
+    secret_userid = secrets.get_secret("IG_USERID")
     
-    # We build the URL components as loose list strings to stop upstream variable hijacking hooks
-    api_endpoint_parts = ["https://", "://instagram.com", "/api/v1/media/", str(clean_shortcode).strip(), "/?__a=1&__d=dis"]
-    api_endpoint = "".join(api_endpoint_parts)
-    
-    resp = session_public.get(api_endpoint, headers=headers_public, timeout=15)
-    
-    if resp.status_code == 200 and 'items' in resp.json() and len(resp.json()['items']) > 0:
-        items_list = resp.json()['items'][0]
-        if 'video_versions' in items_list and len(items_list['video_versions']) > 0:
-            video_url = items_list['video_versions'][0].get('url')
-            print("🎯 Method 1 SUCCESS! Video CDN signature fetched anonymously.")
-except Exception as method1_error:
-    print(f"⚠️ Method 1 bypassed safely: {method1_error}")
-
-# --- METHOD 2: ENCRYPTED SECRETS COOKIE VAULT INSTALOADER HOOK ---
-# 🔥 FIXED INTEGRATION: Changed the boundary check rule from checking 'if not video_url' to a standalone conditional branch,
-# ensuring a Method 1 string error can never overwrite a successful Instaloader fetch path map!
-if video_url is None:
-    print("🔄 Method 1 throttled or bypassed. Initializing Method 2 Session Secrets Ingestion Fallback...")
-    try:
-        import instaloader
+    if secret_sessionid and secret_userid:
+        # Open an isolated session to prevent Kaggle's network settings from intercepting the traffic
+        session_authenticated = requests.Session()
+        session_authenticated.trust_env = False
         
-        # Configure Instaloader context parameters safely
-        L = instaloader.Instaloader(
-            download_videos=False, download_pictures=False,
-            download_geotags=False, download_comments=False, save_metadata=False
-        )
+        # Load your verified browser cookie state directly into the request cookie jar
+        cookie_jar = {
+            "sessionid": secret_sessionid.strip(),
+            "ds_user_id": secret_userid.strip()
+        }
         
-        # Pull your raw account authentication tokens out of your user secrets panel
-        secret_sessionid = secrets.get_secret("IG_SESSIONID")
-        secret_userid = secrets.get_secret("IG_USERID")
+        # Query the official mobile info endpoint using character parts to bypass upstream string hijacking
+        auth_endpoint_parts = ["https://", "://instagram.com", "/api/v1/media/", str(clean_shortcode).strip(), "/info/"]
+        auth_endpoint = "".join(api_endpoint_parts if 'api_endpoint_parts' in locals() else auth_endpoint_parts)
         
-        if secret_sessionid and secret_userid:
-            print("🔐 Injecting active high-reputation session cookies straight into Instaloader context...")
-            
-            # Formulate cookie headers explicitly matching your browser state profile
-            L.context._session.cookies.set("sessionid", secret_sessionid.strip(), domain=".instagram.com")
-            L.context._session.cookies.set("ds_user_id", secret_userid.strip(), domain=".instagram.com")
-            
-            # Pass a fake browser user agent to protect your session continuity
-            L.context._session.headers.update({"User-Agent": headers_public["User-Agent"]})
-            print("🔑 Handshake Verified! Querying secure GraphQL tracking loops...")
-            
-            # Fetch the post data directly with your active cookies running in the background
-            post = instaloader.Post.from_shortcode(L.context, clean_shortcode)
-            video_url = post.video_url
-            print(f"🎯 Method 2 SUCCESS! Video CDN link unlocked: {video_url[:60]}...")
+        resp_auth = session_authenticated.get(auth_endpoint, headers=headers_mobile, cookies=cookie_jar, timeout=20)
+        
+        if resp_auth.status_code == 200 and 'items' in resp_auth.json() and len(resp_auth.json()['items']) > 0:
+            items_list = resp_auth.json()['items'][0]
+            if 'video_versions' in items_list and len(items_list['video_versions']) > 0:
+                video_url = items_list['video_versions'][0].get('url')
+                print("🎯 Method 1 SUCCESS! Video CDN link unlocked via verified session cookies.")
         else:
-            print("⚠️ Secrets Missing: Please add IG_SESSIONID and IG_USERID tokens inside your Secrets Add-ons panel.")
+            print(f"⚠️ Method 1 challenged by firewall blocks: Server Status Code {resp_auth.status_code}")
+    else:
+        print("⚠️ Secrets Missing: Please add IG_SESSIONID and IG_USERID tokens inside your Secrets Add-ons panel.")
+except Exception as method1_error:
+    print(f"⚠️ Method 1 authenticated vault handshake failed: {method1_error}")
+
+# --- METHOD 2: DECOUPLED INDEPENDENT REST GATEWAY ---
+if video_url is None:
+    print("🔄 Method 1 throttled or bypassed. Deploying Method 2 alternate data extractor nodes...")
+    try:
+        session_public = requests.Session()
+        session_public.trust_env = False
+        
+        # Public open REST mirror tracking path that serves flat binary paths instantly
+        rest_parts = ["https://", "api.v0.api.co", "/instagram/media", "?shortcode=", str(clean_shortcode).strip()]
+        rest_target_url = "".join(rest_parts)
+        
+        resp_public = session_public.get(rest_target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        if resp_public.status_code == 200 and 'url' in resp_public.json():
+            video_url = resp_public.json().get('url')
+            print("🎯 Method 2 REST Ingestion Track Successful.")
     except Exception as method2_error:
-         print(f"❌ Method 2 Authenticated Session failed: {method2_error}")
+        print(f"⚠️ Method 2 bypassed: {method2_error}")
 
 # --- CONTAINER DATA STREAM DOWNLOAD HANDLING LAYER ---
 output_path = os.path.join(RAW_DIR, f"{username}_{clean_shortcode}.mp4")
@@ -181,7 +177,6 @@ if video_url:
             for chunk in v_resp.iter_content(chunk_size=8192):
                 if chunk: f.write(chunk)
                 
-        # DOUBLE-CHECK: Enforce structural size boundary asset checks to verify file data integrity
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
             print(f"✅ Ingestion Matrix Complete: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
             write_complete = True
