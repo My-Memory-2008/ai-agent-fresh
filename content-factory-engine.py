@@ -157,11 +157,10 @@ output_path = execute_unmangled_ytdlp_download()
 
 
 
-
 # ==========================================
-# 4. STEP 1: EXECUTE SEAMLESS AI CLOAK & NATIVE FRAME BAKING
+# 4. STEP 1: EXECUTE ADAPTIVE AI CLOAK & NATIVE FRAME BAKING
 # ==========================================
-print("🚀 Step 1: Initiating pixel-perfect visual cloaking and brand integration canvas...")
+print("🚀 Step 1: Initiating adaptive background-matching visual cloaking canvas...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -190,7 +189,7 @@ from pytesseract import Output
 import subprocess
 
 # --------------------------------------------------
-# PHASE A: MULTI-FRAME WATERMARK DETECTOR & SEAMLESS FRAME BAKER
+# PHASE A: MULTI-FRAME WATERMARK DETECTOR & ADAPTIVE FRAME BAKER
 # --------------------------------------------------
 print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
@@ -233,15 +232,15 @@ for idx in sample_frames:
 cap.release()
 unique_boxes = list(set(watermark_bounding_boxes))
 
-print("🎨 Initializing Native Pixel Inpainter & Localized Brand Overlay Engine...")
+print("🎨 Initializing Native Pixel Inpainter & Adaptive Color Matching Engine...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Define native branding metrics
+# Define native branding font metrics
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.55
+font_scale = 0.52
 font_thickness = 1
 
 if unique_boxes:
@@ -253,6 +252,38 @@ if unique_boxes:
     tx = bx + int((bw - text_w) / 2)
     ty = by + int((bh + text_h) / 2)
     
+    # --------------------------------------------------
+    # 🔥 THE ADAPTIVE SAMPLING MATRIX
+    # Read a sample frame to analyze the exact background color palette behind the old watermark text
+    # --------------------------------------------------
+    cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames[2])
+    ret, sample_img = cap.read()
+    if ret:
+        # Sample a localized perimeter ring around the text box to find the clean background color
+        sample_zone = sample_img[max(0, by-10):min(orig_height, by+bh+10), max(0, bx-10):min(orig_width, bx+bw+10)]
+        avg_color_per_row = np.average(sample_zone, axis=0)
+        avg_color = np.average(avg_color_per_row, axis=0)
+        b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
+        
+        # Calculate the dynamic luminance background brightness (Standard ITU-R BT.601 weights)
+        bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
+        
+        # Adaptive Contrast text switching logic ensures high readability with low visual impact
+        if bg_brightness > 127:
+            # Background is light (white/grey) -> Apply dark elegant text values
+            text_color = (40, 40, 40)
+            shadow_color = (220, 220, 220)
+        else:
+            # Background is dark -> Apply smooth light text values
+            text_color = (225, 225, 225)
+            shadow_color = (20, 20, 20)
+    else:
+        b_match, g_match, r_match = 30, 30, 30
+        text_color, shadow_color = (230, 230, 230), (10, 10, 10)
+        
+    print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match} | Brightness: {int(bg_brightness)}")
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset video feed back to frame 0
+    
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: break
@@ -262,23 +293,21 @@ if unique_boxes:
         cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
         healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
         
-        # 2. 🔥 THE NATIVE OVERLAY ENGINE: Extracts the healed patch and darkens it lightly
+        # 2. 🔥 THE ADAPTIVE MATCHING OVERLAY: Fills your patch box with the exact background color shade
         overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (0, 0, 0), -1) # Dynamic charcoal block
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
         
-        # Alpha-blend the darkened matte box to keep it completely see-through and non-intrusive
-        alpha_box = 0.40
-        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_box, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_box, 0)
+        # Soft blend matrix (50% blend level ensures seamless color continuity with video transitions)
+        alpha_blend = 0.50
+        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_blend, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_blend, 0)
         
-        # 3. 🔥 Light, high-readability dimmed branding text layout injection
-        # Draws a very subtle text dropshadow outline first, followed by semi-transparent white text
-        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, (10, 10, 10), font_thickness + 1, cv2.LINE_AA) # Shadow
-        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, (230, 230, 230), font_thickness, cv2.LINE_AA) # Light Text
+        # 3. Inject subtle contrast-matched text layers smoothly into the frame matrix
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA) # Text Shadow
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA) # Core Brand Handle
         
         video_writer.write(healed_frame)
 else:
     print("✨ Clean Layout Check! Zero handle watermarks found. Rendering fallback branding overlays...")
-    # Safe top-center default patch layout if no watermark was detected in the stream
     bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
     (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx, ty = bx + int((bw - text_w) / 2), by + int((bh + text_h) / 2)
@@ -287,9 +316,9 @@ else:
         ret, frame = cap.read()
         if not ret: break
         overlay_roi = frame[by:by+bh, bx:bx+bw].copy()
-        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (0, 0, 0), -1)
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (20, 20, 20), -1)
         frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.35, frame[by:by+bh, bx:bx+bw], 0.65, 0)
-        cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (240, 240, 240), font_thickness, cv2.LINE_AA)
+        cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (220, 220, 220), font_thickness, cv2.LINE_AA)
         video_writer.write(frame)
 
 cap.release()
@@ -303,7 +332,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Watermark covered natively inside local pixel arrays.")
+print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
 # --------------------------------------------------
 # PHASE B: APPLY Advanced 9:16 PORTRAIT CANVAS FILTERS
@@ -322,7 +351,6 @@ effects = [
 ]
 chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# Completely removed drawtext and drawbox from FFmpeg to prevent scaling and displacement bugs!
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
@@ -344,7 +372,7 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("🏆 SUCCESS! Step 1 Complete: Millimeter-accurate native brand patch rendered flawlessly.")
+print("🏆 SUCCESS! Step 1 Complete: Adaptive color-matched brand overlay rendered flawlessly.")
 
 
 
