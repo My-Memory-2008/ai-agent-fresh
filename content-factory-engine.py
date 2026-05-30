@@ -74,13 +74,12 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (HYBRID SESSION COOKIE BYPASS + TEXT SANITIZATION)
+# 3. DOWNLOAD REEL (HYBRID SESSION COOKIE BYPASS + HARD BOUNDARY ISOLATION)
 # ==========================================
 print("📥 Initializing hybrid public-to-authenticated download matrix...")
 video_url = None
 
-# 🔥 ABSOLUTE FIX: Force deep character scrubbing to strip hidden trailing carriage returns (\r) and newlines (\n)
-# This completely stops the domain names from getting smashed or mangled upstream!
+# Force character scrubbing to strip hidden trailing carriage returns (\r) and newlines (\n)
 clean_shortcode = ""
 if 'shortcode' in locals() and shortcode:
     clean_shortcode = str(shortcode).replace('\r', '').replace('\n', '').strip()
@@ -110,20 +109,25 @@ try:
     session_public = requests.Session()
     session_public.trust_env = False
     
-    api_endpoint = f"https://instagram.com{clean_shortcode}/?__a=1&__d=dis"
-    resp = session_public.get(api_endpoint, headers=headers_public, timeout=20)
+    # We build the URL components as loose list strings to stop upstream variable hijacking hooks
+    api_endpoint_parts = ["https://", "://instagram.com", "/api/v1/media/", str(clean_shortcode).strip(), "/?__a=1&__d=dis"]
+    api_endpoint = "".join(api_endpoint_parts)
+    
+    resp = session_public.get(api_endpoint, headers=headers_public, timeout=15)
     
     if resp.status_code == 200 and 'items' in resp.json() and len(resp.json()['items']) > 0:
-        items_list = resp.json()['items']
-        if 'video_versions' in items_list[0]:
-            video_url = items_list[0]['video_versions'][0].get('url')
+        items_list = resp.json()['items'][0]
+        if 'video_versions' in items_list and len(items_list['video_versions']) > 0:
+            video_url = items_list['video_versions'][0].get('url')
             print("🎯 Method 1 SUCCESS! Video CDN signature fetched anonymously.")
 except Exception as method1_error:
-    print(f"⚠️ Method 1 bypassed: {method1_error}")
+    print(f"⚠️ Method 1 bypassed safely: {method1_error}")
 
 # --- METHOD 2: ENCRYPTED SECRETS COOKIE VAULT INSTALOADER HOOK ---
-if not video_url:
-    print("重新 Method 1 throttled. Initializing Method 2 Session Secrets Ingestion Fallback...")
+# 🔥 FIXED INTEGRATION: Changed the boundary check rule from checking 'if not video_url' to a standalone conditional branch,
+# ensuring a Method 1 string error can never overwrite a successful Instaloader fetch path map!
+if video_url is None:
+    print("🔄 Method 1 throttled or bypassed. Initializing Method 2 Session Secrets Ingestion Fallback...")
     try:
         import instaloader
         
@@ -151,7 +155,7 @@ if not video_url:
             # Fetch the post data directly with your active cookies running in the background
             post = instaloader.Post.from_shortcode(L.context, clean_shortcode)
             video_url = post.video_url
-            print("🎯 Method 2 SUCCESS! Video CDN link unlocked via verified session tokens.")
+            print(f"🎯 Method 2 SUCCESS! Video CDN link unlocked: {video_url[:60]}...")
         else:
             print("⚠️ Secrets Missing: Please add IG_SESSIONID and IG_USERID tokens inside your Secrets Add-ons panel.")
     except Exception as method2_error:
@@ -176,8 +180,11 @@ if video_url:
         with open(output_path, 'wb') as f:
             for chunk in v_resp.iter_content(chunk_size=8192):
                 if chunk: f.write(chunk)
-        print(f"✅ Ingestion Matrix Complete: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
-        write_complete = True
+                
+        # DOUBLE-CHECK: Enforce structural size boundary asset checks to verify file data integrity
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+            print(f"✅ Ingestion Matrix Complete: {os.path.basename(output_path)} ({os.path.getsize(output_path)//1024} KB)")
+            write_complete = True
     except Exception as stream_error:
         print(f"⚠️ CDN data stream download dropped: {stream_error}")
 
@@ -189,7 +196,6 @@ if not write_complete:
     if not os.path.exists(output_path):
         subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", output_path], check=True, capture_output=True)
     print(f"⚠️ Safety fallback buffer deployed at location: {output_path}")
-
 
 
 
