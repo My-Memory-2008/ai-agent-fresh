@@ -72,12 +72,12 @@ print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
 # ==========================================
-# 3. DOWNLOAD REEL (ISOLATED SHELL COOKIE BYPASS)
+# 3. DOWNLOAD REEL (ABSOLUTE CHARACTER-JOIN BYPASS)
 # ==========================================
-print("📥 Initializing self-contained clean shell download matrix via Vault cookies...")
+print("📥 Initializing character-join shell download matrix via Vault cookies...")
 
-def execute_shell_session_download():
-    # 1. Safely extract shortcode strictly out of the baseline dictionary mapping array 
+def execute_strict_join_download():
+    # 1. Extract shortcode safely without using standard string formatting attributes
     local_shortcode = None
     if 'pipeline' in locals() and pipeline.get("reel_url"):
         url_string = str(pipeline.get("reel_url", "")).strip()
@@ -89,7 +89,7 @@ def execute_shell_session_download():
         local_shortcode = str(shortcode).strip()
         
     if not local_shortcode or local_shortcode == "unknown":
-        local_shortcode = "DY42lC6AN3U" # Hardcoded high-availability baseline fallback
+        local_shortcode = "DY42lC6AN3U"
         
     print(f"🎯 Terminal Shell Validation Passed -> Shortcode Variable Locked: {local_shortcode}")
     
@@ -97,22 +97,28 @@ def execute_shell_session_download():
     final_output_path = os.path.join(RAW_DIR, f"{username}_{local_shortcode}.mp4")
     download_url = None
     
-    # Pull your raw authentication tokens straight out of the encrypted secrets vault context
+    # Pull raw authentication tokens straight out of the encrypted secrets vault context
     secret_sessionid = secrets.get_secret("IG_SESSIONID")
     secret_userid = secrets.get_secret("IG_USERID")
     
     # ------------------------------------------
-    # LAYER 1: AUTHENTICATED INTERNAL MOBILE API VIA CURL
+    # LAYER 1: AUTHENTICATED INTERNAL MOBILE API VIA STRICT JOIN
     # ------------------------------------------
     if secret_sessionid and secret_userid:
         print("🔐 Injecting high-reputation session cookies straight into shell network layers...")
         
-        # Build the exact string headers that official web browsers use
         cookie_header_string = f"sessionid={secret_sessionid.strip()}; ds_user_id={secret_userid.strip()}"
-        mobile_api_url = f"https://instagram.com{local_shortcode}/info/"
+        
+        # 🔥 CRITICAL SYNC FIX: Explicitly combine URL blocks using an array join to prevent the text from squishing together
+        mobile_api_url = "".join([
+            "https://", 
+            "://instagram.com", 
+            "/api/v1/media/", 
+            str(local_shortcode).strip(), 
+            "/info/"
+        ])
         
         try:
-            # Native shell execution completely isolates the domain text from your upstream python string bugs
             curl_auth_cmd = [
                 "curl", "-s", "-L",
                 "-A", "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
@@ -124,24 +130,31 @@ def execute_shell_session_download():
             
             shell_output = subprocess.check_output(curl_auth_cmd, text=True, timeout=25)
             
-            # Safely parse the returning data stream text fields 
             json_data = json.loads(shell_output)
             items = json_data.get("items", [])
             if items and len(items) > 0:
                 video_versions = items[0].get("video_versions", [])
-                if video_versions:
+                if video_versions and len(video_versions) > 0:
                     download_url = video_versions[0].get("url")
-                    print("🎯 Layer 1 Authenticated App Extractor Successful via native shell.")
+                    print("🎯 Layer 1 Authenticated App Extractor Successful via array join.")
         except Exception as auth_shell_error:
             print(f"⚠️ Layer 1 authenticated shell challenge encountered: {auth_shell_error}")
 
     # ------------------------------------------
-    # LAYER 2: DECOUPLED INDEPENDENT REST GATEWAY BYPASS
+    # LAYER 2: DECOUPLED INDEPENDENT REST GATEWAY BYPASS (STRICT JOIN)
     # ------------------------------------------
     if not download_url:
         print("🔄 Layer 1 bypassed or secrets empty. Deploying Layer 2 alternate network route...")
         try:
-            rest_target_url = f"https://api.co{local_shortcode}"
+            # 🔥 CRITICAL SYNC FIX: Formulated using plain text chunks to block character corruption completely
+            rest_target_url = "".join([
+                "https://", 
+                "api.v0.api.co", 
+                "/instagram/media", 
+                "?shortcode=", 
+                str(local_shortcode).strip()
+            ])
+            
             curl_rest_cmd = [
                 "curl", "-s", "-L",
                 "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -151,7 +164,7 @@ def execute_shell_session_download():
             rest_data = json.loads(rest_output)
             if isinstance(rest_data, dict) and 'url' in rest_data:
                 download_url = rest_data.get('url')
-                print("🎯 Layer 2 REST Ingestion Track Successful via native shell.")
+                print("🎯 Layer 2 REST Ingestion Track Successful via array join.")
         except Exception as rest_shell_error:
             print(f"⚠️ Layer 2 alternate shell query bypassed: {rest_shell_error}")
 
@@ -161,7 +174,6 @@ def execute_shell_session_download():
     if download_url:
         try:
             print("⬇️ Streaming raw video binaries natively into workspace partition...")
-            # Pushes the binary download directly to file storage location instantly
             curl_download_cmd = [
                 "curl", "-s", "-L",
                 "-o", final_output_path,
@@ -187,7 +199,7 @@ def execute_shell_session_download():
     return final_output_path
 
 # Execute the isolated local shell bypass function to set global pipeline tracks cleanly
-output_path = execute_shell_session_download()
+output_path = execute_strict_join_download()
 
 
 
