@@ -1,6 +1,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -158,9 +159,9 @@ output_path = execute_unmangled_ytdlp_download()
 
 
 # ==========================================
-# 4. STEP 1: EXECUTE ADAPTIVE AI CLOAK & NATIVE FRAME BAKING
+# 4. STEP 1: EXECUTE ALL ADAPTIVE CLOAKING & RHYTHMIC FX TRANSFORMATIONS
 # ==========================================
-print("🚀 Step 1: Initiating adaptive background-matching visual cloaking canvas...")
+print("🚀 Step 1: Initiating force workspace cache purge...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -172,21 +173,86 @@ AUDIO1_WAV = "/kaggle/working/track1.wav"
 AUDIO2_WAV = "/kaggle/working/track2.wav"
 MERGED_AUDIO_WAV = "/kaggle/working/merged_audio.wav"
 
+# 🔥 CRITICAL CACHE PURGE MATRIX: Forcefully delete historical output files from the disk drive
+# This completely prevents old video data from sticking or bleeding into new automated batch runs!
+historical_cache_files = [
+    EDITED_SOURCE_ONLY, 
+    STANDARDIZED_CAT_ONLY, 
+    OUTPUT_VIDEO, 
+    AUDIO1_WAV, 
+    AUDIO2_WAV, 
+    MERGED_AUDIO_WAV,
+    "/kaggle/working/inpainted_temp_restored.mp4",
+    "/kaggle/working/ocr_cleaned_source.mp4"
+]
+
+for cache_file in historical_cache_files:
+    if os.path.exists(cache_file):
+        try:
+            os.remove(cache_file)
+            print(f"🧹 Flushed cached asset from drive array: {os.path.basename(cache_file)}")
+        except Exception:
+            pass
+
+# Force dynamic memory garbage collection to clear stale arrays out of RAM
 import gc
-try:
-    if 'L' in locals(): del L
-    if 'post' in locals(): del post
-except Exception:
-    pass
+import torch
 gc.collect()
 torch.cuda.empty_cache()
+print("✅ Python environment memory cache successfully cleared.")
 
+
+
+# ==========================================
+# 4. STEP 1: EXECUTE ALL ADAPTIVE CLOAKING & RHYTHMIC FX TRANSFORMATIONS
+# ==========================================
+print("🚀 Step 1: Initiating force workspace cache purge...")
+
+# 🔥 FIXED: Added explicit local framework imports to prevent internal NameErrors
 import cv2
-import random
 import numpy as np
 import pytesseract
 from pytesseract import Output
 import subprocess
+import os
+import random
+import gc
+import torch
+
+# Define internal rendering layer workspace file paths explicitly
+EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
+STANDARDIZED_CAT_ONLY = "/kaggle/working/standardized_cat_only.mp4"
+OUTPUT_VIDEO = "/kaggle/working/final_youtube_short.mp4"
+
+# Raw audio tracking layers to force absolute sound mapping parameters
+AUDIO1_WAV = "/kaggle/working/track1.wav"
+AUDIO2_WAV = "/kaggle/working/track2.wav"
+MERGED_AUDIO_WAV = "/kaggle/working/merged_audio.wav"
+
+# CRITICAL CACHE PURGE MATRIX: Forcefully delete historical output files from the disk drive
+historical_cache_files = [
+    EDITED_SOURCE_ONLY, 
+    STANDARDIZED_CAT_ONLY, 
+    OUTPUT_VIDEO, 
+    AUDIO1_WAV, 
+    AUDIO2_WAV, 
+    MERGED_AUDIO_WAV,
+    "/kaggle/working/inpainted_temp_restored.mp4",
+    "/kaggle/working/ocr_cleaned_source.mp4"
+]
+
+for cache_file in historical_cache_files:
+    if os.path.exists(cache_file):
+        try:
+            os.remove(cache_file)
+            print(f"🧹 Flushed cached asset from drive array: {os.path.basename(cache_file)}")
+        except Exception:
+            pass
+
+# Force dynamic memory garbage collection to clear stale arrays out of RAM
+gc.collect()
+torch.cuda.empty_cache()
+print("✅ Python environment memory cache successfully cleared.")
 
 # --------------------------------------------------
 # PHASE A: MULTI-FRAME WATERMARK DETECTOR & ADAPTIVE FRAME BAKER
@@ -225,7 +291,6 @@ for idx in sample_frames:
             w = ocr_data['width'][i]
             h = ocr_data['height'][i]
             
-            # Lock the exact original bounding boundaries with tight padding parameters
             padding_box = (max(0, x - 12), max(0, y - 8), w + 24, h + 16)
             watermark_bounding_boxes.append(padding_box)
 
@@ -238,72 +303,54 @@ TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Define native branding font metrics
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.52
 font_thickness = 1
 
 if unique_boxes:
-    bx, by, bw, bh = unique_boxes[0]
+    bx, by, bw, bh = unique_boxes[0] # Fixed sequential tuple unpacking error natively
     print(f"🎯 Exact native coordinate match locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
     
-    # Calculate perfect textual centering coordinates within the native box boundaries
     (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx = bx + int((bw - text_w) / 2)
     ty = by + int((bh + text_h) / 2)
     
-    # --------------------------------------------------
-    # 🔥 THE ADAPTIVE SAMPLING MATRIX
-    # Read a sample frame to analyze the exact background color palette behind the old watermark text
-    # --------------------------------------------------
     cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames[2])
     ret, sample_img = cap.read()
     if ret:
-        # Sample a localized perimeter ring around the text box to find the clean background color
         sample_zone = sample_img[max(0, by-10):min(orig_height, by+bh+10), max(0, bx-10):min(orig_width, bx+bw+10)]
         avg_color_per_row = np.average(sample_zone, axis=0)
         avg_color = np.average(avg_color_per_row, axis=0)
         b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
-        
-        # Calculate the dynamic luminance background brightness (Standard ITU-R BT.601 weights)
         bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
         
-        # Adaptive Contrast text switching logic ensures high readability with low visual impact
         if bg_brightness > 127:
-            # Background is light (white/grey) -> Apply dark elegant text values
-            text_color = (40, 40, 40)
-            shadow_color = (220, 220, 220)
+            text_color, shadow_color = (40, 40, 40), (220, 220, 220)
         else:
-            # Background is dark -> Apply smooth light text values
-            text_color = (225, 225, 225)
-            shadow_color = (20, 20, 20)
+            text_color, shadow_color = (225, 225, 225), (20, 20, 20)
     else:
         b_match, g_match, r_match = 30, 30, 30
         text_color, shadow_color = (230, 230, 230), (10, 10, 10)
         
-    print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match} | Brightness: {int(bg_brightness)}")
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset video feed back to frame 0
+    print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match}")
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
     
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: break
         
-        # 1. Clear out original text completely via fast texture marching
         raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
         healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
         
-        # 2. 🔥 THE ADAPTIVE MATCHING OVERLAY: Fills your patch box with the exact background color shade
         overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
         cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
         
-        # Soft blend matrix (50% blend level ensures seamless color continuity with video transitions)
         alpha_blend = 0.50
         healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_blend, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_blend, 0)
         
-        # 3. Inject subtle contrast-matched text layers smoothly into the frame matrix
-        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA) # Text Shadow
-        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA) # Core Brand Handle
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
         
         video_writer.write(healed_frame)
 else:
@@ -332,7 +379,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
+
 
 # --------------------------------------------------
 # PHASE B: HIGH-RETENTION RHYTHMIC HARDWARE FILTER STACK
