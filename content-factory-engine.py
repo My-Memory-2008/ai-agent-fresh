@@ -156,11 +156,10 @@ def execute_unmangled_ytdlp_download():
 output_path = execute_unmangled_ytdlp_download()
 
 
-
 # ==========================================
 # 4. STEP 1: EXECUTE ALL VIDEO EDITING TRANSFORMATIONS FIRST
 # ==========================================
-print("🚀 Step 1: Initiating subtle professional cloaking and light brand accent visual canvas...")
+print("🚀 Step 1: Initiating full visual editing transformation canvas...")
 
 # Define internal rendering layer workspace file paths explicitly
 EDITED_SOURCE_ONLY = "/kaggle/working/edited_source_only.mp4"
@@ -182,114 +181,43 @@ gc.collect()
 torch.cuda.empty_cache()
 
 import cv2
-import random
-import numpy as np
 import pytesseract
 from pytesseract import Output
-import subprocess
 
-# --------------------------------------------------
-# PHASE A: MULTI-FRAME AI WATERMARK LOCATOR & CLEANER
-# --------------------------------------------------
-print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
+# --- AI OCR CHECKPOINT: USERNAME WATERMARK REMOVER ---
+print("👁️ Scanning frame layers for creator username text signatures...")
 cap = cv2.VideoCapture(output_path)
-orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-fps = cap.get(cv2.CAP_PROP_FPS)
-
-sample_frames = [
-    int(frame_count * 0.10), 
-    int(frame_count * 0.30), 
-    int(frame_count * 0.50), 
-    int(frame_count * 0.70), 
-    int(frame_count * 0.90)
-]
-watermark_bounding_boxes = []
+sample_frames = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+text_watermark_box = None
+clean_username_target = username.lower().strip()
 
 for idx in sample_frames:
     cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
     ret, frame = cap.read()
     if not ret: continue
-    
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
     
     for i in range(len(ocr_data['text'])):
-        detected_word = str(ocr_data['text'][i]).strip().lower()
-        clean_target = str(username).strip().lower()
-        
-        if '@' in detected_word or (len(detected_word) > 2 and (detected_word in clean_target or clean_target in detected_word)):
-            x = ocr_data['left'][i]
-            y = ocr_data['top'][i]
-            w = ocr_data['width'][i]
-            h = ocr_data['height'][i]
-            
-            # Pad the bounding tracking parameters outward to fully isolate text glows
-            padding_box = (max(0, x - 10), max(0, y - 5), w + 20, h + 10)
-            watermark_bounding_boxes.append(padding_box)
-
+        detected_word = str(ocr_data['text'][i]).lower().strip()
+        if clean_username_target in detected_word or (len(detected_word) > 3 and detected_word in clean_username_target):
+            x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
+            text_watermark_box = (max(0, x-15), max(0, y-10), w+30, h+20)
+            break
+    if text_watermark_box: break
 cap.release()
-unique_boxes = list(set(watermark_bounding_boxes))
 
-# Default alignment values if no watermark is found
-final_x, final_y, final_w, final_h = 420, 160, 240, 70
-
-if unique_boxes:
-    bx, by, bw, bh = unique_boxes[0]
-    print(f"🎯 Watermark localized in raw video layout -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-    
-    # Calculate the dynamic downscaling ratios matching your FFmpeg scale profile (max size 918x1632)
-    scale_factor = min(918.0 / orig_width, 1632.0 / orig_height)
-    
-    # Project the bounding coordinates cleanly onto the true 1080x1920 pixel grid space
-    scaled_w = bw * scale_factor
-    scaled_h = bh * scale_factor
-    offset_x = (1080.0 - (orig_width * scale_factor)) / 2.0
-    offset_y = (1920.0 - (orig_height * scale_factor)) / 2.0
-    
-    # Cast parameters to strict integers and add 15% safety padding for absolute physical coverage
-    final_x = int((bx * scale_factor) + offset_x - 10)
-    final_y = int((by * scale_factor) + offset_y - 5)
-    final_w = int(scaled_w + 20)
-    final_h = int(scaled_h + 10)
-    
-    print(f"🚀 Projected coordinates locked -> X:{final_x}, Y:{final_y}, W:{final_w}, H:{final_h}")
-    
-    print("🎨 Initializing OpenCV Fast-Marching Pixel Inpainter...")
-    cap = cv2.VideoCapture(output_path)
-    TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
-    
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret: break
-        
-        raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-        cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
-        
-        healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
-        video_writer.write(healed_frame)
-        
-    cap.release()
-    video_writer.release()
-    
+if text_watermark_box:
+    x, y, w, h = text_watermark_box
+    print(f"🎯 Watermark Matched! Scrubbing region -> X:{x}, Y:{y}, W:{w}, H:{h}")
     CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
-        "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
-        CLEAN_INPUT_STAGE1
-    ], check=True, capture_output=True)
-    
-    if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
+    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}", "-c:a", "copy", CLEAN_INPUT_STAGE1], check=True, capture_output=True)
 else:
-    print("✨ Clean Layout Check! Zero watermarks found. Using center-top defaults.")
+    print("✨ Clean Layout Check! Bypassing OCR erasure step.")
     CLEAN_INPUT_STAGE1 = output_path
 
-# --------------------------------------------------
-# PHASE B: APPLY FILTER STACK & CENTER BRAND TEXT BOX OVER BLUR
-# --------------------------------------------------
+# --- APPLY 9:16 PORTRAIT VISUAL EDITING FILTER STACK ---
 styles = [
     "eq=contrast=1.05:brightness=0.01:saturation=1.02:gamma=0.97",
     "curves=m='0/0 0.25/0.18 0.5/0.5 0.75/0.82 1/1'",
@@ -302,20 +230,12 @@ effects = [
 ]
 chosen_style, chosen_effect = random.choice(styles), random.choice(effects)
 
-# Mathematically centers your text handle perfectly inside the box on the final 1080x1920 layout
-text_alignment_x = f"{final_x} + ({final_w} - tw)/2"
-text_alignment_y = f"{final_y} + ({final_h} - th)/2"
-
-# 🔥 THE SUBTLE INTENTIONAL COVER UP ENGINE:
-# 1. drawbox: Draws an absolute solid geometric box (t=fill) using semi-transparent black (black@0.40) over the exact blur coordinates.
-# 2. drawtext: Places a light, highly subtle semi-transparent text watermark layer (white@0.45) cleanly centered on top.
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,{chosen_effect}[bg];"
     f"[0:v]scale=918:1632,{chosen_style}[main_scaled];"
     f"[bg][main_scaled]overlay=(W-w)/2:(H-h)/2,setsar=1[processed_source];"
     f"[processed_source]noise=alls=7:allf=t+u[grained];"
-    f"[grained]drawbox=x={final_x}:y={final_y}:w={final_w}:h={final_h}:color=black@0.40:t=fill[covered];"
-    f"[covered]drawtext=text='@AWRAM':x={text_alignment_x}:y={text_alignment_y}:fontsize=38:fontcolor=white@0.45:borderw=1:bordercolor=black@0.20[v]"
+    f"[grained]drawtext=text='@AWRAM':x=(w-tw)/2:y=80:fontsize=40:fontcolor=white@0.55:box=1:boxcolor=black@0.25[v]"
 )
 
 # Render Step 1: Fully process video transformations into constant 30fps container lanes
@@ -332,15 +252,15 @@ res1 = subprocess.run(ffmpeg_editing, capture_output=True, text=True)
 if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
-
-print("✅ Step 1 Complete: Watermark covered flawlessly with a subtle, non-intrusive brand accent overlay.")
-
+print("✅ Step 1 Complete: Visual layers processed successfully.")
 
 
+
+
+## ==========================================
+# 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (NO REPEATS)
 # ==========================================
-# 4b. MULTIMODAL VISION AI VIRAL SEO GENERATOR (RESILIENT DUAL-AI MATRIX)
-# ==========================================
-print("🧠 Activating Resilient Multimodal Vision SEO Generation Matrix...")
+print("🧠 Activating Cloud Vision AI Engine via Google GenAI...")
 import cv2
 import json
 import os
@@ -349,105 +269,86 @@ from PIL import Image
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
-# Baseline default fallback metadata matrix
+# Safety default fallback metadata structure
 seo_metadata = {
     "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
     "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
     "tags": ["satisfying", "asmr", "shorts", "relaxing"]
 }
 
+# Fetch your secure environment token out of Kaggle User Secrets Vault
+# Make sure you have a secret named "GEMINI_API_KEY" set up in your Kaggle notebook!
 gemini_key = secrets.get_secret("GEMINI_API_KEY")
-groq_key = secrets.get_secret("GROQ_API_KEY")
 
-# Extract a video frame layer matrix directly from your edited loop source file
-print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
-cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
-frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45))
-ret, frame = cap.read()
-cap.release()
-
-seo_prompt = (
-    f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
-    f"Analyze this loop video details created by creator @{username} containing an oddly satisfying visual layout and a funny cat reaction attached right at the end.\n\n"
-    f"Tasks:\n"
-    f"1. YOUTUBE_TITLE: Write a highly clickable title (Max 65 characters) focusing entirely on high-relevance satisfying value. End strictly with #shorts.\n"
-    f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about the loop or the cat reaction at the end. "
-    f"Sentence 2 states why this unique ASMR loop content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
-    f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords in this niche.\n\n"
-    f"Return response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks, 'json' headers, or introductory conversational filler text."
-)
-
-ai_generation_success = False
-
-# --- ENGINE LAYER 1: GEMINI CLOUD VISION CORE ---
-if gemini_key and ret:
-    print("📡 Attempting Primary Engine: Gemini-2.5-Flash Multimodal Cluster...")
+if gemini_key:
     try:
         from google import genai
-        client_gemini = genai.Client(api_key=gemini_key.strip())
+        from google.genai import types
         
-        cv2.imwrite(TEMP_FRAME_PATH, frame)
-        pil_image = Image.open(TEMP_FRAME_PATH)
+        # Initialize the official secure Google GenAI Client
+        client = genai.Client(api_key=gemini_key.strip())
         
-        response = client_gemini.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[pil_image, seo_prompt]
-        )
-        
-        clean_json_text = response.text.strip().replace('```json', '').replace('```', '').strip()
-        ai_seo_data = json.loads(clean_json_text)
-        
-        seo_metadata = {
-            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
-            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
-            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
-        }
-        print(f"🎉 Primary Gemini Engine Successful -> Title: \"{seo_metadata['title']}\"")
-        ai_generation_success = True
-        
-        if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
-    except Exception as gemini_error:
-        print(f"⚠️ Gemini Quota Exhausted or Challenged: {gemini_error}")
+        # 1. Capture a mid-timeline frame directly from your edited source video file
+        print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
+        cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45)) # Grab frame right in the middle of action
+        ret, frame = cap.read()
+        cap.release()
 
-# --- ENGINE LAYER 2: LLAMA 3.3 CORE TEXT FALLBACK ---
-if not ai_generation_success and groq_key:
-    print("🔄 Initializing Layer 2 Fallback: Llama-3.3-70b Engine via Groq Gateway...")
-    try:
-        from groq import Groq
-        client_groq = Groq(api_key=groq_key.strip())
-        
-        chat_completion = client_groq.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a precise YouTube SEO generation microservice that outputs data exclusively as raw JSON objects."},
-                {"role": "user", "content": seo_prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.65,
-            max_tokens=250
-        )
-        
-        clean_json_text = chat_completion.choices[0].message.content.strip().replace('```json', '').replace('```', '').strip()
-        ai_seo_data = json.loads(clean_json_text)
-        
-        seo_metadata = {
-            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
-            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
-            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
-        }
-        print(f"🎉 Fallback Llama Engine Successful -> Title: \"{seo_metadata['title']}\"")
-        ai_generation_success = True
-    except Exception as groq_error:
-        print(f"⚠️ Llama fallback gateway challenged: {groq_error}")
+        if ret:
+            # Save the frame image locally to pass to the Vision API node
+            cv2.imwrite(TEMP_FRAME_PATH, frame)
+            pil_image = Image.open(TEMP_FRAME_PATH)
+            
+            print("📡 Uploading video frame to Gemini-2.5 Vision cluster for deep analysis...")
+            
+            seo_prompt = (
+                f"You are a viral YouTube Shorts master growth hacker specializing in high-retention Oddly Satisfying and ASMR niches. "
+                f"Analyze this visual frame screenshot taken from a vertical loop video created by @{username}.\n\n"
+                f"Tasks:\n"
+                f"1. YOUTUBE_TITLE: Write a highly clickable title (Max 65 characters) describing the satisfying action visible in the image. End strictly with #shorts.\n"
+                f"2. YOUTUBE_DESCRIPTION: Write an engaging 3-sentence description. Sentence 1 is a witty hook about what is happening in this loop. "
+                f"Sentence 2 states why this unique ASMR content is completely addictive. Sentence 3 is an organic CTA to subscribe. Include: \"Original concept inspired by @{username}\". Append viral hashtags.\n"
+                f"3. YOUTUBE_TAGS: Provide a clean array of exactly 6 high-traffic trending keywords describing the objects or materials visible in the image.\n\n"
+                f"Return your response STRICTLY as a raw JSON object with keys 'youtube_title', 'youtube_description', and 'youtube_tags'. Do not include markdown ticks, 'json' headings, or introductory conversational filler text."
+            )
 
-# Force a system memory purge to clear textures out of the GPU layout area
+            # Fire the high-speed multimodal generation query
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[pil_image, seo_prompt]
+            )
+            
+            # Clean response boundaries of potential text wrappers cleanly before unpacking
+            clean_json_text = response.text.strip().replace('```json', '').replace('```', '').strip()
+            ai_seo_data = json.loads(clean_json_text)
+            
+            seo_metadata = {
+                "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+                "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+                "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+            }
+            print(f"🎉 SUCCESS! Fresh Visual SEO Generated via Gemini -> Title: \"{seo_metadata['title']}\"")
+            
+            # Cleanup temp file from disk partition
+            if os.path.exists(TEMP_FRAME_PATH):
+                os.remove(TEMP_FRAME_PATH)
+        else:
+            raise RuntimeError("Frame capture extraction failed.")
+
+    except Exception as vision_error:
+        print(f"⚠️ Cloud vision block failed, using system fallback arrays: {vision_error}")
+else:
+    print("⚠️ GEMINI_API_KEY secret missing in Kaggle vault. Bypassing cloud vision block.")
+
+# Force a memory purge to ensure the GPU is 100% clean for your upcoming video processing stages
 import torch
 torch.cuda.empty_cache()
 
 # Save metadata manifest file to drive partition for Section 6 upload mapping
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-print("✅ Section 4b Processing Finished Safely.")
 
 
 
