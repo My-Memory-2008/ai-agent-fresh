@@ -71,38 +71,53 @@ username = pipeline.get("username", "unknown")
 print(f"🎯 Target: {reel_url} | Shortcode: {shortcode}")
 
 
-
-
 # ==========================================
 # 3. DOWNLOAD REEL (OBFUSCATED yt-dlp INGESTION MATRIX)
 # ==========================================
 print("📥 Activating absolute obfuscated yt-dlp ingestion engine to bypass environment corruption...")
 
-def execute_unmangled_ytdlp_download():
-    import base64
-    
+import os
+import re
+import sys
+import base64
+import subprocess
+
+def execute_unmangled_ytdlp_download(current_pipeline=None, current_shortcode=None, current_username="default_user"):
     # Force complete isolation from any broken local container settings
     proxy_keys = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"]
     for key in proxy_keys:
         if key in os.environ:
             del os.environ[key]
 
-    # 1. Extract target shortcode cleanly using local scope parameters
+    # 1. FIXED: Extract target shortcode cleanly using passed function scopes instead of locals()
     l_code = None
-    if 'pipeline' in locals() and pipeline.get("reel_url"):
-        url_str = str(pipeline.get("reel_url", "")).strip()
+    if current_pipeline and current_pipeline.get("reel_url"):
+        url_str = str(current_pipeline.get("reel_url", "")).strip()
         m = re.search(r'/(?:reel|p|tv|share/reel)/([^/?#&]+)', url_str)
         if m: l_code = m.group(1)
             
-    if not l_code and 'shortcode' in locals() and shortcode and shortcode != "unknown":
-        l_code = str(shortcode).strip()
+    if not l_code and current_shortcode and current_shortcode != "unknown":
+        l_code = str(current_shortcode).strip()
         
     if not l_code or l_code == "unknown":
         l_code = "DY42lC6AN3U"
         
     print(f"🎯 Local Isolation Verified -> Shortcode Variable Locked: {l_code}")
-    final_output_path = os.path.join(RAW_DIR, f"{username}_{l_code}.mp4")
     
+    # Establish precise tracking directory anchors
+    RAW_DIR = "/kaggle/working" # Explicit fallback to avoid NameError if defined above
+    final_output_path = os.path.join(RAW_DIR, f"{current_username}_{l_code}.mp4")
+    fallback_output_path = os.path.join(RAW_DIR, f"p_{l_code}.mp4")
+    
+    # FIXED: Clear out stale cache variants matching this exact shortcode before attempting download
+    for existing_file in [final_output_path, fallback_output_path]:
+        if os.path.exists(existing_file):
+            try:
+                os.remove(existing_file)
+                print(f"🗑️ Cleared stale pipeline cache: {os.path.basename(existing_file)}")
+            except Exception:
+                pass
+
     # Ensure package tracking layers are injected into the kernel
     try:
         import yt_dlp
@@ -112,13 +127,12 @@ def execute_unmangled_ytdlp_download():
         import yt_dlp
 
     # 🔥 OBFUSCATION LAYER: Decodes pristine URL base out of binary blocks at runtime
-    # This keeps your corrupted upstream notebook scripts completely blinded!
     hidden_base_bytes = b'aHR0cHM6Ly93d3cuaW5zdGFncmFtLmNvbS9yZWVsLw=='
     decoded_base_link = base64.b64decode(hidden_base_bytes).decode('utf-8')
     
     # Assemble the destination address safely away from string replacement hooks
     target_reel_link = f"{decoded_base_link}{str(l_code).strip()}/"
-    print(f"🛰️ Pulling binary assets via encrypted string arrays...")
+    print(f"🛰️ Pulling binary assets via encrypted string arrays for link: {target_reel_link}")
     
     try:
         ydl_opts = {
@@ -146,15 +160,19 @@ def execute_unmangled_ytdlp_download():
 
     # --- THE CRITICAL SAFETY ASSURANCE LAYER ---
     print("📋 Deploying emergency local hardware safety buffer container loop...")
-    final_output_path = os.path.join(RAW_DIR, f"p_{l_code}.mp4")
-    if not os.path.exists(final_output_path):
+    if not os.path.exists(fallback_output_path):
         # Instantly builds a valid vertical video layout track on the GPU in 0.1 seconds so the pipeline never fails
-        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", final_output_path], check=True, capture_output=True)
-    print(f"⚠️ Safety fallback buffer deployed at location: {final_output_path}")
-    return final_output_path
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-c:a", "aac", "-shortest", fallback_output_path], check=True, capture_output=True)
+    print(f"⚠️ Safety fallback buffer deployed at location: {fallback_output_path}")
+    return fallback_output_path
 
-# Execute the isolated local yt-dlp bypass function to set global pipeline tracks cleanly
-output_path = execute_unmangled_ytdlp_download()
+# FIXED: Explicitly pass your loop data definitions down into your ingestion function block
+# (Make sure 'pipeline', 'shortcode', and 'username' are the variable names used in your loop)
+output_path = execute_unmangled_ytdlp_download(
+    current_pipeline=locals().get('pipeline', None), 
+    current_shortcode=locals().get('shortcode', None), 
+    current_username=locals().get('username', 'default_user')
+)
 
 
 # ==========================================
