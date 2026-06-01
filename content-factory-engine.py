@@ -232,53 +232,117 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 
-
 # ==========================================
-# PHASE A: LOCAL SPATIAL CORNER INPAINTER ENGINE (100% FREE & ACCURATE)
+# PHASE A: LOCAL ZERO-MOTION VARIANCE WATERMARK ERASER (100% FREE & AUTOMATED)
 # ==========================================
-print("📥 Activating local high-precision spatial pixel eraser...")
+print("🧠 Activating local zero-motion variance pixel tracking engine...")
 
 import os
 import cv2
-import sys
 import re
 import random
 import numpy as np
 import subprocess
 
-# 1. Capture dynamic container metrics from your target clip
+# 1. Capture dynamic frame arrays from your target clip to map motion variance
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Setup sample markers for localized color tracking processing routines
-sample_markers = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
-ret_sample, sample_img = cap.read()
+# Take 5 snapshots across different timestamps to isolate stationary items from background motion
+sample_markers = [
+    int(frame_count * 0.15), 
+    int(frame_count * 0.35), 
+    int(frame_count * 0.55), 
+    int(frame_count * 0.75), 
+    int(frame_count * 0.90)
+]
+
+frames_buffer = []
+for f_idx in sample_markers:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
+    ret_f, frame_f = cap.read()
+    if ret_f:
+        gray = cv2.cvtColor(frame_f, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        frames_buffer.append(blurred)
 cap.release()
 
-# 📐 THE ABSOLUTE POSITION ARCHITECTURE MARGINS:
-# Locks tight, standard grid boundaries wrapping typical creator watermark channels.
-# Because it uses raw numbers inside your local layout scope, it is mathematically
-# impossible for it to drift or snap onto the outer borders of the video canvas!
-bx = int(orig_width * 0.06)       # Clear of the left edge margin line
-by = int(orig_height * 0.05)      # Clean starting marker situated inside the top quadrant lane
-bw = int(orig_width * 0.28)       # Compact width boundary envelope
-bh = int(orig_height * 0.05)      # Compact height boundary envelope
+# Default fallback patch parameters (Top-Left corner) if no stationary shapes match rules
+bx = int(orig_width * 0.05)
+by = int(orig_height * 0.05)
+bw = int(orig_width * 0.28)
+bh = int(orig_height * 0.05)
+watermark_detected = False
 
-print(f"📐 Absolute Target Frame Coordinates Locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+if len(frames_buffer) >= 3:
+    # 🔥 LAYER 1: TEMPORAL MOVEMENT SEPARATION
+    # Moving video elements generate high numbers, while frozen watermarks or logos output near ZERO variance!
+    stacked_frames = np.stack(frames_buffer, axis=0)
+    pixel_variance = np.std(stacked_frames, axis=0)
+    
+    # Isolate absolute low-variance pixels that stayed completely still across the reel
+    low_variance_mask = (pixel_variance < 2.2).astype(np.uint8) * 255
+    
+    # 🔥 LAYER 2: EDGE CONTROLS INTERSECT
+    # We run a standard outline check on a sample frame to isolate sharp text edges from flat background blocks
+    sample_img_gray = frames_buffer[len(frames_buffer)//2]
+    sobel_x = cv2.Sobel(sample_img_gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(sample_img_gray, cv2.CV_64F, 0, 1, ksize=3)
+    sobel_mag = cv2.magnitude(sobel_x, sobel_y)
+    sobel_mag = np.clip(sobel_mag, 0, 255).astype(np.uint8)
+    _, edges_mask = cv2.threshold(sobel_mag, 35, 255, cv2.THRESH_BINARY)
+    
+    # Intersect the structural edges with our low-motion map layers
+    pure_static_text_shapes = cv2.bitwise_and(low_variance_mask, edges_mask)
+    
+    # Close horizontal letter gaps to group text strings into a single solid bounding block
+    kernel_group = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 12))
+    grouped_regions = cv2.morphologyEx(pure_static_text_shapes, cv2.MORPH_CLOSE, kernel_group)
+    
+    # Locate individual structural shapes matching the watermark profile metrics
+    contours, _ = cv2.findContours(grouped_regions, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    candidate_boxes = []
+    
+    for cnt in contours:
+        cx_r, cy_r, cw_r, ch_r = cv2.boundingRect(cnt)
+        
+        # Filter boundaries to look specifically within standard watermark sizes, ignoring fullscreen shapes
+        if cw_r > 35 and ch_r > 10 and cw_r < (orig_width * 0.50) and ch_r < (orig_height * 0.12):
+            # Spatial Lane Filter: Check if the shape lives in typical outer text areas (Top 25% or Bottom 25% of screen)
+            is_in_text_lane = (cy_r < (orig_height * 0.25)) or (cy_r > (orig_height * 0.75))
+            
+            if is_in_text_lane:
+                # 🔥 PROGRESSIVE SHELL EXPANSION:
+                # Add a 20% safety padding mask to fully enclose all soft text shadows and anti-aliasing artifacts
+                pad_w = int(cw_r * 0.20) + 8
+                pad_h = int(ch_r * 0.20) + 6
+                
+                fit_x = np.clip(cx_r - pad_w, 0, orig_width - 10)
+                fit_y = np.clip(cy_r - pad_h, 0, orig_height - 10)
+                fit_w = np.clip(cw_r + (pad_w * 2), 15, orig_width - fit_x)
+                fit_h = np.clip(ch_r + (pad_h * 2), 12, orig_height - fit_y)
+                candidate_boxes.append((fit_x, fit_y, fit_w, fit_h))
+                
+    if candidate_boxes:
+        # Sort shapes to lock onto the zero-motion container closest to the outer top or bottom video margins
+        candidate_boxes.sort(key=lambda b: abs(b[1] - (orig_height * 0.06)) if b[1] < (orig_height * 0.5) else abs(b[1] - (orig_height * 0.88)))
+        bx, by, bw, bh = candidate_boxes[0]
+        watermark_detected = True
+        print(f"🎯 LOCAL ZERO-MOTION ANCHOR LOCKED SUCCESSFULLY -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+    else:
+        print("📐 No static text shapes matched in outer lanes. Deploying corner fallback safety block dimensions.")
 
-# Calculate perfect branding text overlay alignment positions inside local scope variables
+# 🔥 AUTOMATED ADAPTIVE FONT SCALING LOOP
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.35  
 font_thickness = 1
 
-# Scale text size upward incrementally to fill the exact boundary footprint smoothly
-for scale_step in np.arange(0.35, 1.2, 0.02):
+for scale_step in np.arange(0.35, 1.4, 0.02):
     (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
-    if test_w < (bw * 0.72) and test_h < (bh * 0.60):
+    if test_w < (bw * 0.72) and test_h < (bh * 0.58):
         font_scale = scale_step
     else:
         break
@@ -287,23 +351,22 @@ for scale_step in np.arange(0.35, 1.2, 0.02):
 tx = bx + int((bw - text_w) / 2)
 ty = by + int((bh + text_h) / 2)
 
-# --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
+# --- 3. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
 print("🎨 Launching frame-by-frame content-aware pixel healing matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Calculate accurate native frame brightness matrices cleanly
+# Calculate accurate native frame brightness matrices cleanly using direct positional channel array index keys
+cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_markers))
+ret_sample, sample_img = cap.read()
 if ret_sample:
     sample_zone = sample_img[by:by+bh, bx:bx+bw]
     avg_channels = np.mean(sample_zone, axis=(0, 1))
-    
-    # Unpack raw channel values explicitly using position indexes to prevent dimension scalar TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
-    
     brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
     text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
 else:
@@ -316,21 +379,19 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Generate hard filled masking tracking block bounds directly matching the exact spatial coordinates
+    # Generate hard filled masking tracking block bounds completely engulfing the text and shadow margins
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
     
-    # Fast Marching Telea inpainting clears out the underlying original letters from the image layer completely
+    # Clear out old watermark curves and text shadows completely via local texture marching calculations
     healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
     # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
     overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
     cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
-    
-    # Adaptive 55% alpha blend ensures absolute smooth color continuity with moving background transitions
     healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
     
-    # Burn your custom subtle text watermark perfectly centered on top of the patch area
+    # Inject text layers centered and scaled to perfectly mask the blurry underlying region
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
@@ -348,7 +409,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Local spatial patch matrix successfully cleared original watermark with 0% AI dependencies.")
+print("✅ Phase A Complete: Local zero-motion engine successfully tracked, erased, and covered up the watermark.")
 
 
 # --------------------------------------------------
