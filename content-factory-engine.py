@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: OPENROUTER GPT-4o-MINI TIGHT-BOUND VISION ENGINE (PERFECT FIT)
+# PHASE A: OPENROUTER CLOUD VISION PROGRESSIVE SHELL ENGINE (PERFECT FIT)
 # ==========================================
-print("🧠 Activating OpenRouter High-Precision Tight-Bounding Vision Engine...")
+print("🧠 Activating OpenRouter High-Precision Vision Progressive Shell Engine...")
 
 import os
 import re
@@ -279,13 +279,15 @@ if openrouter_key and ret_v:
             
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
 
-        # Enhanced precise bounding prompt instructing the AI to give tight coordinates with NO whitespace
+        # High-precision prompt commanding the AI to capture the full logo bounding perimeter
         vision_prompt = (
-            f"Locate the precise bounding box of the creator watermark, social media username, or brand logo in this frame. "
-            f"The video resolution is Width: {orig_width} and Height: {orig_height}.\n"
-            f"CRITICAL: Do not include empty space, black borders, or margins. Tighten the dimensions directly to the edge of the text characters.\n\n"
-            f"Return a raw JSON object only: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
-            f"If none exists, return: {{\"found\": false}}."
+            f"Locate the bounding box of any creator watermark, social media handle text, profile username, or brand logo in this video frame. "
+            f"The image resolution metrics are exactly Width: {orig_width} and Height: {orig_height}.\n\n"
+            f"Tasks:\n"
+            f"Return the exact pixel coordinates matching its location container as a raw JSON object.\n"
+            f"Format your output strictly as: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
+            f"If there is absolutely no watermark visible anywhere in the image, return strictly: {{\"found\": false}}.\n"
+            f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
         )
 
         openrouter_target_parts = ["https://", "openrouter.ai", "/api/v1", "/chat/completions"]
@@ -323,6 +325,7 @@ if openrouter_key and ret_v:
         
         if response.status_code == 200:
             ai_response_json = response.json()
+            # 🔥 FIXED: Added index 0 to target the choice array elements list safely
             if "choices" in ai_response_json and len(ai_response_json["choices"]) > 0:
                 ai_text = ai_response_json['choices'][0]['message']['content']
                 clean_json = ai_text.strip().replace('```json', '').replace('```', '').strip()
@@ -332,49 +335,37 @@ if openrouter_key and ret_v:
                     raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
                     raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
                     
-                    bx = np.clip(raw_x - 5, 0, orig_width - 5)
-                    by = np.clip(raw_y - 4, 0, orig_height - 5)
-                    bw = np.clip(raw_w + 10, 5, orig_width - bx)
-                    bh = np.clip(raw_h + 8, 5, orig_height - by)
+                    # PROGRESSIVE SAFETY SHELL EXPANSION ENGINE:
+                    # Dynamically pad the AI's box outward by an explicit 15% ratio margin
+                    pad_w = int(raw_w * 0.15) + 6
+                    pad_h = int(raw_h * 0.15) + 4
                     
-                    # LOCAL GEOMETRIC TIGHTENER: Isolates textual shapes from empty layout margins
-                    roi = sample_frame[by:by+bh, bx:bx+bw]
-                    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                    _, thresh_roi = cv2.threshold(gray_roi, 200, 255, cv2.THRESH_BINARY)
-                    
-                    contours, _ = cv2.findContours(thresh_roi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    if contours:
-                        # 🔥 FIXED: Explicitly map individual primitive scalar values out of the contour bounding tuples
-                        contour_boxes = [cv2.boundingRect(c) for c in contours]
-                        
-                        cx_list = [c[0] for c in contour_boxes]
-                        cy_list = [c[1] for c in contour_boxes]
-                        cw_list = [c[2] for c in contour_boxes]
-                        ch_list = [c[3] for c in contour_boxes]
-                        
-                        tight_x = bx + min(cx_list)
-                        tight_y = by + min(cy_list)
-                        tight_w = max([cx + cw for cx, cw in zip(cx_list, cw_list)]) - min(cx_list)
-                        tight_h = max([cy + ch for cy, ch in zip(cy_list, ch_list)]) - min(cy_list)
-                        
-                        # Add a clean +12px padding safety margin to guarantee full textual encapsulation
-                        bx = np.clip(tight_x - 6, 0, orig_width - 5)
-                        by = np.clip(tight_y - 4, 0, orig_height - 5)
-                        bw = np.clip(tight_w + 12, 5, orig_width - bx)
-                        bh = np.clip(tight_h + 8, 5, orig_height - by)
+                    bx = np.clip(raw_x - pad_w, 0, orig_width - 10)
+                    by = np.clip(raw_y - pad_h, 0, orig_height - 10)
+                    bw = np.clip(raw_w + (pad_w * 2), 10, orig_width - bx)
+                    bh = np.clip(raw_h + (pad_h * 2), 10, orig_height - by)
                     
                     watermark_detected = True
-                    print(f"🎯 PIXEL-PERFECT ACCURACY! Box tightened precisely to text coordinates -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+                    print(f"🎯 AI MAPPING LOCKED & SHELL PADDED -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
         else:
             print(f"⚠️ OpenRouter Server Gateway returned error status: {response.status_code}")
             
     except Exception as vision_fault:
         print(f"⚠️ OpenRouter Cloud Vision AI layer challenged: {vision_fault}")
 
-# Calculate perfect branding text overlay alignment positions inside local scope variables
+# AUTOMATED ADAPTIVE FONT SCALING:
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.46  
+font_scale = 0.35  
 font_thickness = 1
+
+# Scale text size upward incrementally to fill 70% of the bounding width safely
+for scale_step in np.arange(0.35, 1.2, 0.02):
+    (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
+    if test_w < (bw * 0.72) and test_h < (bh * 0.60):
+        font_scale = scale_step
+    else:
+        break
+
 (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
 tx = bx + int((bw - text_w) / 2)
 ty = by + int((bh + text_h) / 2)
@@ -392,6 +383,7 @@ ret_sample, sample_img = cap.read()
 if ret_sample:
     sample_zone = sample_img[by:by+bh, bx:bx+bw]
     avg_channels = np.mean(sample_zone, axis=(0, 1))
+    # 🔥 FIXED: Unpacked channel scalars by position to permanently clear the dimension TypeError
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -407,11 +399,11 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Generate hard filled masking tracking block bounds directly matching the tight text coordinates
+    # Generate hard filled masking tracking block bounds completely engulfing the text and shadow margins
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
     
-    # Clear out old watermark shapes completely via local texture marching calculations
+    # Clear out old watermark curves and text shadows completely via local texture marching calculations
     healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
     # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
@@ -419,7 +411,7 @@ while cap.isOpened():
     cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
     healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
     
-    # Inject light, non-intrusive brand text layers smoothly on top of the patch area
+    # Inject text layers centered and scaled to perfectly mask the blurry underlying region
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
@@ -438,6 +430,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: OpenRouter Cloud Vision AI successfully localized and erased watermarks flawlessly.")
+
 
 
 
