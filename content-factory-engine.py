@@ -2,6 +2,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -367,10 +368,11 @@ if os.path.exists(TEMP_HEALED_MP4):
 
 print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
+
 # --------------------------------------------------
-# PHASE B: HIGH-RETENTION RHYTHMIC HARDWARE FILTER STACK
+# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (STABLE HOLD)
 # --------------------------------------------------
-print("🎬 Injecting pulse entry zooms, dynamic color loops, and flashing cuts into video canvas...")
+print("🎬 Injecting stable frame layout, dynamic color loops, and flashing cuts into canvas...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
@@ -392,17 +394,17 @@ chosen_style = random.choice(styles)
 # Dynamic exposure flash cut trigger right at the 0.3-second clip exit boundary
 flash_transition = f"eq=brightness='if(gte(t,{p_duration}-0.3), (t-({p_duration}-0.3))*1.5, 0)':contrast='if(gte(t,{p_duration}-0.3), 1+((t-({p_duration}-0.3))*2), 1)'"
 
-# 🔥 FIXED TRANSITION FILTERGRAPH DESIGN:
-# Changed zoompan from a looping sine wave to a strict 30-frame linear interpolation clamp.
-# It starts zoomed in at 1.40x and scales down smoothly to 1.00x over the first 1 second, then locks flat.
+# 🔥 TRANSITION GRAPH DESIGN (STABLE HOLD):
+# Completely removed the zoompan expression to keep the main scaled video 100% stable.
+# The ambient blur background (hue='H=t*0.6') and glowing chroma frames (hue='H=t*2.2') remain perfectly active.
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6'[bg];"
-    f"[0:v]scale=1620:2880,zoompan=z='if(lte(on,30), 1.40-((on/30)*0.40), 1.00)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=918x1632,{chosen_style},split=2[main_pulsing1][main_pulsing2];"
-    f"[main_pulsing1]drawbox=x=0:y=0:w=918:h=1632:color=white:t=14[base_border];"
+    f"[0:v]scale=918:1632,{chosen_style},split=2[main_stable1][main_stable2];"
+    f"[main_stable1]drawbox=x=0:y=0:w=918:h=1632:color=white:t=14[base_border];"
     f"[base_border]hue='H=t*2.2'[glowing_chroma_border];"
     f"[glowing_chroma_border]scale=926:1640[scaled_border_layer];"
     f"[bg][scaled_border_layer]overlay=(W-w)/2:(H-h)/2,setsar=1[canvas_joined];"
-    f"[canvas_joined][main_pulsing2]overlay=(W-w)/2:(H-h)/2,setsar=1[visual_master];"
+    f"[canvas_joined][main_stable2]overlay=(W-w)/2:(H-h)/2,setsar=1[visual_master];"
     f"[visual_master]noise=alls=7:allf=t+u,{flash_transition}[v]"
 )
 
@@ -421,9 +423,7 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("🏆 SUCCESS! Step 1 Complete: Watermarks adaptive-cloaked and entry visual zoom transitions fully rendered.")
-
-
+print("🏆 SUCCESS! Step 1 Complete: Rhythmic chroma borders and environment layers compiled with a stable main video frame.")
 
 
 ## ==========================================
