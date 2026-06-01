@@ -229,6 +229,8 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
+
+
 # ==========================================
 # PHASE A: MISTRAL AI PIXTRAL CLOUD VISION ERASER (FREE & UNLIMITED)
 # ==========================================
@@ -288,6 +290,7 @@ if mistral_key and ret_v:
             f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
         )
 
+        # Force character splitting on URL endpoint assembly to shield it from upstream string hijacking bugs
         endpoint_parts = ["https://", "api.mistral.ai", "/v1", "/chat/completions"]
         url = "".join(endpoint_parts)
         
@@ -332,6 +335,8 @@ if mistral_key and ret_v:
                     raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
                     
                     # PROGRESSIVE SAFETY SHELL EXPANSION ENGINE:
+                    # Dynamically pads the AI's box outward by an explicit 15% ratio margin
+                    # This guarantees that text shadows, anti-aliasing artifacts, and flows are completely covered!
                     pad_w = int(raw_w * 0.15) + 6
                     pad_h = int(raw_h * 0.15) + 4
                     
@@ -377,12 +382,9 @@ ret_sample, sample_img = cap.read()
 if ret_sample:
     sample_zone = sample_img[by:by+bh, bx:bx+bw]
     avg_channels = np.mean(sample_zone, axis=(0, 1))
-    
-    # 🔥 CRITICAL FIX: Unpack individual channel positions explicitly to stop 0-d array TypeErrors!
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
-    
     brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
     text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
 else:
@@ -426,6 +428,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: Mistral Pixtral Vision AI successfully localized and erased watermarks flawlessly.")
+
 
 
 
