@@ -369,10 +369,13 @@ if os.path.exists(TEMP_HEALED_MP4):
 
 print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
+
+
+
 # --------------------------------------------------
-# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7-EFFECT STACK)
+# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
 # --------------------------------------------------
-print("🎬 Injecting advanced 7-effect rhythmic visual stack into canvas...")
+print("🎬 Injecting advanced 7-filter rhythmic visual stack into canvas...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
@@ -383,25 +386,35 @@ try:
 except Exception:
     p_duration = 10.0 
 
-# Color grading dynamic presets
+# 🔥 EXPANDED COLOR GRADING MATRIX: Exactly 7 professional creator filters
 styles = [
-    "eq=contrast=1.06:brightness=0.01:saturation=1.12:gamma=0.96",
-    "curves=m='0/0 0.25/0.20 0.5/0.5 0.75/0.80 1/1'",
-    "eq=contrast=1.02:brightness=0.02:saturation=1.05:gamma=1.02"
+    # Filter 1: Vibrant Pop (Punchy contrast and boosted vivid saturation)
+    "eq=contrast=1.08:brightness=0.01:saturation=1.15:gamma=0.95",
+    
+    # Filter 2: Cinematic S-Curve (Deep movie shadow values and polished highlights)
+    "curves=m='0/0 0.22/0.15 0.5/0.5 0.78/0.85 1/1',eq=contrast=1.03",
+    
+    # Filter 3: Teal & Orange Matte (Balanced commercial warmth and complementary cool skin tones)
+    "eq=contrast=1.02:brightness=0.01:saturation=1.08:gamma=1.02,curves=r='0/0 0.5/0.54 1/1':b='0/0 0.5/0.46 1/1'",
+    
+    # Filter 4: Cyberpunk Neon (Elevates magenta/blue spectrum values for high nighttime pop)
+    "curves=r='0/0 0.5/0.45 1/1':g='0/0 0.5/0.48 1/1':b='0/0 0.5/0.58 1/1',eq=contrast=1.05:saturation=1.12",
+    
+    # Filter 5: Warm Vintage (Gives content an organic, sun-kissed retro 35mm look)
+    "curves=r='0/0 0.5/0.55 1/1':b='0/0 0.5/0.44 1/1',eq=contrast=1.02:saturation=1.04",
+    
+    # Filter 6: Crisp High-Definition (Ultra-sharp texture mapping with pristine midtones)
+    "unsharp=3:3:0.6:3:3:0.6,eq=contrast=1.06:brightness=0.01:saturation=1.04",
+    
+    # Filter 7: Golden Hour (Rich golden ambient hues, perfect for lifestyle and satisfying loops)
+    "eq=contrast=1.04:brightness=0.02:saturation=1.08:gamma=0.98,curves=r='0/0 0.5/0.53 1/1':g='0/0 0.5/0.51 1/1'"
 ]
 chosen_style = random.choice(styles)
 
 # Dynamic exposure flash cut trigger right at the 0.3-second clip exit boundary
 flash_transition = f"eq=brightness='if(gte(t,{p_duration}-0.3), (t-({p_duration}-0.3))*1.5, 0)':contrast='if(gte(t,{p_duration}-0.3), 1+((t-({p_duration}-0.3))*2), 1)'"
 
-# 🔥 ADVANCED 7-EFFECT HARDWARE FILTERGRAPH ENGINE:
-# Effect 1: Ambient Canvas Backdrop Swirl (hue='H=t*0.6')
-# Effect 2: Cinematic Vignette Outer Focus (vignette=PI/4) -> NEW!
-# Effect 3: Subtle Cinematic Camera Float (overlay x & y expressions using sin/cos) -> NEW!
-# Effect 4: Rhythmic Glowing Chroma Border Loop (hue='H=t*2.2')
-# Effect 5: Cinematic Color Enhancement Presets (chosen_style)
-# Effect 6: Addictive Organic Noise/Film Grain (noise=alls=7)
-# Effect 7: End-of-Clip Flash Transition (flash_transition)
+# Advanced 7-Effect Hardware Filtergraph Engine
 filter_complex_editing = (
     f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6',vignette=PI/4[bg];"
     f"[0:v]scale=918:1632,{chosen_style},split=2[main_stable1][main_stable2];"
@@ -428,7 +441,8 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("🏆 SUCCESS! Step 1 Complete: Advanced 7-Effect Rhythmic Visual Canvas compiled flawlessly.")
+print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 7-Effect Rhythmic Engine.")
+
 
 
 ## ==========================================
