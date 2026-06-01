@@ -3,6 +3,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -368,11 +369,10 @@ if os.path.exists(TEMP_HEALED_MP4):
 
 print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
-
 # --------------------------------------------------
-# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (STABLE HOLD)
+# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7-EFFECT STACK)
 # --------------------------------------------------
-print("🎬 Injecting stable frame layout, dynamic color loops, and flashing cuts into canvas...")
+print("🎬 Injecting advanced 7-effect rhythmic visual stack into canvas...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
@@ -394,17 +394,22 @@ chosen_style = random.choice(styles)
 # Dynamic exposure flash cut trigger right at the 0.3-second clip exit boundary
 flash_transition = f"eq=brightness='if(gte(t,{p_duration}-0.3), (t-({p_duration}-0.3))*1.5, 0)':contrast='if(gte(t,{p_duration}-0.3), 1+((t-({p_duration}-0.3))*2), 1)'"
 
-# 🔥 TRANSITION GRAPH DESIGN (STABLE HOLD):
-# Completely removed the zoompan expression to keep the main scaled video 100% stable.
-# The ambient blur background (hue='H=t*0.6') and glowing chroma frames (hue='H=t*2.2') remain perfectly active.
+# 🔥 ADVANCED 7-EFFECT HARDWARE FILTERGRAPH ENGINE:
+# Effect 1: Ambient Canvas Backdrop Swirl (hue='H=t*0.6')
+# Effect 2: Cinematic Vignette Outer Focus (vignette=PI/4) -> NEW!
+# Effect 3: Subtle Cinematic Camera Float (overlay x & y expressions using sin/cos) -> NEW!
+# Effect 4: Rhythmic Glowing Chroma Border Loop (hue='H=t*2.2')
+# Effect 5: Cinematic Color Enhancement Presets (chosen_style)
+# Effect 6: Addictive Organic Noise/Film Grain (noise=alls=7)
+# Effect 7: End-of-Clip Flash Transition (flash_transition)
 filter_complex_editing = (
-    f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6'[bg];"
+    f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6',vignette=PI/4[bg];"
     f"[0:v]scale=918:1632,{chosen_style},split=2[main_stable1][main_stable2];"
     f"[main_stable1]drawbox=x=0:y=0:w=918:h=1632:color=white:t=14[base_border];"
     f"[base_border]hue='H=t*2.2'[glowing_chroma_border];"
     f"[glowing_chroma_border]scale=926:1640[scaled_border_layer];"
-    f"[bg][scaled_border_layer]overlay=(W-w)/2:(H-h)/2,setsar=1[canvas_joined];"
-    f"[canvas_joined][main_stable2]overlay=(W-w)/2:(H-h)/2,setsar=1[visual_master];"
+    f"[bg][scaled_border_layer]overlay=((W-w)/2)+8*sin(t*2):((H-h)/2)+6*cos(t*1.5),setsar=1[canvas_joined];"
+    f"[canvas_joined][main_stable2]overlay=((W-w)/2)+8*sin(t*2):((H-h)/2)+6*cos(t*1.5),setsar=1[visual_master];"
     f"[visual_master]noise=alls=7:allf=t+u,{flash_transition}[v]"
 )
 
@@ -423,7 +428,7 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("🏆 SUCCESS! Step 1 Complete: Rhythmic chroma borders and environment layers compiled with a stable main video frame.")
+print("🏆 SUCCESS! Step 1 Complete: Advanced 7-Effect Rhythmic Visual Canvas compiled flawlessly.")
 
 
 ## ==========================================
