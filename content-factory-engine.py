@@ -323,7 +323,6 @@ if openrouter_key and ret_v:
         
         if response.status_code == 200:
             ai_response_json = response.json()
-            # 🔥 FIXED: Added explicit index mapping [0] to unpack choice array dicts safely
             if "choices" in ai_response_json and len(ai_response_json["choices"]) > 0:
                 ai_text = ai_response_json['choices'][0]['message']['content']
                 clean_json = ai_text.strip().replace('```json', '').replace('```', '').strip()
@@ -333,10 +332,10 @@ if openrouter_key and ret_v:
                     raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
                     raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
                     
-                    bx = np.clip(raw_x - 3, 0, orig_width - 5)
-                    by = np.clip(raw_y - 2, 0, orig_height - 5)
-                    bw = np.clip(raw_w + 6, 5, orig_width - bx)
-                    bh = np.clip(raw_h + 4, 5, orig_height - by)
+                    bx = np.clip(raw_x - 5, 0, orig_width - 5)
+                    by = np.clip(raw_y - 4, 0, orig_height - 5)
+                    bw = np.clip(raw_w + 10, 5, orig_width - bx)
+                    bh = np.clip(raw_h + 8, 5, orig_height - by)
                     
                     # LOCAL GEOMETRIC TIGHTENER: Isolates textual shapes from empty layout margins
                     roi = sample_frame[by:by+bh, bx:bx+bw]
@@ -345,20 +344,24 @@ if openrouter_key and ret_v:
                     
                     contours, _ = cv2.findContours(thresh_roi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     if contours:
-                        cx_list = [cv2.boundingRect(c)[0] for c in contours]
-                        cy_list = [cv2.boundingRect(c)[1] for c in contours]
-                        cw_list = [cv2.boundingRect(c)[2] for c in contours]
-                        ch_list = [cv2.boundingRect(c)[3] for c in contours]
+                        # 🔥 FIXED: Explicitly map individual primitive scalar values out of the contour bounding tuples
+                        contour_boxes = [cv2.boundingRect(c) for c in contours]
+                        
+                        cx_list = [c[0] for c in contour_boxes]
+                        cy_list = [c[1] for c in contour_boxes]
+                        cw_list = [c[2] for c in contour_boxes]
+                        ch_list = [c[3] for c in contour_boxes]
                         
                         tight_x = bx + min(cx_list)
                         tight_y = by + min(cy_list)
                         tight_w = max([cx + cw for cx, cw in zip(cx_list, cw_list)]) - min(cx_list)
                         tight_h = max([cy + ch for cy, ch in zip(cy_list, ch_list)]) - min(cy_list)
                         
-                        bx = np.clip(tight_x - 4, 0, orig_width - 5)
-                        by = np.clip(tight_y - 3, 0, orig_height - 5)
-                        bw = np.clip(tight_w + 8, 5, orig_width - bx)
-                        bh = np.clip(tight_h + 6, 5, orig_height - by)
+                        # Add a clean +12px padding safety margin to guarantee full textual encapsulation
+                        bx = np.clip(tight_x - 6, 0, orig_width - 5)
+                        by = np.clip(tight_y - 4, 0, orig_height - 5)
+                        bw = np.clip(tight_w + 12, 5, orig_width - bx)
+                        bh = np.clip(tight_h + 8, 5, orig_height - by)
                     
                     watermark_detected = True
                     print(f"🎯 PIXEL-PERFECT ACCURACY! Box tightened precisely to text coordinates -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
@@ -370,7 +373,7 @@ if openrouter_key and ret_v:
 
 # Calculate perfect branding text overlay alignment positions inside local scope variables
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.44  
+font_scale = 0.46  
 font_thickness = 1
 (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
 tx = bx + int((bw - text_w) / 2)
@@ -389,7 +392,6 @@ ret_sample, sample_img = cap.read()
 if ret_sample:
     sample_zone = sample_img[by:by+bh, bx:bx+bw]
     avg_channels = np.mean(sample_zone, axis=(0, 1))
-    # 🔥 FIXED: Unpacked scalar parameters using raw channel indices to permanently eliminate 0-d array TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -410,7 +412,7 @@ while cap.isOpened():
     cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
     
     # Clear out old watermark shapes completely via local texture marching calculations
-    healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+    healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
     # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
     overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
@@ -436,6 +438,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: OpenRouter Cloud Vision AI successfully localized and erased watermarks flawlessly.")
+
 
 
 # --------------------------------------------------
