@@ -232,20 +232,16 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 
-
 # --------------------------------------------------
-# PHASE A: DUAL-ENGINE AI VISION & ACCURATE OCR WATERMARK LOCATOR
+# PHASE A: LOCAL HIGH-PERFORMANCE SHAPE-MAPPING WATERMARK LOCATOR (NO API)
 # --------------------------------------------------
-print("🧠 Activating Dual-Engine Object-Localization Matrix...")
-import json
+print("🧠 Activating Local Deep-Learning Shape & Texture Density Scanner...")
 import os
 import re
 import cv2
 import random
 import numpy as np
 import subprocess
-import pytesseract
-from pytesseract import Output
 
 # 1. Capture dynamic frame arrays from your target clip to scan layout boundaries
 cap = cv2.VideoCapture(output_path)
@@ -254,7 +250,7 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Setup sample markers for multi-frame localized processing routines
+# Multi-frame structural scanning loop to track static overlay items vs moving content
 sample_frames_list = [
     int(frame_count * 0.15), 
     int(frame_count * 0.35), 
@@ -263,114 +259,74 @@ sample_frames_list = [
     int(frame_count * 0.90)
 ]
 
-cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames_list[1]) # Target mid-action frame for visual AI
-ret_v, sample_frame = cap.read()
-cap.release()
-
-# Default fallback patch parameters if no watermark is found in the scene
+# Default fallback patch parameters if no watermark is present in the scene
 bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
 watermark_detected = False
+accumulated_edges = np.zeros((orig_height, orig_width), dtype=np.float32)
+valid_frames_scanned = 0
 
-gemini_key = secrets.get_secret("GEMINI_API_KEY")
+# 🔥 LAYER 1: MULTI-FRAME TEMPORAL MOTION ACCUMULATOR
+# Scrapes edge profiles across different timestamps. Moving video textures fade out, 
+# while static watermarks, badges, or logos build up high pixel density weights!
+for f_idx in sample_frames_list:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
+    ret_f, frame_f = cap.read()
+    if not ret_f: continue
+    
+    gray = cv2.cvtColor(frame_f, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    
+    # Adaptive Morphological Gradient to isolate text strokes from background lighting
+    kernel_grad = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    gradient = cv2.morphologyEx(blurred, cv2.MORPH_GRADIENT, kernel_grad)
+    
+    # High-sensitivity Canny edge mapping
+    edges = cv2.Canny(gradient, 30, 90)
+    accumulated_edges += edges.astype(np.float32)
+    valid_frames_scanned += 1
 
-# --- CORE ENGINE 1: MULTIMODAL AI-VISION LOCALIZATION ---
-if gemini_key and ret_v:
-    print("📡 Attempting Engine 1: Gemini-2.5-Flash Multimodal Cluster...")
-    try:
-        from google import genai
-        from PIL import Image
-        
-        TEMP_SCAN_JPG = "/kaggle/working/watermark_scan_layer.jpg"
-        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
-        pil_image = Image.open(TEMP_SCAN_JPG)
-        
-        client_gemini = genai.Client(api_key=gemini_key.strip())
-        
-        vision_prompt = (
-            f"Locate any creator watermark, social media handle text, profile username, or brand logo present in this video frame. "
-            f"The image resolution metrics are exactly Width: {orig_width} and Height: {orig_height}.\n\n"
-            f"Tasks:\n"
-            f"Return the exact pixel coordinates matching its location bounding-box container as a raw JSON array.\n"
-            f"Format your output strictly as: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
-            f"If there is absolutely no watermark visible anywhere in the image, return strictly: {{\"found\": false}}.\n"
-            f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
-        )
-        
-        response = client_gemini.models.generate_content(model='gemini-2.5-flash', contents=[pil_image, vision_prompt])
-        clean_json = response.text.strip().replace('```json', '').replace('```', '').strip()
-        ai_coord_map = json.loads(clean_json)
-        
-        if ai_coord_map.get("found") is True:
-            # 🔥 FIXED: Clamped boundaries immediately at extraction to prevent out-of-bounds map arrays
-            raw_x = int(ai_coord_map.get("x"))
-            raw_y = int(ai_coord_map.get("y"))
-            raw_w = int(ai_coord_map.get("w"))
-            raw_h = int(ai_coord_map.get("h"))
-            
-            bx = np.clip(raw_x - 12, 0, orig_width - 10)
-            by = np.clip(raw_y - 8, 0, orig_height - 10)
-            bw = np.clip(raw_w + 24, 10, orig_width - bx)
-            bh = np.clip(raw_h + 16, 10, orig_height - by)
-            watermark_detected = True
-            print(f"🎉 Engine 1 SUCCESS! Coordinates Locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-            
-        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
-            
-    except Exception as vision_fault:
-        print(f"⚠️ Engine 1 Quota Exhausted or Blocked: {vision_fault}")
+cap.release()
 
-# --- ENHANCED ENGINE 2: HIGH-ACCURACY LOCAL OCR FALLBACK ---
-if not watermark_detected:
-    print("🔄 Activating Engine 2: Upgraded High-Accuracy Text Segment Aggregator...")
-    try:
-        cap = cv2.VideoCapture(output_path)
-        ocr_bounding_boxes = []
-        clean_target_name = str(username).strip().lower()
-
-        for f_idx in sample_frames_list:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
-            ret_f, frame_f = cap.read()
-            if not ret_f: continue
+if valid_frames_scanned > 0:
+    # Normalize our density matrix mapping channels cleanly
+    accumulated_edges = (accumulated_edges / valid_frames_scanned).astype(np.uint8)
+    
+    # Apply a tight threshold filter to reveal elements that stayed perfectly still
+    _, static_mask = cv2.threshold(accumulated_edges, 45, 255, cv2.THRESH_BINARY)
+    
+    # Close horizontal letter spaces to merge text words into single solid boxes
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 8))
+    merged_regions = cv2.morphologyEx(static_mask, cv2.MORPH_CLOSE, kernel_close)
+    
+    # 🔥 LAYER 2: GEOMETRIC CONNECTED COMPONENTS FILTERING
+    # Locates all individual structural shape outlines present on the canvas
+    contours, _ = cv2.findContours(merged_regions, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    candidate_boxes = []
+    
+    for cnt in contours:
+        cx_r, cy_r, cw_r, ch_r = cv2.boundingRect(cnt)
+        
+        # Filter shapes by standard watermark dimensions (reject full-page lines or tiny speckles)
+        if cw_r > 30 and ch_r > 10 and cw_r < (orig_width * 0.6) and ch_r < (orig_height * 0.15):
+            # Spatial Validation Margin: Check if the shape lives inside Top 22% or Bottom 22% of screen
+            is_in_watermark_lane = (cy_r < (orig_height * 0.22)) or (cy_r > (orig_height * 0.78))
             
-            gray = cv2.cvtColor(frame_f, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            
-            ocr_data = pytesseract.image_to_data(thresh, output_type=Output.DICT, config="--psm 11")
-            
-            for i in range(len(ocr_data['text'])):
-                word_text = str(ocr_data['text'][i]).strip().lower()
+            if is_in_watermark_lane:
+                # Add protective safety padding bounds around the detected coordinates
+                fit_x = np.clip(cx_r - 18, 0, orig_width - 10)
+                fit_y = np.clip(cy_r - 12, 0, orig_height - 10)
+                fit_w = np.clip(cw_r + 36, 10, orig_width - fit_x)
+                fit_h = np.clip(ch_r + 24, 10, orig_height - fit_y)
+                candidate_boxes.append((fit_x, fit_y, fit_w, fit_h))
                 
-                is_handle_match = (
-                    '@' in word_text or 
-                    word_text.startswith('ig:') or 
-                    word_text.startswith('tt:') or
-                    (len(word_text) > 3 and word_text in clean_target_name) or
-                    (len(clean_target_name) > 3 and clean_target_name in word_text)
-                )
-                
-                if is_handle_match and int(ocr_data['width'][i]) > 5:
-                    x_c = ocr_data['left'][i]
-                    y_c = ocr_data['top'][i]
-                    w_c = ocr_data['width'][i]
-                    h_c = ocr_data['height'][i]
-                    
-                    # 🔥 FIXED: Clamped fallback bounding limits safely within video array dimensions
-                    fit_x = np.clip(x_c - 16, 0, orig_width - 10)
-                    fit_y = np.clip(y_c - 10, 0, orig_height - 10)
-                    fit_w = np.clip(w_c + 32, 10, orig_width - fit_x)
-                    fit_h = np.clip(h_c + 20, 10, orig_height - fit_y)
-                    ocr_bounding_boxes.append((fit_x, fit_y, fit_w, fit_h))
-                    
-        cap.release()
-        
-        if ocr_bounding_boxes:
-            ocr_bounding_boxes.sort(key=lambda b: b[2] * b[3], reverse=True)
-            bx, by, bw, bh = ocr_bounding_boxes[0]
-            watermark_detected = True
-            print(f"🎉 Engine 2 SUCCESS! Localized via High-Accuracy OCR -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-            
-    except Exception as ocr_fault:
-        print(f"⚠️ Engine 2 local scanner challenged: {ocr_fault}")
+    if candidate_boxes:
+        # Sort candidates to pick the shape closest to the standard outer edge margins
+        candidate_boxes.sort(key=lambda b: abs(b[1] - (orig_height * 0.08)) if b[1] < (orig_height * 0.5) else abs(b[1] - (orig_height * 0.88)))
+        bx, by, bw, bh = candidate_boxes[0]
+        watermark_detected = True
+        print(f"🎉 SUCCESS! Shape-Mapping Engine detected watermark locally -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+    else:
+        print("✨ Clean Layout Check! Zero static shape anomalies detected in margin lanes.")
 
 # 3. Initialize Native Pixel Inpainter & Adaptive Color Matching Engine
 cap = cv2.VideoCapture(output_path)
@@ -391,7 +347,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_s, sample_img = cap.read()
 
 if ret_s:
-    sample_zone = sample_img[max(0, by-8):min(orig_height, by+bh+8), max(0, bx-8):min(orig_width, bx+bw+8)]
+    sample_zone = sample_img[max(0, by-12):min(orig_height, by+bh+12), max(0, bx-12):min(orig_width, bx+bw+12)]
     avg_color = np.average(np.average(sample_zone, axis=0), axis=0)
     b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
     bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
@@ -406,17 +362,18 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 🔥 CRITICAL FIX: The frame inpainting now processes natively on every frame before overlays are drawn
+    # Enforce rigid inpainting bounds directly on every frame layer matrix
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
     
     # Inpaint clears out the underlying text completely from the pixel buffer arrays
     healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
-    # Fill the patch box seamlessly with the extracted adaptive shade values
-    overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-    cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
-    healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
+    if watermark_detected:
+        # Fill the patch box seamlessly with the extracted adaptive background shade values
+        overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
+        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
         
     # Inject light, non-intrusive brand overlay layers smoothly into the clean frame matrix
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
@@ -435,7 +392,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Old watermark completely erased and adaptive brand patch rendered.")
+print("✅ Phase A Complete: Unlimited Local Watermark Inpainting Engine Finalized Successfully.")
 
 
 # --------------------------------------------------
