@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: MISTRAL AI PIXTRAL CLOUD VISION ERASER (FREE & UNLIMITED)
+# PHASE A: PART 1 OF 2 (AI VISION & CORNER TENSOR MAPPING)
 # ==========================================
-print("🧠 Activating Mistral AI Pixtral Distributed Cloud Vision Layer...")
+print("📥 Activating Mistral AI Universal Angle & Pattern-Proof Visual Eraser Matrix...")
 
 import os
 import re
@@ -259,67 +259,49 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Default fallback compact patch parameters if no watermark is identified by the AI
-bx = int(orig_width * 0.05)
-by = int(orig_height * 0.05)
-bw = int(orig_width * 0.28)
-bh = int(orig_height * 0.05)
+# Global default parameter shapes if no watermark is identified
+polygon_vertices = np.array([[int(orig_width*0.05), int(orig_height*0.05)], 
+                             [int(orig_width*0.33), int(orig_height*0.05)], 
+                             [int(orig_width*0.33), int(orig_height*0.10)], 
+                             [int(orig_width*0.05), int(orig_height*0.10)]], dtype=np.int32)
 watermark_detected = False
+watermark_angle = 0.0
+is_vertical = False
 
 mistral_key = secrets.get_secret("MISTRAL_API_KEY")
 
 if mistral_key and ret_v:
     try:
-        # Save frame temporary to local storage to encode it to base64
         TEMP_SCAN_JPG = "/kaggle/working/watermark_mistral_layer.jpg"
         cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
-        
         with open(TEMP_SCAN_JPG, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-            
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
 
-        # High-precision prompt commanding Pixtral to give tight coordinate boundaries
+        # ADVANCED TENSOR PROMPT: Forces the AI to extract four layout coordinates for rotatable text tracking
         vision_prompt = (
-            f"Locate the precise bounding box of the creator watermark, social media handle text, profile username, or brand logo in this frame. "
-            f"The image resolution metrics are exactly Width: {orig_width} and Height: {orig_height}.\n\n"
+            f"Locate any creator watermark text, brand logo icon, or channel handle in this video frame regardless of its layout direction.\n"
+            f"It might be perfectly horizontal, completely vertical (stacked letters or read sideways), or rotated at an angled slant.\n"
+            f"The image resolution is Width: {orig_width} and Height: {orig_height}.\n\n"
             f"Tasks:\n"
-            f"Return the exact pixel coordinates matching its location container as a raw JSON object.\n"
-            f"Format your output strictly as: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
-            f"If there is absolutely no watermark visible anywhere in the image, return strictly: {{\"found\": false}}.\n"
-            f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
+            f"Extract the EXACT four corner vertices wrapping the perimeter of the watermark starting from top-left, going clockwise.\n"
+            f"Output your result strictly as a raw JSON map matching this layout: \n"
+            f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
+            f"If none exists, output: {{\"found\": false}}.\n"
+            f"Do not write markdown backticks or json conversational formatting filler strings."
         )
 
-        # Force character splitting on URL endpoint assembly to shield it from upstream string hijacking bugs
         endpoint_parts = ["https://", "api.mistral.ai", "/v1", "/chat/completions"]
         url = "".join(endpoint_parts)
         
-        headers = {
-            "Authorization": f"Bearer {mistral_key.strip()}",
-            "Content-Type": "application/json"
-        }
-        
+        headers = {"Authorization": f"Bearer {mistral_key.strip()}", "Content-Type": "application/json"}
         payload = {
             "model": "pixtral-12b",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": vision_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
+            "messages": [{"role": "user", "content": [{"type": "text", "text": vision_prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}],
             "temperature": 0.0,
-            "response_format": {"type": "json_object"}  # Forces Mistral to strictly return valid JSON structures
+            "response_format": {"type": "json_object"}
         }
         
-        # Open an isolated session lane to ignore corrupt background environment proxy routes completely
         with requests.Session() as session:
             session.trust_env = False
             response = session.post(url, headers=headers, json=payload, timeout=35)
@@ -331,60 +313,65 @@ if mistral_key and ret_v:
                 ai_coord_map = json.loads(ai_text)
                 
                 if ai_coord_map.get("found") is True:
-                    raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
-                    raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
+                    # Unpack 4-point visual boundary polygon vertices out of the dictionary matrix
+                    p1 = ai_coord_map.get("p1")
+                    p2 = ai_coord_map.get("p2")
+                    p3 = ai_coord_map.get("p3")
+                    p4 = ai_coord_map.get("p4")
                     
-                    # PROGRESSIVE SAFETY SHELL EXPANSION ENGINE:
-                    # Dynamically pads the AI's box outward by an explicit 15% ratio margin
-                    # This guarantees that text shadows, anti-aliasing artifacts, and flows are completely covered!
-                    pad_w = int(raw_w * 0.15) + 6
-                    pad_h = int(raw_h * 0.15) + 4
+                    raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
                     
-                    bx = np.clip(raw_x - pad_w, 0, orig_width - 10)
-                    by = np.clip(raw_y - pad_h, 0, orig_height - 10)
-                    bw = np.clip(raw_w + (pad_w * 2), 10, orig_width - bx)
-                    bh = np.clip(raw_h + (pad_h * 2), 10, orig_height - by)
+                    # PROGRESSIVE TENSOR SHELL EXPANSION:
+                    rect = cv2.minAreaRect(raw_pts)
+                    box_points = cv2.boxPoints(rect)
+                    box_points = np.int32(box_points)
                     
+                    # Measure rotation angles dynamically
+                    watermark_angle = float(rect[2])
+                    width_check, height_check = float(rect[1][0]), float(rect[1][1])
+                    if height_check > width_check:
+                        is_vertical = True
+                        watermark_angle -= 90.0
+                    
+                    if ai_coord_map.get("direction") == "vertical":
+                        is_vertical = True
+                        
+                    # Expand vertices margins outward safely
+                    center_pt = np.mean(box_points, axis=0)
+                    inflated_pts = []
+                    for pt in box_points:
+                        dx = float(pt[0] - center_pt[0])
+                        dy = float(pt[1] - center_pt[1])
+                        len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
+                        fit_x = int(pt[0] + (dx / len_d) * 12)
+                        fit_y = int(pt[1] + (dy / len_d) * 10)
+                        inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
+                    
+                    polygon_vertices = np.array(inflated_pts, dtype=np.int32)
                     watermark_detected = True
-                    print(f"🎯 MISTRAL AI LOCKED TARGET -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-        else:
-            print(f"⚠️ Mistral Server Gateway returned status code {response.status_code}: {response.text}")
-            
+                    print(f"🎯 UNIVERSAL AI LOCKED COORDINATES! Direction: {ai_coord_map.get('direction')} | Angle: {watermark_angle:.2f}°")
     except Exception as vision_fault:
-        print(f"⚠️ Mistral Cloud Vision AI layer challenged: {vision_fault}")
-
-# AUTOMATED ADAPTIVE FONT SCALING LOOP:
-font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.35  
-font_thickness = 1
-
-for scale_step in np.arange(0.35, 1.4, 0.02):
-    (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
-    if test_w < (bw * 0.72) and test_h < (bh * 0.58):
-        font_scale = scale_step
-    else:
-        break
-
-(text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-tx = bx + int((bw - text_w) / 2)
-ty = by + int((bh + text_h) / 2)
+        print(f"⚠️ Mistral Cloud Vision AI multi-angle layer challenged: {vision_fault}")
+# ==========================================
+# PHASE A: PART 2 OF 2 (PIXEL RECONSTRUCTION & MULTI-ANGLE BRANDING)
+# ==========================================
 
 # --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
-print("🎨 Launching frame-by-frame content-aware pixel healing matrix...")
+print("🎨 Launching frame-by-frame multi-angle content-aware pixel healing matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Calculate accurate native frame brightness matrices cleanly
+# Sample regional brightness properties using flat polygon area parameters cleanly
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
-    sample_zone = sample_img[by:by+bh, bx:bx+bw]
-    avg_channels = np.mean(sample_zone, axis=(0, 1))
-    avg_b = int(avg_channels[0])
-    avg_g = int(avg_channels[1])
-    avg_r = int(avg_channels[2])
+    # Build localized background mask to process colors inside the calculated area
+    temp_mask = np.zeros(sample_img.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(temp_mask, [polygon_vertices], 255)
+    avg_channels = cv2.mean(sample_img, mask=temp_mask)
+    avg_b, avg_g, avg_r = int(avg_channels[0]), int(avg_channels[1]), int(avg_channels[2])
     brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
     text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
 else:
@@ -393,26 +380,76 @@ else:
 
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
 
+# Assigned unique identifier variables to prevent structural unpacking overlap bugs
+rect_x, rect_y, rect_w, rect_h = cv2.boundingRect(polygon_vertices)
+target_w, target_h = rect_w, rect_h
+if is_vertical and target_h > target_w:
+    target_w, target_h = target_h, target_w
+
+font_face = cv2.FONT_HERSHEY_SIMPLEX
+font_scale = 0.35
+font_thickness = 1
+for scale_step in np.arange(0.35, 1.4, 0.02):
+    (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
+    if test_w < (target_w * 0.75) and test_h < (target_h * 0.60):
+        font_scale = scale_step
+    else:
+        break
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Generate hard filled masking tracking block bounds completely engulfing the text and shadow margins
+    # 1. Clear out original watermark using polygon mask fill layers
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
-    
-    # Clear out old watermark curves and text shadows completely via local texture marching calculations
+    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
-    # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
-    overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-    cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
-    healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
+    # 2. Overlay color-matched matte patch seamlessly over the original polygon mask vertices
+    overlay_roi = healed_frame.copy()
+    cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
+    healed_frame = cv2.addWeighted(overlay_roi, 0.50, healed_frame, 0.50, 0)
     
-    # Inject text layers centered and scaled to perfectly mask the blurry underlying region
-    cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
-    cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    # 3. THE ANGLED OVERLAY ENGINE:
+    text_layer = np.zeros_like(healed_frame)
     
+    # Compute precise placement anchor points inside the localized text boundaries
+    moments = cv2.moments(polygon_vertices)
+    if moments["m00"] != 0:
+        cx_m = int(moments["m10"] / moments["m00"])
+        cy_m = int(moments["m01"] / moments["m00"])
+    else:
+        cx_m, cy_m = rect_x + rect_w//2, rect_y + rect_h//2
+        
+    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    
+    if is_vertical and not (abs(watermark_angle) > 35):
+        # Handle strict top-to-bottom vertical text formatting loops gracefully
+        char_y = cy_m - int((th * len("@AWRAM")) / 2)
+        for char in "@AWRAM":
+            (cw_s, ch_s), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
+            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
+            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+            char_y += ch_s + 6
+    else:
+        # Handle standard or slanted angled line typography configurations natively
+        tx_a = cx_m - (tw // 2)
+        ty_a = cy_m + (th // 2)
+        
+        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
+        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+        
+        # Apply rotational transformation matrices matching the original tilt angles exactly
+        rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -watermark_angle, 1.0)
+        rotated_text_layer = cv2.warpAffine(text_layer, rot_matrix, (orig_width, orig_height))
+        
+        # Merge the slanted text onto the video frames flawlessly
+        text_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY)
+        _, alpha_mask = cv2.threshold(text_mask, 10, 255, cv2.THRESH_BINARY)
+        alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
+        
+        healed_frame = (rotated_text_layer * alpha_mask_3d + healed_frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
+
     video_writer.write(healed_frame)
 
 cap.release()
@@ -427,7 +464,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Mistral Pixtral Vision AI successfully localized and erased watermarks flawlessly.")
+print("✅ Phase A Complete: Universal Multi-Angle Watermark erasure loop finalized flawlessly.")
 
 
 
