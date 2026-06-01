@@ -230,54 +230,144 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 # --------------------------------------------------
-# PHASE A: MULTI-FRAME WATERMARK DETECTOR & ADAPTIVE FRAME BAKER
+# PHASE A: DUAL-ENGINE AI VISION & ACCURATE OCR WATERMARK LOCATOR
 # --------------------------------------------------
-print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
+print("🧠 Activating Dual-Engine Object-Localization Matrix...")
+import json
+import os
+import re
+import cv2
+import random
+import numpy as np
+import subprocess
+import pytesseract
+from pytesseract import Output
+
+# 1. Capture dynamic frame arrays from your target clip to scan layout boundaries
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Guard rail to verify the new video actually opened
-if frame_count <= 0 or orig_width == 0 or orig_height == 0:
-    cap.release()
-    raise ValueError(f"❌ Error: Cannot read the video file at {output_path}")
-
-sample_frames = [
-    int(frame_count * 0.10), 
-    int(frame_count * 0.30), 
-    int(frame_count * 0.50), 
-    int(frame_count * 0.70), 
+# Setup sample markers for multi-frame localized processing routines
+sample_frames_list = [
+    int(frame_count * 0.15), 
+    int(frame_count * 0.35), 
+    int(frame_count * 0.55), 
+    int(frame_count * 0.75), 
     int(frame_count * 0.90)
 ]
 
-for idx in sample_frames:
-    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-    ret, frame = cap.read()
-    if not ret: continue
-    
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
-    
-    for i in range(len(ocr_data['text'])):
-        detected_word = str(ocr_data['text'][i]).strip().lower()
-        clean_target = str(username).strip().lower()
-        
-        if '@' in detected_word or (len(detected_word) > 2 and (detected_word in clean_target or clean_target in detected_word)):
-            x = ocr_data['left'][i]
-            y = ocr_data['top'][i]
-            w = ocr_data['width'][i]
-            h = ocr_data['height'][i]
-            
-            padding_box = (max(0, x - 12), max(0, y - 8), w + 24, h + 16)
-            watermark_bounding_boxes.append(padding_box)
-
+cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames_list[1]) # Target mid-action frame for visual AI
+ret_v, sample_frame = cap.read()
 cap.release()
-unique_boxes = list(set(watermark_bounding_boxes))
 
-print("🎨 Initializing Native Pixel Inpainter & Adaptive Color Matching Engine...")
+# Default fallback patch parameters if no watermark is found in the scene
+bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
+watermark_detected = False
+
+gemini_key = secrets.get_secret("GEMINI_API_KEY")
+
+# --- CORE ENGINE 1: MULTIMODAL AI-VISION LOCALIZATION ---
+if gemini_key and ret_v:
+    print("📡 Attempting Engine 1: Gemini-2.5-Flash Multimodal Cluster...")
+    try:
+        from google import genai
+        from PIL import Image
+        
+        TEMP_SCAN_JPG = "/kaggle/working/watermark_scan_layer.jpg"
+        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
+        pil_image = Image.open(TEMP_SCAN_JPG)
+        
+        client_gemini = genai.Client(api_key=gemini_key.strip())
+        
+        vision_prompt = (
+            f"Locate any creator watermark, social media handle text, profile username, or brand logo present in this video frame. "
+            f"The image resolution metrics are exactly Width: {orig_width} and Height: {orig_height}.\n\n"
+            f"Tasks:\n"
+            f"Return the exact pixel coordinates matching its location bounding-box container as a raw JSON array.\n"
+            f"Format your output strictly as: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
+            f"If there is absolutely no watermark visible anywhere in the image, return strictly: {{\"found\": false}}.\n"
+            f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
+        )
+        
+        response = client_gemini.models.generate_content(model='gemini-2.5-flash', contents=[pil_image, vision_prompt])
+        clean_json = response.text.strip().replace('```json', '').replace('```', '').strip()
+        ai_coord_map = json.loads(clean_json)
+        
+        if ai_coord_map.get("found") is True:
+            bx = max(0, int(ai_coord_map.get("x")) - 10)
+            by = max(0, int(ai_coord_map.get("y")) - 8)
+            bw = min(orig_width - bx, int(ai_coord_map.get("w")) + 20)
+            bh = min(orig_height - by, int(ai_coord_map.get("h")) + 16)
+            watermark_detected = True
+            print(f"🎉 Engine 1 SUCCESS! Coordinates Locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+            
+        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
+            
+    except Exception as vision_fault:
+        print(f"⚠️ Engine 1 Quota Exhausted or Blocked: {vision_fault}")
+
+# --- 🔥 ENHANCED ENGINE 2: HIGH-ACCURACY LOCAL OCR FALLBACK ---
+if not watermark_detected:
+    print("🔄 Activating Engine 2: Upgraded High-Accuracy Text Segment Aggregator...")
+    try:
+        cap = cv2.VideoCapture(output_path)
+        ocr_bounding_boxes = []
+        clean_target_name = str(username).strip().lower()
+
+        # Multi-frame scanning matrix to catch fading or stationary handle components
+        for f_idx in sample_frames_list:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
+            ret_f, frame_f = cap.read()
+            if not ret_f: continue
+            
+            # Step A: Pre-process frame layouts to clean character noise boundaries
+            gray = cv2.cvtColor(frame_f, cv2.COLOR_BGR2GRAY)
+            # Apply adaptive thresholding to elevate faint text edge weights
+            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+            
+            # Step B: Scan word elements natively using strict configurations
+            ocr_data = pytesseract.image_to_data(thresh, output_type=Output.DICT, config="--psm 11")
+            
+            for i in range(len(ocr_data['text'])):
+                word_text = str(ocr_data['text'][i]).strip().lower()
+                
+                # Dynamic Regex Filters: Detects handles containing '@', 'ig:', 'tt:', or matching the creator username string
+                is_handle_match = (
+                    '@' in word_text or 
+                    word_text.startswith('ig:') or 
+                    word_text.startswith('tt:') or
+                    (len(word_text) > 3 and word_text in clean_target_name) or
+                    (len(clean_target_name) > 3 and clean_target_name in word_text)
+                )
+                
+                if is_handle_match and int(ocr_data['width'][i]) > 5:
+                    x_c = ocr_data['left'][i]
+                    y_c = ocr_data['top'][i]
+                    w_c = ocr_data['width'][i]
+                    h_c = ocr_data['height'][i]
+                    
+                    # Pad text bounding parameters safely outward to contain full handle layouts
+                    ocr_bounding_boxes.append((max(0, x_c - 16), max(0, y_c - 10), w_c + 32, h_c + 20))
+                    
+        cap.release()
+        
+        # Step C: Aggregate text segments and isolate cluster centers cleanly
+        if ocr_bounding_boxes:
+            # Sort boxes by area size weights to select the most relevant channel patch region
+            ocr_bounding_boxes.sort(key=lambda b: b[2] * b[3], reverse=True)
+            bx, by, bw, bh = ocr_bounding_boxes[0]
+            watermark_detected = True
+            print(f"🎉 Engine 2 SUCCESS! Localized via High-Accuracy OCR -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+            
+    except Exception as ocr_fault:
+        print(f"⚠️ Engine 2 local scanner challenged: {ocr_fault}")
+
+# 3. Initialize Native Pixel Inpainter & Adaptive Color Matching Engine
 cap = cv2.VideoCapture(output_path)
+TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
@@ -285,90 +375,61 @@ font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.52
 font_thickness = 1
 
-# FIXED: Wrapped processing in try/finally block to guarantee resource unlocking 
-try:
-    if unique_boxes:
-        bx, by, bw, bh = unique_boxes[0]
-        print(f"🎯 Exact native coordinate match locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+(text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+tx = bx + int((bw - text_w) / 2)
+ty = by + int((bh + text_h) / 2)
+
+# Calculate dynamic localized color analytics to match adjacent background layers perfectly
+cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
+ret_s, sample_img = cap.read()
+
+if ret_s:
+    sample_zone = sample_img[max(0, by-8):min(orig_height, by+bh+8), max(0, bx-8):min(orig_width, bx+bw+8)]
+    avg_color = np.average(np.average(sample_zone, axis=0), axis=0)
+    b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
+    bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
+    text_color, shadow_color = ((40, 40, 40), (220, 220, 220)) if bg_brightness > 127 else ((225, 225, 225), (20, 20, 20))
+else:
+    b_match, g_match, r_match = 30, 30, 30
+    text_color, shadow_color = (230, 230, 230), (10, 10, 10)
+
+cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret: break
+    
+    if watermark_detected:
+        # Clear out original logo shape completely via fast texture marching
+        raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+        cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
+        healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
         
-        (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-        tx = bx + int((bw - text_w) / 2)
-        ty = by + int((bh + text_h) / 2)
-        
-        cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames[2])
-        ret, sample_img = cap.read()
-        if ret:
-            sample_zone = sample_img[max(0, by-10):min(orig_height, by+bh+10), max(0, bx-10):min(orig_width, bx+bw+10)]
-            avg_color_per_row = np.average(sample_zone, axis=0)
-            avg_color = np.average(avg_color_per_row, axis=0)
-            b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
-            
-            bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
-            
-            if bg_brightness > 127:
-                text_color = (40, 40, 40)
-                shadow_color = (220, 220, 220)
-            else:
-                text_color = (225, 225, 225)
-                shadow_color = (20, 20, 20)
-        else:
-            b_match, g_match, r_match = 30, 30, 30
-            text_color, shadow_color = (230, 230, 230), (10, 10, 10)
-            
-        print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match}")
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
-            
-            raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-            cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
-            healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
-            
-            overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-            cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
-            
-            alpha_blend = 0.50
-            healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_blend, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_blend, 0)
-            
-            cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
-            cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-            
-            video_writer.write(healed_frame)
+        # Fill the patch box with the exact background shade matching current coordinates
+        overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
+        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.50, healed_frame[by:by+bh, bx:bx+bw], 0.50, 0)
     else:
-        print("✨ Clean Layout Check! Zero handle watermarks found. Rendering fallback branding overlays...")
-        bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
-        (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-        tx, ty = bx + int((bw - text_w) / 2), by + int((bh + text_h) / 2)
+        healed_frame = frame.copy()
         
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # FIXED: Reset capture device to starting frame
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
-            overlay_roi = frame[by:by+bh, bx:bx+bw].copy()
-            cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (20, 20, 20), -1)
-            frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.35, frame[by:by+bh, bx:bx+bw], 0.65, 0)
-            cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (220, 220, 220), font_thickness, cv2.LINE_AA)
-            video_writer.write(frame)
+    # Inject light, non-intrusive brand overlay layers smoothly into the frame matrix
+    cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
+    cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    
+    video_writer.write(healed_frame)
 
-finally:
-    # FIXED: This block executes even if video reading crashes, forcing open files to close
-    cap.release()
-    video_writer.release()
+cap.release()
+video_writer.release()
 
-# Run audio stitching
+CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
     CLEAN_INPUT_STAGE1
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4): 
-    os.remove(TEMP_HEALED_MP4)
-
-print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
-
+if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
+print("✅ Phase A Complete: Dual-Engine localization and adaptive patch rendering complete.")
 
 
 
