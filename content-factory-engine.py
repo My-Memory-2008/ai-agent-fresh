@@ -230,7 +230,6 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
-
 # ==========================================
 # PHASE A: OPENROUTER GPT-4o-MINI CLOUD VISION AI WATERMARK ERASER (FREE & UNLIMITED)
 # ==========================================
@@ -290,12 +289,17 @@ if openrouter_key and ret_v:
             f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
         )
 
-        # Fire the query straight across OpenRouter's high-speed distributed cloud cluster lanes
-        url = "https://openrouter.ai"
+        # 🔥 FIXED ARCHITECTURE: Built using independent string array pieces to block upstream link corruption loops
+        openrouter_target_parts = ["https://", "openrouter.ai", "/api/v1", "/chat/completions"]
+        url = "".join(openrouter_target_parts)
+        
         headers = {
             "Authorization": f"Bearer {openrouter_key.strip()}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://kaggle.com",  # Added clear referer tracking hooks to satisfy firewall filters
+            "X-Title": "Content Automation Engine"
         }
+        
         payload = {
             "model": "openai/gpt-4o-mini",
             "messages": [
@@ -315,26 +319,31 @@ if openrouter_key and ret_v:
             "temperature": 0.0
         }
         
-        response = requests.post(url, headers=headers, json=payload, timeout=25)
+        # Open an isolated session lane to ignore corrupt background environment proxy routes completely
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.post(url, headers=headers, json=payload, timeout=30)
         
         if response.status_code == 200:
-            ai_text = response.json()['choices'][0]['message']['content']
-            clean_json = ai_text.strip().replace('```json', '').replace('```', '').strip()
-            ai_coord_map = json.loads(clean_json)
-            
-            if ai_coord_map.get("found") is True:
-                raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
-                raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
+            ai_response_json = response.json()
+            if "choices" in ai_response_json and len(ai_response_json["choices"]) > 0:
+                ai_text = ai_response_json['choices'][0]['message']['content']
+                clean_json = ai_text.strip().replace('```json', '').replace('```', '').strip()
+                ai_coord_map = json.loads(clean_json)
                 
-                # Enforce strict boundary margins with generous safety padding masks
-                bx = np.clip(raw_x - 18, 0, orig_width - 10)
-                by = np.clip(raw_y - 12, 0, orig_height - 10)
-                bw = np.clip(raw_w + 36, 10, orig_width - bx)
-                bh = np.clip(raw_h + 24, 10, orig_height - by)
-                watermark_detected = True
-                print(f"🎉 OpenRouter Vision AI Success! Coordinates Locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+                if ai_coord_map.get("found") is True:
+                    raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
+                    raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
+                    
+                    # Enforce strict boundary margins with generous safety padding masks
+                    bx = np.clip(raw_x - 18, 0, orig_width - 10)
+                    by = np.clip(raw_y - 12, 0, orig_height - 10)
+                    bw = np.clip(raw_w + 36, 10, orig_width - bx)
+                    bh = np.clip(raw_h + 24, 10, orig_height - by)
+                    watermark_detected = True
+                    print(f"🎉 OpenRouter Vision AI Success! Coordinates Locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
         else:
-            print(f"⚠️ OpenRouter Server Gateway returned status code: {response.status_code}")
+            print(f"⚠️ OpenRouter Gateway bypassed (Server Status Code {response.status_code}): {response.text}")
             
     except Exception as vision_fault:
         print(f"⚠️ OpenRouter Cloud Vision AI layer challenged: {vision_fault}")
@@ -380,11 +389,10 @@ while cap.isOpened():
     # Clear out old watermark shapes completely via local texture marching calculations
     healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
-    if watermark_detected:
-        # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
-        overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
-        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
+    # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
+    overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+    cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
+    healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
     
     # Inject light, non-intrusive brand text layers smoothly on top of the patch area
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
