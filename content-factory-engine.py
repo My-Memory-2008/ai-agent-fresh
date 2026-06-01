@@ -179,7 +179,6 @@ output_path = execute_unmangled_ytdlp_download(
 )
 
 
-
 # ==========================================
 # 4. STEP 1: EXECUTE ADAPTIVE AI CLOAK & NATIVE FRAME BAKING
 # ==========================================
@@ -231,155 +230,143 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
-# ==========================================
-# PHASE A: LOCAL PADDLE_OCR PIXEL-PERFECT ERASER (100% FREE & ACCURATE)
-# ==========================================
-print("📥 Initializing Local Deep-Learning PaddleOCR Engine...")
 
-import os
-import cv2
-import sys
-import re
-import random
-import numpy as np
-import subprocess
-
-# 1. Inject enterprise-grade PaddleOCR tracking packages into the kernel environment
-try:
-    from paddleocr import PaddleOCR
-except ImportError:
-    print("📥 Ingesting local PaddleOCR high-precision tracking modules...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "paddlepaddle", "paddleocr"])
-    from paddleocr import PaddleOCR
-
-# Load the local model weights into memory lanes natively
-print("🧠 Loading neural character detection weights into memory maps...")
-ocr_engine = PaddleOCR(use_angle_cls=False, lang='en')
-
-# 2. Capture structural video metrics from your target clip
+# --------------------------------------------------
+# PHASE A: MULTI-FRAME WATERMARK DETECTOR & ADAPTIVE FRAME BAKER
+# --------------------------------------------------
+print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Multi-frame structural scanning loop to find the watermark location across the timeline
-sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-watermark_detected = False
+sample_frames = [
+    int(frame_count * 0.10), 
+    int(frame_count * 0.30), 
+    int(frame_count * 0.50), 
+    int(frame_count * 0.70), 
+    int(frame_count * 0.90)
+]
+watermark_bounding_boxes = []
 
-# Default fallback patch parameters if no text is present in the video layout
-bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
-
-print("🛰️ Running frame-by-frame character localization maps...")
-for f_idx in sample_frames_list:
-    cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
-    ret_f, frame_f = cap.read()
-    if not ret_f: continue
+for idx in sample_frames:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    ret, frame = cap.read()
+    if not ret: continue
     
-    try:
-        # 🔥 FIXED: Swapped 'ocr()' call for the modern 'predict()' pipeline runner method without illegal keyword parameters
-        result = ocr_engine.predict(frame_f)
-    except Exception as e:
-        print(f"⚠️ Primary engine execution warning: {e}")
-        result = None
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
     
-    # 🔥 FIXED: Enhanced deep spatial parser to unpack internal polygon lists safely
-    if result and isinstance(result, list) and len(result) > 0:
-        for block in result:
-            if isinstance(block, list):
-                for line in block:
-                    # PaddleOCR outputs array mappings structured as: [ [ [x1,y1], [x2,y2], [x3,y3], [x4,y4] ], (text_string, score) ]
-                    if isinstance(line, list) and len(line) >= 2 and isinstance(line[0], list):
-                        box_points = line[0] # Isolate the outer 4 geometric vertices explicitly
-                        
-                        try:
-                            # Flatten the array matrices into primitive float point tracking parameters
-                            x_coords = [float(pt[0]) for pt in box_points if isinstance(pt, (list, tuple)) and len(pt) >= 2]
-                            y_coords = [float(pt[1]) for pt in box_points if isinstance(pt, (list, tuple)) and len(pt) >= 2]
-                            
-                            if not x_coords or not y_coords: continue
-                            
-                            x1, y1 = int(min(x_coords)), int(min(y_coords))
-                            x2, y2 = int(max(x_coords)), int(max(y_coords))
-                            
-                            w_check = x2 - x1
-                            h_check = y2 - y1
-                            
-                            # Spatial Rule: Target text residing in typical watermark zones (Outer top/bottom margins)
-                            is_in_watermark_lane = (y1 < (orig_height * 0.25)) or (y1 > (orig_height * 0.75))
-                            
-                            if w_check > 15 and h_check > 6 and is_in_watermark_lane and w_check < (orig_width * 0.6):
-                                # Add protective safety padding bounds around the coordinates down to the millimeter
-                                bx = np.clip(x1 - 15, 0, orig_width - 10)
-                                by = np.clip(y1 - 10, 0, orig_height - 10)
-                                bw = np.clip(w_check + 30, 10, orig_width - bx)
-                                bh = np.clip(h_check + 20, 10, orig_height - by)
-                                watermark_detected = True
-                                print(f"🎯 PADDLEOCR LOCK SUCCESS! Exact text boundaries mapped -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-                                break
-                        except Exception:
-                            continue
-            if watermark_detected: break
-    if watermark_detected: break
+    for i in range(len(ocr_data['text'])):
+        detected_word = str(ocr_data['text'][i]).strip().lower()
+        clean_target = str(username).strip().lower()
+        
+        if '@' in detected_word or (len(detected_word) > 2 and (detected_word in clean_target or clean_target in detected_word)):
+            x = ocr_data['left'][i]
+            y = ocr_data['top'][i]
+            w = ocr_data['width'][i]
+            h = ocr_data['height'][i]
+            
+            # Lock the exact original bounding boundaries with tight padding parameters
+            padding_box = (max(0, x - 12), max(0, y - 8), w + 24, h + 16)
+            watermark_bounding_boxes.append(padding_box)
 
 cap.release()
+unique_boxes = list(set(watermark_bounding_boxes))
 
-# Calculate perfect branding text overlay alignment positions inside local scope variables
-font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52
-font_thickness = 1
-(text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-tx = bx + int((bw - text_w) / 2)
-ty = by + int((bh + text_h) / 2)
-
-# --- 3. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
-print("🎨 Launching frame-by-frame content-aware pixel healing matrix...")
+print("🎨 Initializing Native Pixel Inpainter & Adaptive Color Matching Engine...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Calculate accurate native frame brightness matrices cleanly
-cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
-ret_sample, sample_img = cap.read()
-if ret_sample:
-    sample_zone = sample_img[by:by+bh, bx:bx+bw]
-    avg_channels = np.mean(sample_zone, axis=(0, 1))
-    avg_b, avg_g, avg_r = int(avg_channels[0]), int(avg_channels[1]), int(avg_channels[2])
-    brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
-    text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
+# Define native branding font metrics
+font_face = cv2.FONT_HERSHEY_SIMPLEX
+font_scale = 0.52
+font_thickness = 1
+
+if unique_boxes:
+    bx, by, bw, bh = unique_boxes[0]
+    print(f"🎯 Exact native coordinate match locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+    
+    # Calculate perfect textual centering coordinates within the native box boundaries
+    (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    tx = bx + int((bw - text_w) / 2)
+    ty = by + int((bh + text_h) / 2)
+    
+    # --------------------------------------------------
+    # 🔥 THE ADAPTIVE SAMPLING MATRIX
+    # Read a sample frame to analyze the exact background color palette behind the old watermark text
+    # --------------------------------------------------
+    cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames[2])
+    ret, sample_img = cap.read()
+    if ret:
+        # Sample a localized perimeter ring around the text box to find the clean background color
+        sample_zone = sample_img[max(0, by-10):min(orig_height, by+bh+10), max(0, bx-10):min(orig_width, bx+bw+10)]
+        avg_color_per_row = np.average(sample_zone, axis=0)
+        avg_color = np.average(avg_color_per_row, axis=0)
+        b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
+        
+        # Calculate the dynamic luminance background brightness (Standard ITU-R BT.601 weights)
+        bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
+        
+        # Adaptive Contrast text switching logic ensures high readability with low visual impact
+        if bg_brightness > 127:
+            # Background is light (white/grey) -> Apply dark elegant text values
+            text_color = (40, 40, 40)
+            shadow_color = (220, 220, 220)
+        else:
+            # Background is dark -> Apply smooth light text values
+            text_color = (225, 225, 225)
+            shadow_color = (20, 20, 20)
+    else:
+        b_match, g_match, r_match = 30, 30, 30
+        text_color, shadow_color = (230, 230, 230), (10, 10, 10)
+        
+    print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match} | Brightness: {int(bg_brightness)}")
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset video feed back to frame 0
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+        
+        # 1. Clear out original text completely via fast texture marching
+        raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+        cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
+        healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+        
+        # 2. 🔥 THE ADAPTIVE MATCHING OVERLAY: Fills your patch box with the exact background color shade
+        overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
+        
+        # Soft blend matrix (50% blend level ensures seamless color continuity with video transitions)
+        alpha_blend = 0.50
+        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_blend, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_blend, 0)
+        
+        # 3. Inject subtle contrast-matched text layers smoothly into the frame matrix
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA) # Text Shadow
+        cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA) # Core Brand Handle
+        
+        video_writer.write(healed_frame)
 else:
-    avg_b, avg_g, avg_r = 35, 35, 35
-    text_color, shadow_color = (235, 235, 235), (15, 15, 15)
-
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret: break
+    print("✨ Clean Layout Check! Zero handle watermarks found. Rendering fallback branding overlays...")
+    bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
+    (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    tx, ty = bx + int((bw - text_w) / 2), by + int((bh + text_h) / 2)
     
-    # Generate hard filled masking tracking block bounds directly matching the exact text coordinates
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
-    
-    # Clear out old watermark shapes completely via local texture marching calculations
-    healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
-    
-    # Overlay adaptive backdrop block color matching arrays perfectly over the old text region
-    overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-    cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
-    healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
-    
-    # Inject light, non-intrusive brand text layers smoothly on top of the patch area
-    cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
-    cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-    
-    video_writer.write(healed_frame)
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+        overlay_roi = frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (20, 20, 20), -1)
+        frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.35, frame[by:by+bh, bx:bx+bw], 0.65, 0)
+        cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (220, 220, 220), font_thickness, cv2.LINE_AA)
+        video_writer.write(frame)
 
 cap.release()
 video_writer.release()
 
-# Remux sound container tracks cleanly onto the new video layout
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -388,13 +375,13 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: PaddleOCR successfully localized and erased old text with millimeter precision.")
+print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
 
 # --------------------------------------------------
-# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
+# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (STABLE HOLD)
 # --------------------------------------------------
-print("🎬 Injecting advanced 7-filter rhythmic visual stack into canvas...")
+print("🎬 Injecting stable frame layout, dynamic color loops, and flashing cuts into canvas...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
@@ -405,43 +392,28 @@ try:
 except Exception:
     p_duration = 10.0 
 
-# 🔥 EXPANDED COLOR GRADING MATRIX: Exactly 7 professional creator filters
+# Color grading dynamic presets
 styles = [
-    # Filter 1: Vibrant Pop (Punchy contrast and boosted vivid saturation)
-    "eq=contrast=1.08:brightness=0.01:saturation=1.15:gamma=0.95",
-    
-    # Filter 2: Cinematic S-Curve (Deep movie shadow values and polished highlights)
-    "curves=m='0/0 0.22/0.15 0.5/0.5 0.78/0.85 1/1',eq=contrast=1.03",
-    
-    # Filter 3: Teal & Orange Matte (Balanced commercial warmth and complementary cool skin tones)
-    "eq=contrast=1.02:brightness=0.01:saturation=1.08:gamma=1.02,curves=r='0/0 0.5/0.54 1/1':b='0/0 0.5/0.46 1/1'",
-    
-    # Filter 4: Cyberpunk Neon (Elevates magenta/blue spectrum values for high nighttime pop)
-    "curves=r='0/0 0.5/0.45 1/1':g='0/0 0.5/0.48 1/1':b='0/0 0.5/0.58 1/1',eq=contrast=1.05:saturation=1.12",
-    
-    # Filter 5: Warm Vintage (Gives content an organic, sun-kissed retro 35mm look)
-    "curves=r='0/0 0.5/0.55 1/1':b='0/0 0.5/0.44 1/1',eq=contrast=1.02:saturation=1.04",
-    
-    # Filter 6: Crisp High-Definition (Ultra-sharp texture mapping with pristine midtones)
-    "unsharp=3:3:0.6:3:3:0.6,eq=contrast=1.06:brightness=0.01:saturation=1.04",
-    
-    # Filter 7: Golden Hour (Rich golden ambient hues, perfect for lifestyle and satisfying loops)
-    "eq=contrast=1.04:brightness=0.02:saturation=1.08:gamma=0.98,curves=r='0/0 0.5/0.53 1/1':g='0/0 0.5/0.51 1/1'"
+    "eq=contrast=1.06:brightness=0.01:saturation=1.12:gamma=0.96",
+    "curves=m='0/0 0.25/0.20 0.5/0.5 0.75/0.80 1/1'",
+    "eq=contrast=1.02:brightness=0.02:saturation=1.05:gamma=1.02"
 ]
 chosen_style = random.choice(styles)
 
 # Dynamic exposure flash cut trigger right at the 0.3-second clip exit boundary
 flash_transition = f"eq=brightness='if(gte(t,{p_duration}-0.3), (t-({p_duration}-0.3))*1.5, 0)':contrast='if(gte(t,{p_duration}-0.3), 1+((t-({p_duration}-0.3))*2), 1)'"
 
-# Advanced 7-Effect Hardware Filtergraph Engine
+# 🔥 TRANSITION GRAPH DESIGN (STABLE HOLD):
+# Completely removed the zoompan expression to keep the main scaled video 100% stable.
+# The ambient blur background (hue='H=t*0.6') and glowing chroma frames (hue='H=t*2.2') remain perfectly active.
 filter_complex_editing = (
-    f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6',vignette=PI/4[bg];"
+    f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6'[bg];"
     f"[0:v]scale=918:1632,{chosen_style},split=2[main_stable1][main_stable2];"
     f"[main_stable1]drawbox=x=0:y=0:w=918:h=1632:color=white:t=14[base_border];"
     f"[base_border]hue='H=t*2.2'[glowing_chroma_border];"
     f"[glowing_chroma_border]scale=926:1640[scaled_border_layer];"
-    f"[bg][scaled_border_layer]overlay=((W-w)/2)+8*sin(t*2):((H-h)/2)+6*cos(t*1.5),setsar=1[canvas_joined];"
-    f"[canvas_joined][main_stable2]overlay=((W-w)/2)+8*sin(t*2):((H-h)/2)+6*cos(t*1.5),setsar=1[visual_master];"
+    f"[bg][scaled_border_layer]overlay=(W-w)/2:(H-h)/2,setsar=1[canvas_joined];"
+    f"[canvas_joined][main_stable2]overlay=(W-w)/2:(H-h)/2,setsar=1[visual_master];"
     f"[visual_master]noise=alls=7:allf=t+u,{flash_transition}[v]"
 )
 
@@ -460,8 +432,7 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 7-Effect Rhythmic Engine.")
-
+print("🏆 SUCCESS! Step 1 Complete: Rhythmic chroma borders and environment layers compiled with a stable main video frame.")
 
 
 ## ==========================================
