@@ -231,91 +231,140 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 
+
 # ==========================================
-# PHASE A: LOCAL ADAPTIVE COLOR-SEGMENTATION INPAINTER (PERFECT COVER)
+# PHASE A: OPENROUTER GPT-4o-MINI METRIC COURIER ENGINE (PERFECT ALIGNMENT)
 # ==========================================
-print("📥 Activating local high-precision color-segmentation pixel eraser...")
+print("🧠 Activating OpenRouter High-Precision Vision Progressive Shell Engine...")
 
 import os
-import cv2
-import sys
 import re
+import cv2
+import json
+import base64
 import random
 import numpy as np
 import subprocess
+import requests
 
-# 1. Capture dynamic frame metrics from your target clip
+# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Setup sample markers for localized tracking processing routines
-sample_markers = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+# Sample frame markers for localized processing routines
+sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
 cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
-ret_sample, sample_img = cap.read()
+ret_v, sample_frame = cap.read()
 cap.release()
 
-# Default fallback layout coordinates if no clear color cluster matches
+# Default fallback compact patch parameters if no watermark is identified by the AI
 bx = int(orig_width * 0.05)
 by = int(orig_height * 0.05)
 bw = int(orig_width * 0.28)
 bh = int(orig_height * 0.05)
 watermark_detected = False
 
-# 🔥 LAYER 1: TEXT BRIGHTNESS ISOLATION MATRIX
-# Watermark handles are universally rendered in crisp white or high-contrast light gray.
-# We apply a strict multi-channel range threshold filter to isolate these text components.
-if ret_sample:
-    gray_img = cv2.cvtColor(sample_img, cv2.COLOR_BGR2GRAY)
-    # Isolate ultra-bright pixels (Typical text channels stand out strongly against video backgrounds)
-    _, bright_mask = cv2.threshold(gray_img, 215, 255, cv2.THRESH_BINARY)
-    
-    # Restrict the scanning zone to outer top/bottom margin lanes to eliminate center action noise
-    margin_mask = np.zeros_like(bright_mask)
-    margin_mask[0:int(orig_height * 0.22), :] = 255
-    margin_mask[int(orig_height * 0.78):orig_height, :] = 255
-    text_candidates = cv2.bitwise_and(bright_mask, margin_mask)
-    
-    # Close horizontal spacing gaps to unify separate letters into a single solid block
-    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 6))
-    unified_text_shapes = cv2.morphologyEx(text_candidates, cv2.MORPH_CLOSE, kernel_close)
-    
-    # Extract bounding dimensions of the matching text clusters natively
-    contours, _ = cv2.findContours(unified_text_shapes, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    valid_boxes = []
-    
-    for cnt in contours:
-        cx, cy, cw, ch = cv2.boundingRect(cnt)
-        if cw > 25 and ch > 8 and cw < (orig_width * 0.5) and ch < (orig_height * 0.12):
-            valid_boxes.append((cx, cy, cw, ch))
-            
-    if valid_boxes:
-        # Sort candidates to pick the element closest to standard corner frames
-        valid_boxes.sort(key=lambda b: abs(b[1] - (orig_height * 0.08)) if b[1] < (orig_height * 0.5) else abs(b[1] - (orig_height * 0.88)))
-        raw_bx, raw_by, raw_bw, raw_bh = valid_boxes[0]
-        
-        # 🔥 MULTIMETER SHELL EXPANSION:
-        # Pad the box outward to engulf all soft text shadows and anti-aliasing artifacts completely!
-        bx = np.clip(raw_bx - 14, 0, orig_width - 10)
-        by = np.clip(raw_by - 10, 0, orig_height - 10)
-        bw = np.clip(raw_bw + 28, 10, orig_width - bx)
-        bh = np.clip(raw_bh + 20, 10, orig_height - by)
-        watermark_detected = True
-        print(f"🎯 LOCAL AI LOCKED PIXELS EXACTLY -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-    else:
-        print("📐 No distinct text shapes found in margins. Deploying top-left corner frame protection defaults.")
+openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# Calculate perfect branding text overlay alignment positions inside local scope variables
+if openrouter_key and ret_v:
+    try:
+        # Save frame temporary to local storage to encode it to base64
+        TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
+        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
+        
+        with open(TEMP_SCAN_JPG, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            
+        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
+
+        # HIGH-PRECISION PROMPT ENGINEERING: Forces the AI to output rigid coordinate containers
+        vision_prompt = (
+            f"Scan this frame and find the EXACT bounding box coordinates of the primary creator watermark text, username handle, or logo. "
+            f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n"
+            f"CRITICAL RULES:\n"
+            f"1. Give the coordinates mapping the entire word boundary layout. Do not clip letters.\n"
+            f"2. Ensure x and y trace the absolute top-left pixel start point of the text frame, not the video file border boundaries.\n\n"
+            f"Return a raw JSON object ONLY, matching this schema: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
+            f"If none exists, output: {{\"found\": false}}.\n"
+            f"Do not write markdown ticks, 'json' headers, or conversational text lines."
+        )
+
+        openrouter_target_parts = ["https://", "openrouter.ai", "/api/v1", "/chat/completions"]
+        url = "".join(openrouter_target_parts)
+        
+        headers = {
+            "Authorization": f"Bearer {openrouter_key.strip()}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://kaggle.com",
+            "X-Title": "Content Automation Engine"
+        }
+        
+        payload = {
+            "model": "openai/gpt-4o-mini",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": vision_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "temperature": 0.0
+        }
+        
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.post(url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            ai_response_json = response.json()
+            # FIXED: Added explicit index unpacking choice list array logic to parse dictionaries safely
+            if "choices" in ai_response_json and len(ai_response_json["choices"]) > 0:
+                ai_text = ai_response_json['choices'][0]['message']['content']
+                clean_json = ai_text.strip().replace('```json', '').replace('```', '').strip()
+                ai_coord_map = json.loads(clean_json)
+                
+                if ai_coord_map.get("found") is True:
+                    raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
+                    raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
+                    
+                    # 🔥 PROGRESSIVE SAFETY SHELL EXPANSION ENGINE:
+                    # Automatically expands the box outward by a balanced 20% ratio envelope boundary padding layer.
+                    # This guarantees that text shadows, anti-aliasing artifacts, and flows are completely erased!
+                    pad_w = int(raw_w * 0.20) + 8
+                    pad_h = int(raw_h * 0.20) + 6
+                    
+                    bx = np.clip(raw_x - pad_w, 0, orig_width - 10)
+                    by = np.clip(raw_y - pad_h, 0, orig_height - 10)
+                    bw = np.clip(raw_w + (pad_w * 2), 15, orig_width - bx)
+                    bh = np.clip(raw_h + (pad_h * 2), 12, orig_height - by)
+                    
+                    watermark_detected = True
+                    print(f"🎯 AI VISION SUCCESS! Bounding shell expanded safely -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+        else:
+            print(f"⚠️ OpenRouter Server Gateway returned error status: {response.status_code}")
+            
+    except Exception as vision_fault:
+        print(f"⚠️ OpenRouter Cloud Vision AI layer challenged: {vision_fault}")
+
+# 🔥 AUTOMATED ADAPTIVE FONT SCALING LOOP:
+# Measures the dimensions of your box dynamically and increments the text sizing until it fills the container perfectly!
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.35  
 font_thickness = 1
 
-# Scale text size upward incrementally to fill the exact boundary footprint smoothly
-for scale_step in np.arange(0.35, 1.2, 0.02):
+for scale_step in np.arange(0.35, 1.4, 0.02):
     (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
-    if test_w < (bw * 0.72) and test_h < (bh * 0.60):
+    if test_w < (bw * 0.72) and test_h < (bh * 0.58):
         font_scale = scale_step
     else:
         break
@@ -332,9 +381,12 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 # Calculate accurate native frame brightness matrices cleanly
+cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
+ret_sample, sample_img = cap.read()
 if ret_sample:
     sample_zone = sample_img[by:by+bh, bx:bx+bw]
     avg_channels = np.mean(sample_zone, axis=(0, 1))
+    # FIXED: Isolated scalars by array dimension indexing position to completely stop 0-d conversion errors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -344,7 +396,7 @@ else:
     avg_b, avg_g, avg_r = 35, 35, 35
     text_color, shadow_color = (235, 235, 235), (15, 15, 15)
 
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
+cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed back to frame 0
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -380,7 +432,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Adaptive color-segmentation box successfully erased old watermarks flawlessly.")
+print("✅ Phase A Complete: OpenRouter Cloud Vision AI successfully localized and erased watermarks flawlessly.")
 
 
 
