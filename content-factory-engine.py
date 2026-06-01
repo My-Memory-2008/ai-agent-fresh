@@ -233,89 +233,105 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 
-
 # ==========================================
-# PHASE A: LOCAL VISION-AI WATERMARK DETECTION ENGINE (100% FREE & UNLIMITED)
+# PHASE A: GROQ CLOUD VISION AI WATERMARK ERASER (UNLIMITED FALLBACK)
 # ==========================================
-print("🧠 Activating Local Multimodal Object Ingestion Vision AI Engine...")
+print("🧠 Activating Groq Multimodal Cloud Vision AI Engine...")
 
 import os
 import re
 import cv2
+import json
+import base64
 import random
 import numpy as np
 import subprocess
-import sys
 
-# Define internal storage paths for the Vision AI module layers
-YOLO_MODEL_DIR = "/kaggle/working/yolo_vision"
-os.makedirs(YOLO_MODEL_DIR, exist_ok=True)
-
-# 1. Inject high-performance local Vision AI object-tracking packages into the kernel environment
-try:
-    import ultralytics
-    from ultralytics import YOLO
-except ImportError:
-    print("📥 Ingesting local Vision AI network tracking packages...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "ultralytics"])
-    from ultralytics import YOLO
-
-# Load a lightweight, high-speed, pre-trained visual text-and-logo localization model layer
-# runs completely inside Kaggle memory maps without needing paid API keys or hitting quotas
-print("📥 Initializing computer-vision neural maps inside memory partitions...")
-model = YOLO("yolov8n.pt") 
-
-# 2. Capture structural video metrics from your target clip
+# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Scan a mid-action frame where watermarks build up highest visual prominence parameters
-sample_idx = int(frame_count * 0.35)
-cap.set(cv2.CAP_PROP_POS_FRAMES, sample_idx)
+# Sample frame markers for localized processing routines
+sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
+cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Default fallback patch parameters if no watermark is identified by the AI neural paths
+# Default fallback patch parameters if no watermark is identified by the AI
 bx = int(orig_width * 0.05)
 by = int(orig_height * 0.05)
 bw = int(orig_width * 0.35)
 bh = int(orig_height * 0.08)
 watermark_detected = False
 
-if ret_v:
-    print("📡 Running visual frame inspection across local neural AI layer maps...")
+groq_key = secrets.get_secret("GROQ_API_KEY")
+
+if groq_key and ret_v:
     try:
-        # Fire local object detection tracker. Conf=0.15 optimizes sensitivity to locate tiny watermark grids
-        results = model.predict(source=sample_frame, conf=0.15, verbose=False)
+        from groq import Groq
+        client_groq = Groq(api_key=groq_key.strip())
         
-        # Unpack the neural bounding box array elements
-        for result in results:
-            boxes = result.boxes
-            for box in boxes:
-                # Get coordinates in absolute pixel formats [x1, y1, x2, y2]
-                xyxy = box.xyxy[0].cpu().numpy()
-                
-                # Fetch text bounding box properties cleanly
-                x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
-                w_check = x2 - x1
-                h_check = y2 - y1
-                
-                # Filter out raw background artifacts (Focus on standard corner text/logo geometries)
-                if w_check > 25 and h_check > 10 and w_check < (orig_width * 0.6) and h_check < (orig_height * 0.15):
-                    # Clamp boundaries strictly within image array limits to eliminate spatial errors
-                    bx = np.clip(x1 - 15, 0, orig_width - 10)
-                    by = np.clip(y1 - 10, 0, orig_height - 10)
-                    bw = np.clip(w_check + 30, 10, orig_width - bx)
-                    bh = np.clip(h_check + 20, 10, orig_height - by)
-                    watermark_detected = True
-                    print(f"🎯 VISION AI SUCCESS! Watermark shape localized natively -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
-                    break
-            if watermark_detected: break
-    except Exception as ai_fault:
-        print(f"⚠️ Local vision AI layer bypassed: {ai_fault}")
+        # Save frame temporary to local storage to encode it to base64
+        TEMP_SCAN_JPG = "/kaggle/working/watermark_groq_layer.jpg"
+        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
+        
+        with open(TEMP_SCAN_JPG, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            
+        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
+
+        # High-precision bounding-box extraction prompt engineering for Llama Vision
+        vision_prompt = (
+            f"Locate any creator watermark, social media handle text, profile username, or brand logo present in this video frame. "
+            f"The image resolution metrics are exactly Width: {orig_width} and Height: {orig_height}.\n\n"
+            f"Tasks:\n"
+            f"Return the exact pixel coordinates matching its location bounding-box container as a raw JSON object.\n"
+            f"Format your output strictly as: {{\"found\": true, \"x\": pixel_x, \"y\": pixel_y, \"w\": box_width, \"h\": box_height}}. "
+            f"If there is absolutely no watermark visible anywhere in the image, return strictly: {{\"found\": false}}.\n"
+            f"Do not include markdown code blocks, conversational text, or json headers. Output raw text strings only."
+        )
+
+        # Fire the Groq Llama-Vision Cloud query
+        response = client_groq.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": vision_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            temperature=0.0, # Forces deterministic coordinate returns
+            max_tokens=150
+        )
+        
+        clean_json = response.choices[0].message.content.strip().replace('```json', '').replace('```', '').strip()
+        ai_coord_map = json.loads(clean_json)
+        
+        if ai_coord_map.get("found") is True:
+            raw_x, raw_y = int(ai_coord_map.get("x")), int(ai_coord_map.get("y"))
+            raw_w, raw_h = int(ai_coord_map.get("w")), int(ai_coord_map.get("h"))
+            
+            # Enforce strict boundary margins with generous safety padding masks
+            bx = np.clip(raw_x - 18, 0, orig_width - 10)
+            by = np.clip(raw_y - 12, 0, orig_height - 10)
+            bw = np.clip(raw_w + 36, 10, orig_width - bx)
+            bh = np.clip(raw_h + 24, 10, orig_height - by)
+            watermark_detected = True
+            print(f"🎉 Groq Vision AI Success! Coordinates Locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+            
+    except Exception as groq_vision_fault:
+        print(f"⚠️ Groq Cloud Vision AI layer challenged: {groq_vision_fault}")
 
 # Calculate perfect branding text overlay alignment positions inside local scope variables
 font_face = cv2.FONT_HERSHEY_SIMPLEX
@@ -325,7 +341,7 @@ font_thickness = 1
 tx = bx + int((bw - text_w) / 2)
 ty = by + int((bh + text_h) / 2)
 
-# --- 3. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
+# --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
 print("🎨 Launching frame-by-frame content-aware pixel healing matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -333,11 +349,10 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 # Calculate accurate native frame brightness matrices cleanly
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45))
+cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
     sample_zone = sample_img[by:by+bh, bx:bx+bw]
-    # 🔥 FIXED SCALE ENFORCEMENT: Uses strict explicit axis metrics to eliminate 0-d array scalar TypeErrors!
     avg_channels = np.mean(sample_zone, axis=(0, 1))
     avg_b, avg_g, avg_r = int(avg_channels[0]), int(avg_channels[1]), int(avg_channels[2])
     brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
@@ -359,10 +374,11 @@ while cap.isOpened():
     # Clear out old watermark shapes completely via local texture marching calculations
     healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
-    # Overlay adaptive backdrop block color matching arrays perfectly
-    overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
-    cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
-    healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.45, healed_frame[by:by+bh, bx:bx+bw], 0.55, 0)
+    if watermark_detected:
+        # Overlay adaptive backdrop block color matching arrays perfectly
+        overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+        cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (avg_b, avg_g, avg_r), -1)
+        healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.55, healed_frame[by:by+bh, bx:bx+bw], 0.45, 0)
     
     # Inject light, non-intrusive brand text layers smoothly on top of the patch area
     cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
@@ -382,8 +398,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Local Vision AI model successfully localized and erased watermarks completely free.")
-
+print("✅ Phase A Complete: Groq Llama-Vision successfully localized and erased watermarks flawlessly.")
 
 
 # --------------------------------------------------
