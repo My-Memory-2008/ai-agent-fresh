@@ -465,7 +465,7 @@ import requests
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
-# Baseline default fallback metadata matrix (Pure human creator style)
+# Baseline default fallback metadata matrix (Pure creator style)
 seo_metadata = {
     "title": "This video literally resets your brain chemistry 🤯 #shorts",
     "description": "Watch for the exact second it loops perfectly. Original concept inspired by creator. #shorts #asmr #satisfying",
@@ -488,18 +488,18 @@ if ret and openrouter_key:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
 
-        # 🔥 REMOVED THE APP-AD DICTIONARY: Banned corporate journal writing completely
+        # 🔥 HUMAN-STYLE PROMPT MATRIX: BANS ALL AI CLICHES & GENERATES MASSIVE STRUCTURAL SEARCH REACH
         seo_prompt = (
             f"You are a viral YouTube Shorts creator running a channel with 5 million subscribers in the oddly satisfying and ASMR niches. "
             f"Examine the physical texture, color layers, and visual activity inside this video frame created by @{username}.\n\n"
             f"🚫 MANDATORY CREATOR STYLING RULES:\n"
-            f"1. NEVER write flowery, cheesy lines like 'mini-vacation for my brain', 'my mind starts to wander', 'captivating spectacle', 'symphony', or 'testament'.\n"
-            f"2. Keep the description completely casual, short, and punchy, as if a real human typed it out in 5 seconds while uploading.\n\n"
+            f"1. NEVER use robotic, cheesy corporate AI words like: 'mesmerizing dance', 'captivating spectacle', 'symphony of colors', 'testament', 'stress scrubber', 'mood boosting', 'sensory taps', 'delight', or 'visual journey'.\n"
+            f"2. Write exactly like a real creator targeting raw human curiosity. Use casual, dramatic, brain-scratching styling text.\n\n"
             f"Generate an expanded broad-audience SEO packet strictly as a valid raw JSON object matching this schema:\n"
             f"{{\n"
-            f"  \"youtube_title\": \"Choose ONLY ONE of these human formats, customized to the action you see: 'This video literally resets your brain chemistry 🤯 #shorts', 'Why does this loop feel so illegal to watch? #shorts', 'I can physically feel this video right now #shorts', or 'Watch the exact second it loops #shorts'. Do not deviate from this style.\",\n"
-            f"  \"youtube_description\": \"Write a casual description block. Sentence 1: A brief, raw human comment on the texture being poured or shaped (e.g., 'Watching this sand layer up is honestly addictive.'). Sentence 2: List long-tail search terms that real humans actually type when they can't sleep (e.g., 'oddly satisfying kinetic sand cutting video, relaxing sand layering asmr compilation, satisfying tapping sound therapy loop, sleep aid asmr triggers'). Sentence 3: Include the exact link string: 'Original concept inspired by @{username}'. Sentence 4: Append exactly these tags: #shorts #asmr #satisfying #oddlysatisfying #relaxing.\",\n"
-            f"  \"youtube_tags\": [\"Provide exactly 15 flat string keywords. Mix general traffic tags with long human search lines like 'videos to help you fall asleep', 'satisfying clips for when you are bored', 'relaxing sounds for anxiety', 'kinetic sand satisfying slicing'. Do not combine tags into corporate keywords.\"]\n"
+            f"  \"youtube_title\": \"Create a punchy human title under 55 characters using these specific viral hooks: 'This video literally resets your brain chemistry 🤯 #shorts', 'Why does this loop feel so illegal to watch? #shorts', 'I can physically feel this video right now #shorts', or 'Watch the exact second it loops #shorts'. Choose the one matching the action.\",\n"
+            f"  \"youtube_description\": \"Write a detailed, 4-sentence creator description designed to index for all possible search algorithms to capture a broad audience. Sentence 1: A highly relatable human statement about the physical action shown in the clip. Sentence 2: Pack it heavily with raw terms humans actually type into search bars when they cannot sleep (e.g., 'oddly satisfying kinetic sand cutting video', 'relaxing sand layering asmr compilation', 'satisfying slime scooping noises', 'deep sleep tapping triggers'). Sentence 3: Include the exact mandatory credit link string: 'Original concept inspired by @{username}'. Sentence 4: Append 5 massive high-traffic hashtags like #shorts #asmr #satisfying #oddlysatisfying #relaxing.\",\n"
+            f"  \"youtube_tags\": [\"Provide exactly 15 flat string keywords. Do not combine them. Mix general traffic tags with long human search lines like 'videos to fall asleep to', 'satisfying clips for when you are bored', 'relaxing sounds for anxiety', 'kinetic sand satisfying slicing'.\"]\n"
             f"}}\n\n"
             f"CRITICAL: Output raw JSON syntax blocks only. Do not add intro greetings or conversational filler notes. Start your response directly with the opening curly bracket."
         )
@@ -515,6 +515,8 @@ if ret and openrouter_key:
             "X-Title": "Broad Reach Humanized SEO Microservice"
         }
         
+        # 🔥 REVISED ZERO-CREDIT FREE ENDPOINTS MATRIX:
+        # Cross-checks every available open-source path option to prevent 404 and 402 response drops completely
         model_endpoints = [
             "meta-llama/llama-3.2-11b-vision-instruct",
             "google/gemini-2.5-flash",
@@ -538,7 +540,7 @@ if ret and openrouter_key:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }],
-                "temperature": 0.40
+                "temperature": 0.45 # Optimal configuration to guarantee strict JSON construction while leaving room for human slang
             }
 
             with requests.Session() as session:
@@ -550,14 +552,17 @@ if ret and openrouter_key:
                 if "choices" in ai_data and len(ai_data["choices"]) > 0:
                     ai_text = ai_data["choices"][0]["message"]["content"].strip()
                     
+                    # Clean out markdown block ticks if any free model adds them as filler text boundaries
                     if ai_text.startswith("```"):
                         ai_text = re.sub(r'^```[a-zA-Z]*\n|```$', '', ai_text, flags=re.MULTILINE).strip()
                     
+                    # Run clean extraction
                     json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
                     if json_match:
                         clean_json_text = json_match.group(0)
                         ai_seo_data = json.loads(clean_json_text)
                         
+                        # 🔥 CASING SCHEMA NORMALIZER: Handles property title variations dynamically
                         title_key = 'youtube_title' if 'youtube_title' in ai_seo_data else ('title' if 'title' in ai_seo_data else 'youtube_title')
                         desc_key = 'youtube_description' if 'youtube_description' in ai_seo_data else ('description' if 'description' in ai_seo_data else 'youtube_description')
                         tags_key = 'youtube_tags' if 'youtube_tags' in ai_seo_data else ('tags' if 'tags' in ai_seo_data else 'youtube_tags')
@@ -579,6 +584,7 @@ if ret and openrouter_key:
 import torch
 torch.cuda.empty_cache()
 
+# Write metadata array out to disk storage partition manifest cleanly
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 print("✅ Section 4b Visual SEO Meta Processing Finished Safely.")
