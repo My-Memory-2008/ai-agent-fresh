@@ -449,9 +449,9 @@ print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 
 
 
 # ==========================================
-# 4b. HUMAN-STYLE BROAD-REACH VISUAL SEO GENERATOR (ZERO AI-WORDS FILTER)
+# 4b. HUMAN-CREATOR BROAD-REACH VISUAL SEO GENERATOR (REAL HUMAN LOOKUPS)
 # ==========================================
-print("🧠 Activating Human-Style Broad-Reach SEO Matrix Matrix via Free OpenRouter Gateway...")
+print("🧠 Activating Human-Creator Broad-Reach SEO Matrix via Free OpenRouter Gateway...")
 import cv2
 import json
 import os
@@ -461,10 +461,10 @@ import requests
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
-# Baseline default fallback metadata matrix
+# Baseline default fallback metadata matrix (Pure human creator style)
 seo_metadata = {
-    "title": "This video text resets your brain chemistry 🤯 #shorts",
-    "description": "Watch until the sand loop perfectly resets itself. Original concept inspired by creator. #shorts #asmr #satisfying",
+    "title": "This video literally resets your brain chemistry 🤯 #shorts",
+    "description": "Watch for the exact second it loops perfectly. Original concept inspired by creator. #shorts #asmr #satisfying",
     "tags": ["satisfying", "asmr", "shorts", "relaxing", "kineticsand", "oddlysatisfying"]
 }
 
@@ -472,8 +472,12 @@ openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
 print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
 cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
-frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.45))
+frame_count = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) # Fixed frame metrics call tracking
+cap.release()
+
+cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
+frame_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_total * 0.45))
 ret, frame = cap.read()
 cap.release()
 
@@ -484,21 +488,22 @@ if ret and openrouter_key:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
 
-        # 🔥 HUMAN-STYLE PROMPT MATRIX: BANS ALL AI MARKETING WORDS COMPLETELY
+        # 🔥 THE CREATOR BLACKLIST & TEMPLATE ENGINE
         seo_prompt = (
-            f"You are a viral YouTube Shorts creator running a multi-million subscriber oddly satisfying and ASMR channel. "
-            f"Examine the physical texture, action, and object inside this video frame created by @{username}.\n\n"
-            f"CRITICAL RULE: DO NOT use robotic AI words like 'mesmerizing', 'captivating', 'dance of colors', 'visual journey', 'symphony', 'testament', 'delight', or 'spectacular'. Write exactly like a real human creator writing a viral hook.\n\n"
+            f"You are a viral YouTube Shorts creator running a channel with 5 million subscribers in the oddly satisfying/ASMR niche. "
+            f"Examine the physical texture and visual activity inside this video frame created by @{username}.\n\n"
+            f"🚫 STRICT RULES BANNING ALL AI CLINICAL TEXT:\n"
+            f"1. DO NOT use medical, therapeutic, or corporate wellness words like: 'stress scrubber', 'sensory videos', 'mental health support', 'mood boosting', 'anxiety scrubs', 'tangible', 'texture taps', 'testament', or 'symphony'.\n"
+            f"2. Write EXACTLY like a real human teenager or young adult would click on. Use casual, dramatic, raw curiosity creator slang.\n\n"
             f"Generate a broad-audience SEO packet strictly as a valid raw JSON object matching this schema:\n"
             f"{{\n"
-            f"  \"youtube_title\": \"A short, punchy, human title under 55 characters. Use conversational brain-scratch hooks like: 'This video literally resets your brain', 'Why does this loop feel so illegal to watch?', 'I can physically smell/feel this video', or 'Watch the exact second it loops'. End strictly with #shorts\",\n"
-            f"  \"youtube_description\": \"Write a massive, 4-sentence, human-style description to index for all possible search algorithms. Sentence 1: A highly relatable human reaction hook about watching this texture get cut/crushed/mixed. Sentence 2: Pack it heavily with raw terms humans actually type when searching (e.g., 'oddly satisfying kinetic sand sorting video', 'deep sleep sound therapy loop', 'satisfying slime scooping ASMR compilation', 'anxiety relief tapping noises'). Sentence 3: Include the exact mandatory credit link string: 'Original concept inspired by @{username}'. Sentence 4: Include 5 massive high-traffic community hashtags across the niche.\",\n"
-            f"  \"youtube_tags\": [\"Provide exactly 15 flat string keywords. Mix massive generic terms (asmr, satisfying, relaxing) with exact texture terms found in the image, and human search intent phrases like 'videos to fall asleep to', 'satisfying loops for anxiety', 'satisfying sorting clips'.\"]\n"
+            f"  \"youtube_title\": \"Choose ONLY ONE of these human formats, customized to the action you see: 'This video literally resets your brain chemistry 🤯 #shorts', 'Why does this loop feel so illegal to watch? #shorts', 'I can physically feel this video right now #shorts', or 'Watch the exact second it clicks #shorts'. Do not deviate from this natural style.\",\n"
+            f"  \"youtube_description\": \"Write a massive 4-sentence creator description to reach broad search traffic pools. Sentence 1: A short, dramatic human statement about watching this texture get cut or mixed. Sentence 2: A list of long-tail search phrases that real humans ACTUALLY TYPE into search bars when they can't sleep (e.g., 'oddly satisfying kinetic sand cutting video', 'relaxing sand layering compilation', 'satisfying tapping sound therapy loop', 'sleep aid asmr triggers'). Sentence 3: Include the mandatory link line: 'Original concept inspired by @{username}'. Sentence 4: Add 5 trending casual community hashtags (e.g., #kineticsand #satisfying #asmr #oddlysatisfying #relaxing).\",\n"
+            f"  \"youtube_tags\": [\"Provide exactly 15 flat search tags. They must be lowercase phrases that normal people search for. Mix broad categories with long human lines like 'videos to help you fall asleep', 'satisfying clips for when you are bored', 'kinetic sand satisfying slicing', 'relaxing asmr sounds for sleep'. Do not combine tags into corporate keywords.\"]\n"
             f"}}\n\n"
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
 
-        # PROTECTED SLASHPACK SHIELD:
         protocol_shield = "https" + ":" + chr(47) + chr(47)
         url = f"{protocol_shield}openrouter.ai/api/v1/chat/completions"
         
@@ -518,7 +523,7 @@ if ret and openrouter_key:
         
         for current_endpoint in model_endpoints:
             if response_success: break
-            print(f"📡 Testing humanized algorithmic endpoint lane: {current_endpoint}")
+            print(f"📡 Testing humanized creator endpoint lane: {current_endpoint}")
             
             payload = {
                 "model": current_endpoint, 
@@ -529,7 +534,7 @@ if ret and openrouter_key:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }],
-                "temperature": 0.85 # Higher temperature splits predictable choices to ensure creative, human slang phrases
+                "temperature": 0.90 # High variation breaks robotic text cycles completely
             }
 
             with requests.Session() as session:
@@ -548,7 +553,7 @@ if ret and openrouter_key:
                         "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
                         "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
                     }
-                    print(f"🚀 Human-Style Broad SEO Mapping Complete via {current_endpoint}!")
+                    print(f"🚀 Human Creator SEO Mapping Complete via {current_endpoint}!")
                     print(f" Locked Title: \"{seo_metadata['title']}\"")
                     response_success = True
             else:
@@ -560,10 +565,10 @@ if ret and openrouter_key:
 import torch
 torch.cuda.empty_cache()
 
-# Write expanded reach metadata array to local drive manifest file
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 print("✅ Section 4b Extended Human SEO Meta Processing Finished Safely.")
+
 
 
 
