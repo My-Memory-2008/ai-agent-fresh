@@ -230,7 +230,6 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
-
 # ==========================================
 # PHASE A: PART 1 OF 2 (GEMINI-EXCLUSIVE OBJECT LOCALIZATION MATRIX)
 # ==========================================
@@ -360,6 +359,7 @@ if ai_response_text:
             print(f"🎯 GEMINI METRIC SUCCESS! Direction Pattern: {ai_coord_map.get('direction')} | Precise Angle: {watermark_angle:.2f}°")
     except Exception as data_fault:
         print(f"⚠️ Visual data parsing trace bypassed: {data_fault}")
+
 
 
 # ==========================================
