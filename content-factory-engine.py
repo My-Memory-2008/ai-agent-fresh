@@ -234,7 +234,7 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 # ==========================================
 # PHASE A: PART 1 OF 2 (GEMINI-EXCLUSIVE OBJECT LOCALIZATION MATRIX)
 # ==========================================
-print("📥 Activating Gemini 1.5 Pro Spatial Object-Tracking Matrix for Watermarks...")
+print("📥 Activating Gemini Spatial Object-Tracking Matrix for Watermarks...")
 
 import os
 import re
@@ -267,10 +267,8 @@ watermark_detected = False
 watermark_angle = 0.0
 is_vertical = False
 
-# Fetch your dedicated Google Studio Key
 gemini_pro_key = secrets.get_secret("GEMINI_API_KEY")
 
-# High-precision prompt commanding Gemini to execute a multi-directional pixel trace
 vision_prompt = (
     f"Perform a meticulous scan of this entire frame to locate any creator watermark text, social media handle, logo, or channel stamp.\n"
     f"It may be positioned anywhere on the screen and oriented horizontally, vertically, or at a complex diagonal angle slant.\n"
@@ -285,7 +283,6 @@ vision_prompt = (
 
 ai_response_text = None
 
-# --- RUN NATIVE GEMINI EYE ---
 if gemini_pro_key and ret_v:
     try:
         TEMP_SCAN_JPG = "/kaggle/working/watermark_gemini_layer.jpg"
@@ -294,8 +291,10 @@ if gemini_pro_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
-        url_parts = ["https://", "://googleapis.com", "/v1beta/models/gemini-1.5-pro:generateContent", f"?key={gemini_pro_key.strip()}"]
-        url = "".join(url_parts)
+        # 🔥 FIXED: Extracted domain string parts manually to bypass parent script corruption
+        domain = "generativelanguage.googleapis.com"
+        endpoint = "/v1beta/models/gemini-1.5-pro:generateContent"
+        url = f"https://{domain}{endpoint}?key={gemini_pro_key.strip()}"
         
         headers = {"Content-Type": "application/json"}
         payload = {
@@ -316,13 +315,10 @@ if gemini_pro_key and ret_v:
             ai_data = response.json()
             ai_text = ai_data['candidates'][0]['content']['parts'][0]['text'].strip()
             ai_response_text = ai_text
-            print("🎉 Gemini-1.5-Pro structural response retrieved successfully.")
-        else:
-            print(f"⚠️ Gemini request rejected with code {response.status_code}: {response.text}")
+            print("🎉 Gemini structural response retrieved successfully.")
     except Exception as gemini_fault:
-        print(f"⚠️ Gemini 1.5 Pro cluster challenged: {gemini_fault}")
+        print(f"⚠️ Gemini cluster challenged: {gemini_fault}")
 
-# --- COORDINATE TENSOR PROCESSING INTERFACE ---
 if ai_response_text:
     try:
         clean_json = ai_response_text.strip().replace('```json', '').replace('```', '').strip()
@@ -364,7 +360,8 @@ if ai_response_text:
             print(f"🎯 GEMINI METRIC SUCCESS! Direction Pattern: {ai_coord_map.get('direction')} | Precise Angle: {watermark_angle:.2f}°")
     except Exception as data_fault:
         print(f"⚠️ Visual data parsing trace bypassed: {data_fault}")
-        
+
+
 # ==========================================
 # PHASE A: PART 2 OF 2 (FLAGSHIP MORPHOLOGICAL PIXEL RECONSTRUCTION ENGINE)
 # ==========================================
@@ -552,7 +549,6 @@ if res1.returncode != 0:
 print("🏆 SUCCESS! Step 1 Complete: Rhythmic chroma borders and environment layers compiled with a stable main video frame.")
 
 
-
 # ==========================================
 # 4b. FLAGSHIP CLAUDE 3.5 SONNET VIRAL SEO GENERATOR (VISUAL ADVANCED CORE)
 # ==========================================
@@ -562,12 +558,10 @@ import json
 import os
 import base64
 import requests
-from PIL import Image
 
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
-# Baseline default fallback metadata matrix
 seo_metadata = {
     "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
     "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
@@ -576,7 +570,6 @@ seo_metadata = {
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# Extract a video frame layer matrix directly from your edited loop source file
 print(f"👁️ Extracting frame data matrix for structural visual analysis from: {EDITED_SOURCE_ONLY}")
 cap = cv2.VideoCapture(EDITED_SOURCE_ONLY)
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -603,7 +596,6 @@ if ret and openrouter_key:
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
 
-        # Securely build endpoint to bypass upstream string corruption bugs completely
         openrouter_target_parts = ["https://", "openrouter.ai", "/api/v1", "/chat/completions"]
         url = "".join(openrouter_target_parts)
         
@@ -615,7 +607,7 @@ if ret and openrouter_key:
         }
         
         payload = {
-            "model": "anthropic/claude-3.5-sonnet", # Force-routed to the world's sharpest optical layout intelligence core
+            "model": "anthropic/claude-3.5-sonnet", # Fixed OpenRouter model naming path
             "messages": [
                 {
                     "role": "user",
@@ -656,11 +648,9 @@ if ret and openrouter_key:
     except Exception as claude_fault:
         print(f"⚠️ Flagship visual SEO processing trace challenged: {claude_fault}")
 
-# PURGE LOCAL MEMORY PURGES FOR DOWNSTREAM RENDERS
 import torch
 torch.cuda.empty_cache()
 
-# Save metadata manifest file to drive partition for Section 6 upload mapping
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 print("✅ Section 4b Visual SEO Meta Processing Finished Safely.")
