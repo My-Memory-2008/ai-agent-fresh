@@ -4,7 +4,6 @@
 # %% [code]
 # %% [code]
 # %% [code]
-# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -230,272 +229,153 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
-# ==========================================
-# PHASE A: PART 1 OF 2 (GEMINI-EXCLUSIVE OBJECT LOCALIZATION MATRIX)
-# ==========================================
-print("📥 Activating Gemini Spatial Object-Tracking Matrix for Watermarks...")
 
-import os
-import re
-import cv2
-import json
-import base64
-import random
-import numpy as np
-import subprocess
-import requests
 
-# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
+# --------------------------------------------------
+# PHASE A: MULTI-FRAME WATERMARK DETECTOR & ADAPTIVE FRAME BAKER
+# --------------------------------------------------
+print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
-ret_v, sample_frame = cap.read()
+# Guard rail to verify the new video actually opened
+if frame_count <= 0 or orig_width == 0 or orig_height == 0:
+    cap.release()
+    raise ValueError(f"❌ Error: Cannot read the video file at {output_path}")
+
+sample_frames = [
+    int(frame_count * 0.10), 
+    int(frame_count * 0.30), 
+    int(frame_count * 0.50), 
+    int(frame_count * 0.70), 
+    int(frame_count * 0.90)
+]
+
+for idx in sample_frames:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    ret, frame = cap.read()
+    if not ret: continue
+    
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
+    
+    for i in range(len(ocr_data['text'])):
+        detected_word = str(ocr_data['text'][i]).strip().lower()
+        clean_target = str(username).strip().lower()
+        
+        if '@' in detected_word or (len(detected_word) > 2 and (detected_word in clean_target or clean_target in detected_word)):
+            x = ocr_data['left'][i]
+            y = ocr_data['top'][i]
+            w = ocr_data['width'][i]
+            h = ocr_data['height'][i]
+            
+            padding_box = (max(0, x - 12), max(0, y - 8), w + 24, h + 16)
+            watermark_bounding_boxes.append(padding_box)
+
 cap.release()
+unique_boxes = list(set(watermark_bounding_boxes))
 
-# Global default parameter shapes if no watermark is identified
-polygon_vertices = np.array([[int(orig_width*0.05), int(orig_height*0.05)], 
-                             [int(orig_width*0.33), int(orig_height*0.05)], 
-                             [int(orig_width*0.33), int(orig_height*0.10)], 
-                             [int(orig_width*0.05), int(orig_height*0.10)]], dtype=np.int32)
-watermark_detected = False
-watermark_angle = 0.0
-is_vertical = False
-
-gemini_pro_key = secrets.get_secret("GEMINI_API_KEY")
-
-vision_prompt = (
-    f"Perform a meticulous scan of this entire frame to locate any creator watermark text, social media handle, logo, or channel stamp.\n"
-    f"It may be positioned anywhere on the screen and oriented horizontally, vertically, or at a complex diagonal angle slant.\n"
-    f"The exact image resolution is Width: {orig_width} and Height: {orig_height}.\n\n"
-    f"Tasks:\n"
-    f"Identify the precise four corners enclosing the entire boundary perimeter of the watermark starting from top-left, going clockwise.\n"
-    f"Output your result strictly as a raw JSON map matching this schema: \n"
-    f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
-    f"If absolutely no watermark pattern is found on the pixels, output: {{\"found\": false}}.\n"
-    f"Do not write markdown ticks, json code block headers, or conversational text filling lines."
-)
-
-ai_response_text = None
-
-if gemini_pro_key and ret_v:
-    try:
-        TEMP_SCAN_JPG = "/kaggle/working/watermark_gemini_layer.jpg"
-        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
-        with open(TEMP_SCAN_JPG, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
-            
-        # 🔥 FIXED: Extracted domain string parts manually to bypass parent script corruption
-        domain = "generativelanguage.googleapis.com"
-        endpoint = "/v1beta/models/gemini-1.5-pro:generateContent"
-        url = f"https://{domain}{endpoint}?key={gemini_pro_key.strip()}"
-        
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": vision_prompt},
-                    {"inlineData": {"mimeType": "image/jpeg", "data": base64_image}}
-                ]
-            }],
-            "generationConfig": {"responseMimeType": "application/json"}
-        }
-        
-        with requests.Session() as session:
-            session.trust_env = False
-            response = session.post(url, headers=headers, json=payload, timeout=35)
-            
-        if response.status_code == 200:
-            ai_data = response.json()
-            ai_text = ai_data['candidates'][0]['content']['parts'][0]['text'].strip()
-            ai_response_text = ai_text
-            print("🎉 Gemini structural response retrieved successfully.")
-    except Exception as gemini_fault:
-        print(f"⚠️ Gemini cluster challenged: {gemini_fault}")
-
-if ai_response_text:
-    try:
-        clean_json = ai_response_text.strip().replace('```json', '').replace('```', '').strip()
-        ai_coord_map = json.loads(clean_json)
-        
-        if ai_coord_map.get("found") is True:
-            p1 = ai_coord_map.get("p1")
-            p2 = ai_coord_map.get("p2")
-            p3 = ai_coord_map.get("p3")
-            p4 = ai_coord_map.get("p4")
-            
-            raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
-            rect = cv2.minAreaRect(raw_pts)
-            box_points = cv2.boxPoints(rect)
-            box_points = np.int32(box_points)
-            
-            watermark_angle = float(rect[2])
-            width_check = float(rect[1][0])
-            height_check = float(rect[1][1])
-            
-            if height_check > width_check:
-                is_vertical = True
-                watermark_angle -= 90.0
-            if ai_coord_map.get("direction") == "vertical":
-                is_vertical = True
-                
-            center_pt = np.mean(box_points, axis=0)
-            inflated_pts = []
-            for pt in box_points:
-                dx = float(pt[0] - center_pt[0])
-                dy = float(pt[1] - center_pt[1])
-                len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                fit_x = int(pt[0] + (dx / len_d) * 18) 
-                fit_y = int(pt[1] + (dy / len_d) * 14)
-                inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
-            
-            polygon_vertices = np.array(inflated_pts, dtype=np.int32)
-            watermark_detected = True
-            print(f"🎯 GEMINI METRIC SUCCESS! Direction Pattern: {ai_coord_map.get('direction')} | Precise Angle: {watermark_angle:.2f}°")
-    except Exception as data_fault:
-        print(f"⚠️ Visual data parsing trace bypassed: {data_fault}")
-
-
-
-# ==========================================
-# PHASE A: PART 2 OF 2 (FLAGSHIP MORPHOLOGICAL PIXEL RECONSTRUCTION ENGINE)
-# ==========================================
-
-# --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
-print("🎨 Launching frame-by-frame multi-angle content-aware pixel healing matrix...")
+print("🎨 Initializing Native Pixel Inpainter & Adaptive Color Matching Engine...")
 cap = cv2.VideoCapture(output_path)
-TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Sample regional brightness properties using flat polygon area parameters cleanly
-cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
-ret_sample, sample_img = cap.read()
-if ret_sample:
-    # Build localized background mask to process colors inside the calculated area
-    temp_mask = np.zeros(sample_img.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(temp_mask, [polygon_vertices], 255)
-    avg_channels = cv2.mean(sample_img, mask=temp_mask)
-    
-    # Pristine explicit color channels extraction to prevent 0-d array scalar TypeErrors
-    avg_b = int(avg_channels[0])
-    avg_g = int(avg_channels[1])
-    avg_r = int(avg_channels[2])
-    
-    brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
-    text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
-else:
-    avg_b, avg_g, avg_r = 35, 35, 35
-    text_color, shadow_color = (235, 235, 235), (15, 15, 15)
-
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
-
-# Assigned unique identifier variables to prevent structural unpacking overlap bugs
-rect_x, rect_y, rect_w, rect_h = cv2.boundingRect(polygon_vertices)
-target_w, target_h = rect_w, rect_h
-if is_vertical and target_h > target_w:
-    target_w, target_h = target_h, target_w
-
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.35
+font_scale = 0.52
 font_thickness = 1
 
-# Adaptive scaling loops to guarantee perfect container fit alignments
-for scale_step in np.arange(0.35, 1.4, 0.02):
-    (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
-    if test_w < (target_w * 0.75) and test_h < (target_h * 0.60):
-        font_scale = scale_step
+# FIXED: Wrapped processing in try/finally block to guarantee resource unlocking 
+try:
+    if unique_boxes:
+        bx, by, bw, bh = unique_boxes[0]
+        print(f"🎯 Exact native coordinate match locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+        
+        (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+        tx = bx + int((bw - text_w) / 2)
+        ty = by + int((bh + text_h) / 2)
+        
+        cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames[2])
+        ret, sample_img = cap.read()
+        if ret:
+            sample_zone = sample_img[max(0, by-10):min(orig_height, by+bh+10), max(0, bx-10):min(orig_width, bx+bw+10)]
+            avg_color_per_row = np.average(sample_zone, axis=0)
+            avg_color = np.average(avg_color_per_row, axis=0)
+            b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
+            
+            bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
+            
+            if bg_brightness > 127:
+                text_color = (40, 40, 40)
+                shadow_color = (220, 220, 220)
+            else:
+                text_color = (225, 225, 225)
+                shadow_color = (20, 20, 20)
+        else:
+            b_match, g_match, r_match = 30, 30, 30
+            text_color, shadow_color = (230, 230, 230), (10, 10, 10)
+            
+        print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match}")
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
+            
+            raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+            cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
+            healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+            
+            overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+            cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
+            
+            alpha_blend = 0.50
+            healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_blend, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_blend, 0)
+            
+            cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
+            cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+            
+            video_writer.write(healed_frame)
     else:
-        break
+        print("✨ Clean Layout Check! Zero handle watermarks found. Rendering fallback branding overlays...")
+        bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
+        (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+        tx, ty = bx + int((bw - text_w) / 2), by + int((bh + text_h) / 2)
+        
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # FIXED: Reset capture device to starting frame
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
+            overlay_roi = frame[by:by+bh, bx:bx+bw].copy()
+            cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (20, 20, 20), -1)
+            frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.35, frame[by:by+bh, bx:bx+bw], 0.65, 0)
+            cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (220, 220, 220), font_thickness, cv2.LINE_AA)
+            video_writer.write(frame)
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret: break
-    
-    # 1. MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
-    
-    # Dilate the polygon mask outward evenly across ALL angles using an elliptical kernel matrix
-    # This expands the erasure zone by an extra 18 pixels, completely swallowing hidden shadows or halos!
-    dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (18, 18))
-    inflated_mask = cv2.dilate(raw_mask, dilation_kernel, iterations=1)
-    
-    # Execute fast marching Telea inpainting on the expanded mask to erase the text cleanly
-    healed_frame = cv2.inpaint(frame, inflated_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
-    
-    # 2. Overlay color-matched matte patch seamlessly over the original polygon mask vertices
-    overlay_roi = healed_frame.copy()
-    cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(overlay_roi, 0.50, healed_frame, 0.50, 0)
-    
-    # 3. THE ANGLED OVERLAY ENGINE:
-    text_layer = np.zeros_like(healed_frame)
-    
-    # Compute precise placement anchor points inside the localized text boundaries
-    moments = cv2.moments(polygon_vertices)
-    if moments["m00"] != 0:
-        cx_m = int(moments["m10"] / moments["m00"])
-        cy_m = int(moments["m01"] / moments["m00"])
-    else:
-        cx_m, cy_m = rect_x + rect_w//2, rect_y + rect_h//2
-        
-    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-    
-    if is_vertical and not (abs(watermark_angle) > 35):
-        # Handle strict top-to-bottom vertical text formatting loops gracefully
-        char_y = cy_m - int((th * len("@AWRAM")) / 2)
-        for char in "@AWRAM":
-            (cw_s, ch_s), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
-            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
-            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-            char_y += ch_s + 6
-    else:
-        # Handle standard or slanted angled line typography configurations natively
-        tx_a = cx_m - (tw // 2)
-        ty_a = cy_m + (th // 2)
-        
-        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
-        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-        
-        # Apply rotational transformation matrices matching the original tilt angles exactly
-        rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -watermark_angle, 1.0)
-        rotated_text_layer = cv2.warpAffine(text_layer, rot_matrix, (orig_width, orig_height))
-        
-        # Merge the slanted text onto the video frames flawlessly
-        text_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY)
-        _, alpha_mask = cv2.threshold(text_mask, 10, 255, cv2.THRESH_BINARY)
-        alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
-        
-        healed_frame = (rotated_text_layer * alpha_mask_3d + healed_frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
+finally:
+    # FIXED: This block executes even if video reading crashes, forcing open files to close
+    cap.release()
+    video_writer.release()
 
-    video_writer.write(healed_frame)
-
-cap.release()
-video_writer.release()
-
-# Remux sound container tracks cleanly onto the new video layout
-CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
+# Run audio stitching
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
     CLEAN_INPUT_STAGE1
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
+if os.path.exists(TEMP_HEALED_MP4): 
+    os.remove(TEMP_HEALED_MP4)
 
+print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
 
 # --------------------------------------------------
-# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (STABLE HOLD)
+# PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
 # --------------------------------------------------
-print("🎬 Injecting stable frame layout, dynamic color loops, and flashing cuts into canvas...")
+print("🎬 Injecting advanced 7-filter rhythmic visual stack into canvas...")
 
 def get_duration(file_path):
     cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {file_path}"
@@ -506,28 +386,46 @@ try:
 except Exception:
     p_duration = 10.0 
 
-# Color grading dynamic presets
+# EXPANDED COLOR GRADING MATRIX: Exactly 7 professional creator filters
 styles = [
-    "eq=contrast=1.06:brightness=0.01:saturation=1.12:gamma=0.96",
-    "curves=m='0/0 0.25/0.20 0.5/0.5 0.75/0.80 1/1'",
-    "eq=contrast=1.02:brightness=0.02:saturation=1.05:gamma=1.02"
+    # Filter 1: Vibrant Pop (Punchy contrast and boosted vivid saturation)
+    "eq=contrast=1.08:brightness=0.01:saturation=1.15:gamma=0.95",
+    
+    # Filter 2: Cinematic S-Curve (Deep movie shadow values and polished highlights)
+    "curves=m='0/0 0.22/0.15 0.5/0.5 0.78/0.85 1/1',eq=contrast=1.03",
+    
+    # Filter 3: Teal & Orange Matte (Balanced commercial warmth and complementary cool skin tones)
+    "eq=contrast=1.02:brightness=0.01:saturation=1.08:gamma=1.02,curves=r='0/0 0.5/0.54 1/1':b='0/0 0.5/0.46 1/1'",
+    
+    # Filter 4: Cyberpunk Neon (Elevates magenta/blue spectrum values for high nighttime pop)
+    "curves=r='0/0 0.5/0.45 1/1':g='0/0 0.5/0.48 1/1':b='0/0 0.5/0.58 1/1',eq=contrast=1.05:saturation=1.12",
+    
+    # Filter 5: Warm Vintage (Gives content an organic, sun-kissed retro 35mm look)
+    "curves=r='0/0 0.5/0.55 1/1':b='0/0 0.5/0.44 1/1',eq=contrast=1.02:saturation=1.04",
+    
+    # Filter 6: Crisp High-Definition (Ultra-sharp texture mapping with pristine midtones)
+    "unsharp=3:3:0.6:3:3:0.6,eq=contrast=1.06:brightness=0.01:saturation=1.04",
+    
+    # Filter 7: Golden Hour (Rich golden ambient hues, perfect for lifestyle and satisfying loops)
+    "eq=contrast=1.04:brightness=0.02:saturation=1.08:gamma=0.98,curves=r='0/0 0.5/0.53 1/1':g='0/0 0.5/0.51 1/1'"
 ]
 chosen_style = random.choice(styles)
 
 # Dynamic exposure flash cut trigger right at the 0.3-second clip exit boundary
 flash_transition = f"eq=brightness='if(gte(t,{p_duration}-0.3), (t-({p_duration}-0.3))*1.5, 0)':contrast='if(gte(t,{p_duration}-0.3), 1+((t-({p_duration}-0.3))*2), 1)'"
 
-# 🔥 TRANSITION GRAPH DESIGN (STABLE HOLD):
-# Completely removed the zoompan expression to keep the main scaled video 100% stable.
-# The ambient blur background (hue='H=t*0.6') and glowing chroma frames (hue='H=t*2.2') remain perfectly active.
+# 🔥 ANTI-STRIP SHIELD: Protect setsar assignment by wrapping it into clean separate layout variables
+sar_val = "setsar=1"
+
+# Advanced 7-Effect Hardware Filtergraph Engine (Fully fixed syntax mapping)
 filter_complex_editing = (
-    f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6'[bg];"
+    f"[0:v]scale=1080:1920,boxblur=25:5,hue='H=t*0.6',vignette=PI/4[bg];"
     f"[0:v]scale=918:1632,{chosen_style},split=2[main_stable1][main_stable2];"
     f"[main_stable1]drawbox=x=0:y=0:w=918:h=1632:color=white:t=14[base_border];"
     f"[base_border]hue='H=t*2.2'[glowing_chroma_border];"
     f"[glowing_chroma_border]scale=926:1640[scaled_border_layer];"
-    f"[bg][scaled_border_layer]overlay=(W-w)/2:(H-h)/2,setsar=1[canvas_joined];"
-    f"[canvas_joined][main_stable2]overlay=(W-w)/2:(H-h)/2,setsar=1[visual_master];"
+    f"[bg][scaled_border_layer]overlay=((W-w)/2)+8*sin(t*2):((H-h)/2)+6*cos(t*1.5),{sar_val}[canvas_joined];"
+    f"[canvas_joined][main_stable2]overlay=((W-w)/2)+8*sin(t*2):((H-h)/2)+6*cos(t*1.5),{sar_val}[visual_master];"
     f"[visual_master]noise=alls=7:allf=t+u,{flash_transition}[v]"
 )
 
@@ -546,7 +444,7 @@ if res1.returncode != 0:
     print(f"❌ Editing phase crashed: {res1.stderr}")
     raise RuntimeError("FFmpeg Editing Canvas Failure")
 
-print("🏆 SUCCESS! Step 1 Complete: Rhythmic chroma borders and environment layers compiled with a stable main video frame.")
+print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 7-Effect Rhythmic Engine.")
 
 
 # ==========================================
@@ -596,8 +494,9 @@ if ret and openrouter_key:
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
 
-        openrouter_target_parts = ["https://", "openrouter.ai", "/api/v1", "/chat/completions"]
-        url = "".join(openrouter_target_parts)
+        # 🔥 FIXED SLASHPACK PROTECTION ARCHITECTURE:
+        protocol_shield = "https" + ":" + chr(47) + chr(47)
+        url = f"{protocol_shield}openrouter.ai/api/v1/chat/completions"
         
         headers = {
             "Authorization": f"Bearer {openrouter_key.strip()}",
@@ -606,45 +505,47 @@ if ret and openrouter_key:
             "X-Title": "Flagship SEO Microservice"
         }
         
-        payload = {
-            "model": "anthropic/claude-3.5-sonnet", # Fixed OpenRouter model naming path
-            "messages": [
-                {
+        # 🔥 MULTI-ENDPOINT CHECKER ARRAY: Iterates through updated OpenRouter identifier strings
+        model_endpoints = ["anthropic/claude-3.5-sonnet:beta", "anthropic/claude-3.5-sonnet-20240620", "anthropic/claude-3.5-sonnet"]
+        response_success = False
+        
+        for current_endpoint in model_endpoints:
+            if response_success: break
+            print(f"📡 Testing model endpoint lane matrix mapping: {current_endpoint}")
+            
+            payload = {
+                "model": current_endpoint, 
+                "messages": [{
                     "role": "user",
                     "content": [
                         {"type": "text", "text": seo_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
-                }
-            ],
-            "temperature": 0.50
-        }
+                }],
+                "temperature": 0.50
+            }
 
-        with requests.Session() as session:
-            session.trust_env = False
-            response = session.post(url, headers=headers, json=payload, timeout=40)
+            with requests.Session() as session:
+                session.trust_env = False
+                response = session.post(url, headers=headers, json=payload, timeout=40)
 
-        if response.status_code == 200:
-            ai_data = response.json()
-            if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_text = ai_data["choices"][0]["message"]["content"].strip()
-                clean_json_text = ai_text.replace('```json', '').replace('```', '').strip()
-                ai_seo_data = json.loads(clean_json_text)
-                
-                seo_metadata = {
-                    "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
-                    "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
-                    "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
-                }
-                print(f"🏆 Flagship Claude 3.5 Sonnet Successful! -> Locked Title: \"{seo_metadata['title']}\"")
-        else:
-            print(f"⚠️ Claude SEO gateway returned status code {response.status_code}: {response.text}")
-            
+            if response.status_code == 200:
+                ai_data = response.json()
+                if "choices" in ai_data and len(ai_data["choices"]) > 0:
+                    ai_text = ai_data["choices"][0]["message"]["content"].strip()
+                    clean_json_text = ai_text.replace('```json', '').replace('```', '').strip()
+                    ai_seo_data = json.loads(clean_json_text)
+                    
+                    seo_metadata = {
+                        "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
+                        "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
+                        "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
+                    }
+                    print(f"🏆 Flagship Claude 3.5 Sonnet Successful via {current_endpoint}! -> Locked Title: \"{seo_metadata['title']}\"")
+                    response_success = True
+            else:
+                print(f"❌ Lane endpoint {current_endpoint} returned code {response.status_code}")
+
     except Exception as claude_fault:
         print(f"⚠️ Flagship visual SEO processing trace challenged: {claude_fault}")
 
