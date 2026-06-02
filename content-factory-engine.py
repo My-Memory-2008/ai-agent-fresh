@@ -446,11 +446,10 @@ if res1.returncode != 0:
 
 print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 7-Effect Rhythmic Engine.")
 
-
 # ==========================================
-# 4b. FREE HIGH-PERFORMANCE VISUAL SEO GENERATOR (ZERO-CREDIT ENGINE)
+# 4b. FREE HIGH-PERFORMANCE ALGORITHMIC REACH VISUAL SEO GENERATOR
 # ==========================================
-print("🧠 Activating Free Tier Visual SEO Generation Matrix via OpenRouter Gateway...")
+print("🧠 Activating Algorithmic Reach SEO Generation Matrix via Free OpenRouter Gateway...")
 import cv2
 import json
 import os
@@ -483,14 +482,15 @@ if ret and openrouter_key:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
 
+        # 🔥 GROWTH-HACKED SEO MULTI-TIER PROMPT: Demands deep search-intent indexing mapping
         seo_prompt = (
             f"You are an elite, viral YouTube Shorts growth master specializing in the hyper-retention Oddly Satisfying and ASMR niches. "
             f"Analyze the visual aesthetics, textures, and details in this video frame from content created by creator @{username}.\n\n"
-            f"Your Task is to output high-performing metadata assets strictly as a valid raw JSON object matching this schema:\n"
+            f"Your Task is to output high-performing metadata assets optimized for search algorithms and recommendation feeds, strictly as a valid raw JSON object matching this schema:\n"
             f"{{\n"
-            f"  \"youtube_title\": \"A highly clickable title under 60 characters targeting deep satisfying curiosity, ending with #shorts\",\n"
-            f"  \"youtube_description\": \"A 3-sentence viral description structure. Sentence 1: A powerful psychological hook about the visual action. Sentence 2: Explain why this loop pattern is fully addictive to watch. Sentence 3: Include the exact string 'Original concept inspired by @{username}' followed by premium trending hashtags.\",\n"
-            f"  \"youtube_tags\": [\"exactly\", \"six\", \"high\", \"traffic\", \"viral\", \"keywords\"]\n"
+            f"  \"youtube_title\": \"An algorithmic double-hook title under 60 characters. Combine a high-volume search term discovered in the image (like 'Sand Art', 'Kinetic Sand', 'Satisfying ASMR') with a high-curiosity phrase (e.g., 'This feels illegal to watch', 'Watch till the loop resets'). End strictly with #shorts\",\n"
+            f"  \"youtube_description\": \"A 4-sentence search-intent description structure. Sentence 1: A powerful psychological hook explaining the visual texture action on screen. Sentence 2: Pad heavily with broad and niche semantic search phrases that users search for (e.g., 'oddly satisfying kinetic sand art compilation', 'relaxing sand layering ASMR', 'stress relief loops'). Sentence 3: Include the exact string 'Original concept inspired by @{username}'. Sentence 4: Append 5 high-velocity trending community hashtags centered on the niche.\",\n"
+            f"  \"youtube_tags\": [\"Include exactly 12 viral tags: 4 broad tags, 4 niche sand-specific tags, and 4 high-traffic community search phrases\"]\n"
             f"}}\n\n"
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
@@ -503,22 +503,20 @@ if ret and openrouter_key:
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Free SEO Microservice"
+            "X-Title": "Algorithmic SEO Microservice"
         }
         
-        # 🔥 ZERO-CREDIT FREE VISION ENDPOINTS MATRIX:
-        # Uses high-reputation free vision models to bypass 402 payment requirements completely
+        # Free vision tier matrix map
         model_endpoints = [
-            "google/gemini-flash-1.5-8b",
-            "google/gemini-2.5-flash",
             "meta-llama/llama-3.2-11b-vision-instruct",
-            "google/gemini-pro-1.5"
+            "google/gemini-2.5-flash",
+            "google/gemini-flash-1.5-8b"
         ]
         response_success = False
         
         for current_endpoint in model_endpoints:
             if response_success: break
-            print(f"📡 Testing free model endpoint lane: {current_endpoint}")
+            print(f"📡 Testing algorithmic reach endpoint lane: {current_endpoint}")
             
             payload = {
                 "model": current_endpoint, 
@@ -529,7 +527,7 @@ if ret and openrouter_key:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }],
-                "temperature": 0.50
+                "temperature": 0.65 # Slightly raised temperature to generate more creative, viral hook options
             }
 
             with requests.Session() as session:
@@ -539,7 +537,7 @@ if ret and openrouter_key:
             if response.status_code == 200:
                 ai_data = response.json()
                 if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                    ai_text = ai_data["choices"][0]["message"]["content"].strip()
+                    ai_text = ai_data["choices"]["message"]["content"].strip()
                     clean_json_text = ai_text.replace('```json', '').replace('```', '').strip()
                     ai_seo_data = json.loads(clean_json_text)
                     
@@ -548,21 +546,22 @@ if ret and openrouter_key:
                         "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
                         "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
                     }
-                    print(f"🏆 Free Tier AI Processing Successful via {current_endpoint}! -> Locked Title: \"{seo_metadata['title']}\"")
+                    print(f"🚀 Algorithmic SEO Complete via {current_endpoint}!")
+                    print(f" Locked Title: \"{seo_metadata['title']}\"")
                     response_success = True
             else:
                 print(f"❌ Lane endpoint {current_endpoint} returned code {response.status_code}")
 
     except Exception as seo_fault:
-        print(f"⚠️ Free tier visual SEO processing trace challenged: {seo_fault}")
+        print(f"⚠️ Algorithmic reach processing trace challenged: {seo_fault}")
 
 import torch
 torch.cuda.empty_cache()
 
-# Write metadata array to local drive manifest for automated uploading steps later
+# Write expanded reach metadata array to local drive manifest file
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-print("✅ Section 4b Visual SEO Meta Processing Finished Safely.")
+print("✅ Section 4b Extended Reach SEO Meta Processing Finished Safely.")
 
 
 
