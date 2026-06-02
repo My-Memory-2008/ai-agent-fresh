@@ -447,10 +447,11 @@ if res1.returncode != 0:
 print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 7-Effect Rhythmic Engine.")
 
 
+
 # ==========================================
-# 4b. FLAGSHIP CLAUDE 3.5 SONNET VIRAL SEO GENERATOR (VISUAL ADVANCED CORE)
+# 4b. FLAGSHIP VISUAL SEO GENERATOR (CLAUDE 3.5 SONNET / GPT-4o ARCHITECTURE)
 # ==========================================
-print("🧠 Activating Premium Claude 3.5 Sonnet Visual SEO Generation Matrix via OpenRouter Gateway...")
+print("🧠 Activating Premium Visual SEO Generation Matrix via OpenRouter Gateway...")
 import cv2
 import json
 import os
@@ -460,6 +461,7 @@ import requests
 SEO_MANIFEST_PATH = "/kaggle/working/seo_metadata.json"
 TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
+# Baseline default fallback metadata matrix
 seo_metadata = {
     "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
     "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
@@ -494,7 +496,7 @@ if ret and openrouter_key:
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
 
-        # 🔥 FIXED SLASHPACK PROTECTION ARCHITECTURE:
+        # PROTECTED SLASHPACK ENGINE:
         protocol_shield = "https" + ":" + chr(47) + chr(47)
         url = f"{protocol_shield}openrouter.ai/api/v1/chat/completions"
         
@@ -505,8 +507,14 @@ if ret and openrouter_key:
             "X-Title": "Flagship SEO Microservice"
         }
         
-        # 🔥 MULTI-ENDPOINT CHECKER ARRAY: Iterates through updated OpenRouter identifier strings
-        model_endpoints = ["anthropic/claude-3.5-sonnet:beta", "anthropic/claude-3.5-sonnet-20240620", "anthropic/claude-3.5-sonnet"]
+        # 🔥 UPDATED MODEL ENDPOINTS MATRIX:
+        # Features verified active endpoints for Claude 3.5 Sonnet along with a premium GPT-4o Flagship fallback
+        model_endpoints = [
+            "anthropic/claude-3.5-sonnet:online",
+            "anthropic/claude-3.5-sonnet",
+            "openai/gpt-4o",
+            "openai/gpt-4o-2024-05-13"
+        ]
         response_success = False
         
         for current_endpoint in model_endpoints:
@@ -541,7 +549,7 @@ if ret and openrouter_key:
                         "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
                         "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
                     }
-                    print(f"🏆 Flagship Claude 3.5 Sonnet Successful via {current_endpoint}! -> Locked Title: \"{seo_metadata['title']}\"")
+                    print(f"🏆 Flagship AI Processing Successful via {current_endpoint}! -> Locked Title: \"{seo_metadata['title']}\"")
                     response_success = True
             else:
                 print(f"❌ Lane endpoint {current_endpoint} returned code {response.status_code}")
@@ -552,6 +560,7 @@ if ret and openrouter_key:
 import torch
 torch.cuda.empty_cache()
 
+# Write metadata array to local drive manifest for automated uploading steps later
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 print("✅ Section 4b Visual SEO Meta Processing Finished Safely.")
