@@ -446,6 +446,9 @@ if res1.returncode != 0:
 
 print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 7-Effect Rhythmic Engine.")
 
+
+
+
 # ==========================================
 # 4b. FREE HIGH-PERFORMANCE ALGORITHMIC REACH VISUAL SEO GENERATOR
 # ==========================================
@@ -482,7 +485,6 @@ if ret and openrouter_key:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
 
-        # 🔥 GROWTH-HACKED SEO MULTI-TIER PROMPT: Demands deep search-intent indexing mapping
         seo_prompt = (
             f"You are an elite, viral YouTube Shorts growth master specializing in the hyper-retention Oddly Satisfying and ASMR niches. "
             f"Analyze the visual aesthetics, textures, and details in this video frame from content created by creator @{username}.\n\n"
@@ -490,7 +492,7 @@ if ret and openrouter_key:
             f"{{\n"
             f"  \"youtube_title\": \"An algorithmic double-hook title under 60 characters. Combine a high-volume search term discovered in the image (like 'Sand Art', 'Kinetic Sand', 'Satisfying ASMR') with a high-curiosity phrase (e.g., 'This feels illegal to watch', 'Watch till the loop resets'). End strictly with #shorts\",\n"
             f"  \"youtube_description\": \"A 4-sentence search-intent description structure. Sentence 1: A powerful psychological hook explaining the visual texture action on screen. Sentence 2: Pad heavily with broad and niche semantic search phrases that users search for (e.g., 'oddly satisfying kinetic sand art compilation', 'relaxing sand layering ASMR', 'stress relief loops'). Sentence 3: Include the exact string 'Original concept inspired by @{username}'. Sentence 4: Append 5 high-velocity trending community hashtags centered on the niche.\",\n"
-            f"  \"youtube_tags\": [\"Include exactly 12 viral tags: 4 broad tags, 4 niche sand-specific tags, and 4 high-traffic community search phrases\"]\n"
+            f"  \"youtube_tags\": [\"broad_tag\", \"niche_tag\", \"viral_tag\", \"asmr_tag\"]\n"
             f"}}\n\n"
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
@@ -506,7 +508,6 @@ if ret and openrouter_key:
             "X-Title": "Algorithmic SEO Microservice"
         }
         
-        # Free vision tier matrix map
         model_endpoints = [
             "meta-llama/llama-3.2-11b-vision-instruct",
             "google/gemini-2.5-flash",
@@ -527,7 +528,7 @@ if ret and openrouter_key:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }],
-                "temperature": 0.65 # Slightly raised temperature to generate more creative, viral hook options
+                "temperature": 0.65
             }
 
             with requests.Session() as session:
@@ -536,8 +537,9 @@ if ret and openrouter_key:
 
             if response.status_code == 200:
                 ai_data = response.json()
+                # 🔥 FIXED: Added explicit choice list index unboxing [0] to parse dict blocks safely
                 if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                    ai_text = ai_data["choices"]["message"]["content"].strip()
+                    ai_text = ai_data["choices"][0]["message"]["content"].strip()
                     clean_json_text = ai_text.replace('```json', '').replace('```', '').strip()
                     ai_seo_data = json.loads(clean_json_text)
                     
@@ -562,6 +564,7 @@ torch.cuda.empty_cache()
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 print("✅ Section 4b Extended Reach SEO Meta Processing Finished Safely.")
+
 
 
 
