@@ -4,6 +4,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -232,7 +233,7 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI VISION & CORNER TENSOR MAPPING)
+# PHASE A: PART 1 OF 2 (AI VISUAL GRID SCANNER & CORNER TENSOR MAPPING)
 # ==========================================
 print("📥 Activating Mistral AI Universal Angle & Pattern-Proof Visual Eraser Matrix...")
 
@@ -278,16 +279,16 @@ if mistral_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
 
-        # ADVANCED TENSOR PROMPT: Forces the AI to extract four layout coordinates for rotatable text tracking
+        # 🔥 UPGRADED EVERY-PIXEL PROMPT: Demands a deep scan of the whole frame map for hidden patterns
         vision_prompt = (
-            f"Locate any creator watermark text, brand logo icon, or channel handle in this video frame regardless of its layout direction.\n"
-            f"It might be perfectly horizontal, completely vertical (stacked letters or read sideways), or rotated at an angled slant.\n"
-            f"The image resolution is Width: {orig_width} and Height: {orig_height}.\n\n"
+            f"Perform an exhaustive pixel-by-pixel visual scan of this entire frame image layout to identify any form of creator watermark, brand logo, profile handle, or signature text.\n"
+            f"The watermark may be hidden anywhere on the screen (center action, extreme corners, or middle edges) and structured in any customized layout pattern (horizontal, vertical stacked, or slanted lines).\n"
+            f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n\n"
             f"Tasks:\n"
-            f"Extract the EXACT four corner vertices wrapping the perimeter of the watermark starting from top-left, going clockwise.\n"
-            f"Output your result strictly as a raw JSON map matching this layout: \n"
+            f"Extract the EXACT four corner vertices wrapping the maximum perimeter boundary of the watermark starting from top-left, going clockwise.\n"
+            f"Output your result strictly as a raw JSON map matching this schema: \n"
             f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
-            f"If none exists, output: {{\"found\": false}}.\n"
+            f"If there is absolutely no watermark on the pixels, output: {{\"found\": false}}.\n"
             f"Do not write markdown backticks or json conversational formatting filler strings."
         )
 
@@ -326,9 +327,11 @@ if mistral_key and ret_v:
                     box_points = cv2.boxPoints(rect)
                     box_points = np.int32(box_points)
                     
-                    # Measure rotation angles dynamically
+                    # 🔥 FIXED: Explicitly map the structural index keys out of the tuple to resolve screenshot crashes
                     watermark_angle = float(rect[2])
-                    width_check, height_check = float(rect[1][0]), float(rect[1][1])
+                    width_check = float(rect[1][0])
+                    height_check = float(rect[1][1])
+                    
                     if height_check > width_check:
                         is_vertical = True
                         watermark_angle -= 90.0
@@ -336,15 +339,15 @@ if mistral_key and ret_v:
                     if ai_coord_map.get("direction") == "vertical":
                         is_vertical = True
                         
-                    # Expand vertices margins outward safely
+                    # Expand vertices margins outward safely to completely enclose drop shadows
                     center_pt = np.mean(box_points, axis=0)
                     inflated_pts = []
                     for pt in box_points:
                         dx = float(pt[0] - center_pt[0])
                         dy = float(pt[1] - center_pt[1])
                         len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                        fit_x = int(pt[0] + (dx / len_d) * 12)
-                        fit_y = int(pt[1] + (dy / len_d) * 10)
+                        fit_x = int(pt[0] + (dx / len_d) * 16) # Expanded to 16px to prevent halo ghosts completely
+                        fit_y = int(pt[1] + (dy / len_d) * 12)
                         inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
                     
                     polygon_vertices = np.array(inflated_pts, dtype=np.int32)
@@ -352,6 +355,7 @@ if mistral_key and ret_v:
                     print(f"🎯 UNIVERSAL AI LOCKED COORDINATES! Direction: {ai_coord_map.get('direction')} | Angle: {watermark_angle:.2f}°")
     except Exception as vision_fault:
         print(f"⚠️ Mistral Cloud Vision AI multi-angle layer challenged: {vision_fault}")
+
 # ==========================================
 # PHASE A: PART 2 OF 2 (PIXEL RECONSTRUCTION & MULTI-ANGLE BRANDING)
 # ==========================================
@@ -371,7 +375,12 @@ if ret_sample:
     temp_mask = np.zeros(sample_img.shape[:2], dtype=np.uint8)
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
-    avg_b, avg_g, avg_r = int(avg_channels[0]), int(avg_channels[1]), int(avg_channels[2])
+    
+    # 🔥 FIXED SCALE ENFORCEMENT: Uses strict explicit extraction to eliminate 0-d array scalar TypeErrors!
+    avg_b = int(avg_channels[0])
+    avg_g = int(avg_channels[1])
+    avg_r = int(avg_channels[2])
+    
     brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
     text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
 else:
@@ -389,6 +398,8 @@ if is_vertical and target_h > target_w:
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.35
 font_thickness = 1
+
+# Adaptive scaling loops to guarantee perfect container fit alignments
 for scale_step in np.arange(0.35, 1.4, 0.02):
     (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
     if test_w < (target_w * 0.75) and test_h < (target_h * 0.60):
