@@ -356,8 +356,9 @@ if mistral_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Mistral Cloud Vision AI multi-angle layer challenged: {vision_fault}")
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (PIXEL RECONSTRUCTION & MULTI-ANGLE BRANDING)
+# PHASE A: PART 2 OF 2 (ADVANCED MORPHOLOGICAL INPAINTER ENGINE)
 # ==========================================
 
 # --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
@@ -376,7 +377,7 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # 🔥 FIXED SCALE ENFORCEMENT: Uses strict explicit extraction to eliminate 0-d array scalar TypeErrors!
+    # Pristine explicit color channels extraction to prevent 0-d array scalar TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -411,10 +412,18 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 1. Clear out original watermark using polygon mask fill layers
+    # 1. 🔥 UPGRADE: MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
+    # Generates a clean canvas mask of Mistral's polygon points
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
-    healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
+    
+    # Dilate the polygon mask outward evenly across ALL angles using an elliptical kernel matrix
+    # This expands the erasure zone by an extra 18 pixels, completely swallowing hidden shadows or halos!
+    dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (18, 18))
+    inflated_mask = cv2.dilate(raw_mask, dilation_kernel, iterations=1)
+    
+    # Execute fast marching Telea inpainting on the expanded mask to erase the text cleanly
+    healed_frame = cv2.inpaint(frame, inflated_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
     # 2. Overlay color-matched matte patch seamlessly over the original polygon mask vertices
     overlay_roi = healed_frame.copy()
