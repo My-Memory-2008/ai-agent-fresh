@@ -233,9 +233,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI VISUAL GRID SCANNER & CORNER TENSOR MAPPING)
+# PHASE A: PART 1 OF 2 (FLAGSHIP GPT-4o LARGE TENSOR LOCATION MATRIX)
 # ==========================================
-print("📥 Activating Mistral AI Universal Angle & Pattern-Proof Visual Eraser Matrix...")
+print("📥 Activating Flagship OpenAI GPT-4o Large Cloud Vision Object-Tracking Tensor Matrix...")
 
 import os
 import re
@@ -254,7 +254,6 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Sample frame markers for localized processing routines
 sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
 cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
@@ -269,96 +268,109 @@ watermark_detected = False
 watermark_angle = 0.0
 is_vertical = False
 
-mistral_key = secrets.get_secret("MISTRAL_API_KEY")
+openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-if mistral_key and ret_v:
+# High-precision prompt commanding the flagship models to execute a multi-directional pixel trace
+vision_prompt = (
+    f"Perform a meticulous scan of this entire frame to locate any creator watermark text, social media handle, logo, or channel stamp.\n"
+    f"It may be positioned anywhere on the screen and oriented horizontally, vertically, or at a complex diagonal angle slant.\n"
+    f"The exact image resolution is Width: {orig_width} and Height: {orig_height}.\n\n"
+    f"Tasks:\n"
+    f"Identify the precise four corners enclosing the entire boundary perimeter of the watermark starting from top-left, going clockwise.\n"
+    f"Output your result strictly as a raw JSON map matching this schema: \n"
+    f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
+    f"If absolutely no watermark pattern is found on the pixels, output: {{\"found\": false}}.\n"
+    f"Do not write markdown ticks, json code block headers, or conversational text filling lines."
+)
+
+ai_response_text = None
+
+# --- CORE ENGINE: FLAGSHIP OPENROUTER GPT-4o (LARGE) VISION ENGINE ---
+if openrouter_key and ret_v:
+    print("📡 Querying OpenRouter Core Gateway for Flagship OpenAI GPT-4o (Large Asset)...")
     try:
-        TEMP_SCAN_JPG = "/kaggle/working/watermark_mistral_layer.jpg"
+        TEMP_SCAN_JPG = "/kaggle/working/watermark_gpt4o_layer.jpg"
         cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
         with open(TEMP_SCAN_JPG, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
-
-        # 🔥 UPGRADED EVERY-PIXEL PROMPT: Demands a deep scan of the whole frame map for hidden patterns
-        vision_prompt = (
-            f"Perform an exhaustive pixel-by-pixel visual scan of this entire frame image layout to identify any form of creator watermark, brand logo, profile handle, or signature text.\n"
-            f"The watermark may be hidden anywhere on the screen (center action, extreme corners, or middle edges) and structured in any customized layout pattern (horizontal, vertical stacked, or slanted lines).\n"
-            f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n\n"
-            f"Tasks:\n"
-            f"Extract the EXACT four corner vertices wrapping the maximum perimeter boundary of the watermark starting from top-left, going clockwise.\n"
-            f"Output your result strictly as a raw JSON map matching this schema: \n"
-            f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
-            f"If there is absolutely no watermark on the pixels, output: {{\"found\": false}}.\n"
-            f"Do not write markdown backticks or json conversational formatting filler strings."
-        )
-
-        endpoint_parts = ["https://", "api.mistral.ai", "/v1", "/chat/completions"]
-        url = "".join(endpoint_parts)
+            
+        url_parts = ["https://", "openrouter.ai", "/api/v1", "/chat/completions"]
+        url = "".join(url_parts)
         
-        headers = {"Authorization": f"Bearer {mistral_key.strip()}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {openrouter_key.strip()}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://kaggle.com"
+        }
         payload = {
-            "model": "pixtral-12b",
+            "model": "openai/gpt-4o",  # Force-routed directly to OpenAI's largest flagship intelligence core
             "messages": [{"role": "user", "content": [{"type": "text", "text": vision_prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}],
-            "temperature": 0.0,
-            "response_format": {"type": "json_object"}
+            "temperature": 0.0
         }
         
         with requests.Session() as session:
             session.trust_env = False
             response = session.post(url, headers=headers, json=payload, timeout=35)
-        
+            
         if response.status_code == 200:
             ai_data = response.json()
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_text = ai_data["choices"][0]["message"]["content"].strip()
-                ai_coord_map = json.loads(ai_text)
+                ai_response_text = ai_data["choices"][0]["message"]["content"].strip()
+                print("🎉 OpenAI GPT-4o flagship response retrieved successfully.")
+        else:
+            print(f"⚠️ OpenRouter return status error {response.status_code}: {response.text}")
+    except Exception as gpt_fault:
+        print(f"⚠️ GPT-4o cloud gateway challenged: {gpt_fault}")
+
+# --- LAYER 2: COORDINATE TENSOR PROCESSING INTERFACE ---
+if ai_response_text:
+    try:
+        clean_json = ai_response_text.strip().replace('```json', '').replace('```', '').strip()
+        ai_coord_map = json.loads(clean_json)
+        
+        if ai_coord_map.get("found") is True:
+            p1 = ai_coord_map.get("p1")
+            p2 = ai_coord_map.get("p2")
+            p3 = ai_coord_map.get("p3")
+            p4 = ai_coord_map.get("p4")
+            
+            raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
+            rect = cv2.minAreaRect(raw_pts)
+            box_points = cv2.boxPoints(rect)
+            box_points = np.int32(box_points)
+            
+            # Extract rotation parameters cleanly out of the tuple layout indices
+            watermark_angle = float(rect[2])
+            width_check = float(rect[1][0])
+            height_check = float(rect[1][1])
+            
+            if height_check > width_check:
+                is_vertical = True
+                watermark_angle -= 90.0
+            if ai_coord_map.get("direction") == "vertical":
+                is_vertical = True
                 
-                if ai_coord_map.get("found") is True:
-                    # Unpack 4-point visual boundary polygon vertices out of the dictionary matrix
-                    p1 = ai_coord_map.get("p1")
-                    p2 = ai_coord_map.get("p2")
-                    p3 = ai_coord_map.get("p3")
-                    p4 = ai_coord_map.get("p4")
-                    
-                    raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
-                    
-                    # PROGRESSIVE TENSOR SHELL EXPANSION:
-                    rect = cv2.minAreaRect(raw_pts)
-                    box_points = cv2.boxPoints(rect)
-                    box_points = np.int32(box_points)
-                    
-                    # 🔥 FIXED: Explicitly map the structural index keys out of the tuple to resolve screenshot crashes
-                    watermark_angle = float(rect[2])
-                    width_check = float(rect[1][0])
-                    height_check = float(rect[1][1])
-                    
-                    if height_check > width_check:
-                        is_vertical = True
-                        watermark_angle -= 90.0
-                    
-                    if ai_coord_map.get("direction") == "vertical":
-                        is_vertical = True
-                        
-                    # Expand vertices margins outward safely to completely enclose drop shadows
-                    center_pt = np.mean(box_points, axis=0)
-                    inflated_pts = []
-                    for pt in box_points:
-                        dx = float(pt[0] - center_pt[0])
-                        dy = float(pt[1] - center_pt[1])
-                        len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                        fit_x = int(pt[0] + (dx / len_d) * 16) # Expanded to 16px to prevent halo ghosts completely
-                        fit_y = int(pt[1] + (dy / len_d) * 12)
-                        inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
-                    
-                    polygon_vertices = np.array(inflated_pts, dtype=np.int32)
-                    watermark_detected = True
-                    print(f"🎯 UNIVERSAL AI LOCKED COORDINATES! Direction: {ai_coord_map.get('direction')} | Angle: {watermark_angle:.2f}°")
-    except Exception as vision_fault:
-        print(f"⚠️ Mistral Cloud Vision AI multi-angle layer challenged: {vision_fault}")
+            center_pt = np.mean(box_points, axis=0)
+            inflated_pts = []
+            for pt in box_points:
+                dx = float(pt[0] - center_pt[0])
+                dy = float(pt[1] - center_pt[1])
+                len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
+                # Applied deep spatial padding inflation shell to completely block letter trace bleeding leaks
+                fit_x = int(pt[0] + (dx / len_d) * 18) 
+                fit_y = int(pt[1] + (dy / len_d) * 14)
+                inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
+            
+            polygon_vertices = np.array(inflated_pts, dtype=np.int32)
+            watermark_detected = True
+            print(f"🎯 FLAGSHIP AI METRIC SUCCESS! Direction Pattern: {ai_coord_map.get('direction')} | Precise Angle: {watermark_angle:.2f}°")
+    except Exception as data_fault:
+        print(f"⚠️ Visual data parsing trace bypassed: {data_fault}")
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (ADVANCED MORPHOLOGICAL INPAINTER ENGINE)
+# PHASE A: PART 2 OF 2 (FLAGSHIP MORPHOLOGICAL PIXEL RECONSTRUCTION ENGINE)
 # ==========================================
 
 # --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
@@ -412,8 +424,7 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 1. 🔥 UPGRADE: MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
-    # Generates a clean canvas mask of Mistral's polygon points
+    # 1. MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
@@ -484,7 +495,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Universal Multi-Angle Watermark erasure loop finalized flawlessly.")
+print("✅ Phase A Complete: Flagship OpenAI GPT-4o Large Multi-Angle Watermark erasure loop finalized flawlessly.")
 
 
 
