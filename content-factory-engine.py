@@ -497,12 +497,13 @@ if ret and openrouter_key:
             f"Generate a broad-audience SEO packet strictly as a valid raw JSON object matching this schema:\n"
             f"{{\n"
             f"  \"youtube_title\": \"Choose ONLY ONE of these human formats, customized to the action you see: 'This video literally resets your brain chemistry 🤯 #shorts', 'Why does this loop feel so illegal to watch? #shorts', 'I can physically feel this video right now #shorts', or 'Watch the exact second it clicks #shorts'. Do not deviate from this natural style.\",\n"
-            f"  \"youtube_description\": \"Write a massive 4-sentence creator description to reach broad search traffic pools. Sentence 1: A short, dramatic human statement about watching this texture get cut or mixed. Sentence 2: A list of long-tail search phrases that real humans ACTUALLY TYPE into search bars when they can't sleep (e.g., 'oddly satisfying kinetic sand cutting video', 'relaxing sand layering compilation', 'satisfying tapping sound therapy loop', 'sleep aid asmr triggers'). Sentence 3: Include the mandatory link line: 'Original concept inspired by @{username}'. Sentence 4: Add 5 trending casual community hashtags (e.g., #kineticsand #satisfying #asmr #oddlysatisfying #relaxing).\",\n"
+            f"  \"youtube_description\": \"Write a massive 4-sentence creator description to reach broad search traffic pools. Sentence 1: A short, dramatic human statement about watching this texture get cut or mixed. Sentence 2: A list of long-tail search phrases that real humans ACTUALLY TYPE into search bars when they can't sleep (e.g., 'oddly satisfying kinetic sand cutting video', 'relaxing sand layering compilation', 'satisfying tapping sound therapy loop', 'sleep aid asmr triggers'). Sentence 3: Include the exact mandatory link line: 'Original concept inspired by @{username}'. Sentence 4: Add 5 trending casual community hashtags (e.g., #kineticsand #satisfying #asmr #oddlysatisfying #relaxing).\",\n"
             f"  \"youtube_tags\": [\"Provide exactly 15 flat search tags. They must be lowercase phrases that normal people search for. Mix broad categories with long human lines like 'videos to help you fall asleep', 'satisfying clips for when you are bored', 'kinetic sand satisfying slicing', 'relaxing asmr sounds for sleep'. Do not combine tags into corporate keywords.\"]\n"
             f"}}\n\n"
-            f"CRITICAL: Output raw JSON syntax blocks only. Do not wrap in markdown code blocks. Start your response directly with the open curly bracket."
+            f"CRITICAL: Output raw JSON syntax blocks only. Start your response directly with the open curly bracket."
         )
 
+        # PROTECTED SLASHPACK SHIELD:
         protocol_shield = "https" + ":" + chr(47) + chr(47)
         url = f"{protocol_shield}openrouter.ai/api/v1/chat/completions"
         
@@ -513,10 +514,11 @@ if ret and openrouter_key:
             "X-Title": "Humanized SEO Microservice"
         }
         
+        # 🔥 FIXED ZERO-CREDIT FREE ENDPOINTS: Added explicit ":free" routing models
         model_endpoints = [
-            "meta-llama/llama-3.2-11b-vision-instruct",
-            "google/gemini-2.5-flash",
-            "google/gemini-flash-1.5-8b"
+            "google/gemini-2.5-flash:free",
+            "meta-llama/llama-3.2-11b-vision-instruct:free",
+            "google/gemini-2.5-pro:free"
         ]
         response_success = False
         
@@ -533,7 +535,7 @@ if ret and openrouter_key:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }],
-                "temperature": 0.40  # 🔥 FIXED: Kept low to keep the AI disciplined and force accurate JSON format
+                "temperature": 0.30  # Kept low to guarantee rigid JSON alignment
             }
 
             with requests.Session() as session:
@@ -545,22 +547,25 @@ if ret and openrouter_key:
                 if "choices" in ai_data and len(ai_data["choices"]) > 0:
                     ai_text = ai_data["choices"][0]["message"]["content"].strip()
                     
-                    # 🔥 FIXED: Regex Bracket Stripper extracts the JSON segment even if the AI added conversational filler text!
-                    json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
-                    if json_match:
-                        clean_json_text = json_match.group(0)
-                        ai_seo_data = json.loads(clean_json_text)
-                        
-                        seo_metadata = {
-                            "title": ai_seo_data.get('youtube_title', seo_metadata["title"]),
-                            "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
-                            "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
-                        }
-                        print(f"🚀 Human Creator SEO Mapping Complete via {current_endpoint}!")
-                        print(f" Locked Title: \"{seo_metadata['title']}\"")
-                        response_success = True
-                    else:
-                        print("⚠️ Regex was unable to find raw structural JSON borders in response text.")
+                    # Clean out markdown wrapper boundaries if they exist
+                    if ai_text.startswith("```"):
+                        ai_text = re.sub(r'^```[a-zA-Z]*\n|```$', '', ai_text, flags=re.MULTILINE).strip()
+                    
+                    ai_seo_data = json.loads(ai_text)
+                    
+                    # Target both uppercase and lowercase potential variations safely
+                    title_key = 'youtube_title' if 'youtube_title' in ai_seo_data else 'title'
+                    desc_key = 'youtube_description' if 'youtube_description' in ai_seo_data else 'description'
+                    tags_key = 'youtube_tags' if 'youtube_tags' in ai_seo_data else 'tags'
+                    
+                    seo_metadata = {
+                        "title": ai_seo_data.get(title_key, seo_metadata["title"]),
+                        "description": ai_seo_data.get(desc_key, seo_metadata["description"]),
+                        "tags": ai_seo_data.get(tags_key, seo_metadata["tags"])
+                    }
+                    print(f"🚀 Human Creator SEO Mapping Complete via {current_endpoint}!")
+                    print(f" Locked Title: \"{seo_metadata['title']}\"")
+                    response_success = True
             else:
                 print(f"❌ Lane endpoint {current_endpoint} returned code {response.status_code}")
 
@@ -573,7 +578,6 @@ torch.cuda.empty_cache()
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
 print("✅ Section 4b Extended Human SEO Meta Processing Finished Safely.")
-
 
 
 
