@@ -448,11 +448,10 @@ print("🏆 SUCCESS! Step 1 Complete: 7 Core Filters mapped seamlessly onto the 
 
 
 
-
 # ==========================================
-# 4b. FREE HIGH-PERFORMANCE ALGORITHMIC REACH VISUAL SEO GENERATOR
+# 4b. HUMAN-STYLE BROAD-REACH VISUAL SEO GENERATOR (ZERO AI-WORDS FILTER)
 # ==========================================
-print("🧠 Activating Algorithmic Reach SEO Generation Matrix via Free OpenRouter Gateway...")
+print("🧠 Activating Human-Style Broad-Reach SEO Matrix Matrix via Free OpenRouter Gateway...")
 import cv2
 import json
 import os
@@ -464,9 +463,9 @@ TEMP_FRAME_PATH = "/kaggle/working/seo_temp_frame.jpg"
 
 # Baseline default fallback metadata matrix
 seo_metadata = {
-    "title": "Most Oddly Satisfying ASMR Challenge! 🤯 #shorts",
-    "description": "Wait till the end for the funny cat reaction loop! Original concept inspired by creator. #shorts #asmr",
-    "tags": ["satisfying", "asmr", "shorts", "relaxing"]
+    "title": "This video text resets your brain chemistry 🤯 #shorts",
+    "description": "Watch until the sand loop perfectly resets itself. Original concept inspired by creator. #shorts #asmr #satisfying",
+    "tags": ["satisfying", "asmr", "shorts", "relaxing", "kineticsand", "oddlysatisfying"]
 }
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
@@ -485,14 +484,16 @@ if ret and openrouter_key:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_FRAME_PATH): os.remove(TEMP_FRAME_PATH)
 
+        # 🔥 HUMAN-STYLE PROMPT MATRIX: BANS ALL AI MARKETING WORDS COMPLETELY
         seo_prompt = (
-            f"You are an elite, viral YouTube Shorts growth master specializing in the hyper-retention Oddly Satisfying and ASMR niches. "
-            f"Analyze the visual aesthetics, textures, and details in this video frame from content created by creator @{username}.\n\n"
-            f"Your Task is to output high-performing metadata assets optimized for search algorithms and recommendation feeds, strictly as a valid raw JSON object matching this schema:\n"
+            f"You are a viral YouTube Shorts creator running a multi-million subscriber oddly satisfying and ASMR channel. "
+            f"Examine the physical texture, action, and object inside this video frame created by @{username}.\n\n"
+            f"CRITICAL RULE: DO NOT use robotic AI words like 'mesmerizing', 'captivating', 'dance of colors', 'visual journey', 'symphony', 'testament', 'delight', or 'spectacular'. Write exactly like a real human creator writing a viral hook.\n\n"
+            f"Generate a broad-audience SEO packet strictly as a valid raw JSON object matching this schema:\n"
             f"{{\n"
-            f"  \"youtube_title\": \"An algorithmic double-hook title under 60 characters. Combine a high-volume search term discovered in the image (like 'Sand Art', 'Kinetic Sand', 'Satisfying ASMR') with a high-curiosity phrase (e.g., 'This feels illegal to watch', 'Watch till the loop resets'). End strictly with #shorts\",\n"
-            f"  \"youtube_description\": \"A 4-sentence search-intent description structure. Sentence 1: A powerful psychological hook explaining the visual texture action on screen. Sentence 2: Pad heavily with broad and niche semantic search phrases that users search for (e.g., 'oddly satisfying kinetic sand art compilation', 'relaxing sand layering ASMR', 'stress relief loops'). Sentence 3: Include the exact string 'Original concept inspired by @{username}'. Sentence 4: Append 5 high-velocity trending community hashtags centered on the niche.\",\n"
-            f"  \"youtube_tags\": [\"broad_tag\", \"niche_tag\", \"viral_tag\", \"asmr_tag\"]\n"
+            f"  \"youtube_title\": \"A short, punchy, human title under 55 characters. Use conversational brain-scratch hooks like: 'This video literally resets your brain', 'Why does this loop feel so illegal to watch?', 'I can physically smell/feel this video', or 'Watch the exact second it loops'. End strictly with #shorts\",\n"
+            f"  \"youtube_description\": \"Write a massive, 4-sentence, human-style description to index for all possible search algorithms. Sentence 1: A highly relatable human reaction hook about watching this texture get cut/crushed/mixed. Sentence 2: Pack it heavily with raw terms humans actually type when searching (e.g., 'oddly satisfying kinetic sand sorting video', 'deep sleep sound therapy loop', 'satisfying slime scooping ASMR compilation', 'anxiety relief tapping noises'). Sentence 3: Include the exact mandatory credit link string: 'Original concept inspired by @{username}'. Sentence 4: Include 5 massive high-traffic community hashtags across the niche.\",\n"
+            f"  \"youtube_tags\": [\"Provide exactly 15 flat string keywords. Mix massive generic terms (asmr, satisfying, relaxing) with exact texture terms found in the image, and human search intent phrases like 'videos to fall asleep to', 'satisfying loops for anxiety', 'satisfying sorting clips'.\"]\n"
             f"}}\n\n"
             f"CRITICAL: Do not write conversational filler, markdown formatting ticks like ```json, or intro notes. Output raw JSON syntax blocks only."
         )
@@ -505,7 +506,7 @@ if ret and openrouter_key:
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Algorithmic SEO Microservice"
+            "X-Title": "Humanized SEO Microservice"
         }
         
         model_endpoints = [
@@ -517,7 +518,7 @@ if ret and openrouter_key:
         
         for current_endpoint in model_endpoints:
             if response_success: break
-            print(f"📡 Testing algorithmic reach endpoint lane: {current_endpoint}")
+            print(f"📡 Testing humanized algorithmic endpoint lane: {current_endpoint}")
             
             payload = {
                 "model": current_endpoint, 
@@ -528,7 +529,7 @@ if ret and openrouter_key:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }],
-                "temperature": 0.65
+                "temperature": 0.85 # Higher temperature splits predictable choices to ensure creative, human slang phrases
             }
 
             with requests.Session() as session:
@@ -537,7 +538,6 @@ if ret and openrouter_key:
 
             if response.status_code == 200:
                 ai_data = response.json()
-                # 🔥 FIXED: Added explicit choice list index unboxing [0] to parse dict blocks safely
                 if "choices" in ai_data and len(ai_data["choices"]) > 0:
                     ai_text = ai_data["choices"][0]["message"]["content"].strip()
                     clean_json_text = ai_text.replace('```json', '').replace('```', '').strip()
@@ -548,14 +548,14 @@ if ret and openrouter_key:
                         "description": ai_seo_data.get('youtube_description', seo_metadata["description"]),
                         "tags": ai_seo_data.get('youtube_tags', seo_metadata["tags"])
                     }
-                    print(f"🚀 Algorithmic SEO Complete via {current_endpoint}!")
+                    print(f"🚀 Human-Style Broad SEO Mapping Complete via {current_endpoint}!")
                     print(f" Locked Title: \"{seo_metadata['title']}\"")
                     response_success = True
             else:
                 print(f"❌ Lane endpoint {current_endpoint} returned code {response.status_code}")
 
     except Exception as seo_fault:
-        print(f"⚠️ Algorithmic reach processing trace challenged: {seo_fault}")
+        print(f"⚠️ Humanized reach processing trace challenged: {seo_fault}")
 
 import torch
 torch.cuda.empty_cache()
@@ -563,8 +563,7 @@ torch.cuda.empty_cache()
 # Write expanded reach metadata array to local drive manifest file
 with open(SEO_MANIFEST_PATH, 'w') as f:
     json.dump(seo_metadata, f, indent=2)
-print("✅ Section 4b Extended Reach SEO Meta Processing Finished Safely.")
-
+print("✅ Section 4b Extended Human SEO Meta Processing Finished Safely.")
 
 
 
