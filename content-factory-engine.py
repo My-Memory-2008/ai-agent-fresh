@@ -233,9 +233,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (FLAGSHIP GPT-4o LARGE TENSOR LOCATION MATRIX)
+# PHASE A: PART 1 OF 2 (FLAGSHIP DUAL-VISION OBJ-LOCALIZATION TENSOR MATRIX)
 # ==========================================
-print("📥 Activating Flagship OpenAI GPT-4o Large Cloud Vision Object-Tracking Tensor Matrix...")
+print("📥 Activating Flagship Dual-Vision Object-Tracking Tensor Matrix...")
 
 import os
 import re
@@ -268,6 +268,7 @@ watermark_detected = False
 watermark_angle = 0.0
 is_vertical = False
 
+gemini_pro_key = secrets.get_secret("GEMINI_API_KEY")
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
 # High-precision prompt commanding the flagship models to execute a multi-directional pixel trace
@@ -285,9 +286,45 @@ vision_prompt = (
 
 ai_response_text = None
 
-# --- CORE ENGINE: FLAGSHIP OPENROUTER GPT-4o (LARGE) VISION ENGINE ---
-if openrouter_key and ret_v:
-    print("📡 Querying OpenRouter Core Gateway for Flagship OpenAI GPT-4o (Large Asset)...")
+# --- ENGINE LAYER 1: FLAGSHIP GEMINI 1.5 PRO CORE ENGINE ---
+if gemini_pro_key and ret_v:
+    print("📡 Querying Primary Flagship Engine: Gemini-1.5-Pro Hyper-Vision Cluster...")
+    try:
+        TEMP_SCAN_JPG = "/kaggle/working/watermark_gemini_layer.jpg"
+        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
+        with open(TEMP_SCAN_JPG, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
+            
+        url_parts = ["https://", "://googleapis.com", "/v1beta/models/gemini-1.5-pro:generateContent", f"?key={gemini_pro_key.strip()}"]
+        url = "".join(url_parts)
+        
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": vision_prompt},
+                    {"inlineData": {"mimeType": "image/jpeg", "data": base64_image}}
+                ]
+            }],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.post(url, headers=headers, json=payload, timeout=35)
+            
+        if response.status_code == 200:
+            ai_data = response.json()
+            ai_text = ai_data['candidates'][0]['content']['parts'][0]['text'].strip()
+            ai_response_text = ai_text
+            print("🎉 Gemini-1.5-Pro optical response retrieved successfully.")
+    except Exception as gemini_fault:
+        print(f"⚠️ Gemini 1.5 Pro cluster challenged: {gemini_fault}")
+
+# --- ENGINE LAYER 2: FLAGSHIP OPENROUTER GPT-4o (LARGE) FALLBACK ---
+if ai_response_text is None and openrouter_key and ret_v:
+    print("🔄 Initializing Backup Flagship Engine: OpenAI GPT-4o Cloud Gateway via OpenRouter...")
     try:
         TEMP_SCAN_JPG = "/kaggle/working/watermark_gpt4o_layer.jpg"
         cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
@@ -304,7 +341,7 @@ if openrouter_key and ret_v:
             "HTTP-Referer": "https://kaggle.com"
         }
         payload = {
-            "model": "openai/gpt-4o",  # Force-routed directly to OpenAI's largest flagship intelligence core
+            "model": "openai/gpt-4o",
             "messages": [{"role": "user", "content": [{"type": "text", "text": vision_prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}],
             "temperature": 0.0
         }
@@ -318,12 +355,10 @@ if openrouter_key and ret_v:
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
                 ai_response_text = ai_data["choices"][0]["message"]["content"].strip()
                 print("🎉 OpenAI GPT-4o flagship response retrieved successfully.")
-        else:
-            print(f"⚠️ OpenRouter return status error {response.status_code}: {response.text}")
     except Exception as gpt_fault:
-        print(f"⚠️ GPT-4o cloud gateway challenged: {gpt_fault}")
+        print(f"⚠️ GPT-4o cloud backup gateway challenged: {gpt_fault}")
 
-# --- LAYER 2: COORDINATE TENSOR PROCESSING INTERFACE ---
+# --- ENGINE LAYER 3: COORDINATE TENSOR PROCESSING INTERFACE ---
 if ai_response_text:
     try:
         clean_json = ai_response_text.strip().replace('```json', '').replace('```', '').strip()
@@ -340,7 +375,6 @@ if ai_response_text:
             box_points = cv2.boxPoints(rect)
             box_points = np.int32(box_points)
             
-            # Extract rotation parameters cleanly out of the tuple layout indices
             watermark_angle = float(rect[2])
             width_check = float(rect[1][0])
             height_check = float(rect[1][1])
@@ -357,7 +391,6 @@ if ai_response_text:
                 dx = float(pt[0] - center_pt[0])
                 dy = float(pt[1] - center_pt[1])
                 len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                # Applied deep spatial padding inflation shell to completely block letter trace bleeding leaks
                 fit_x = int(pt[0] + (dx / len_d) * 18) 
                 fit_y = int(pt[1] + (dy / len_d) * 14)
                 inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
@@ -367,7 +400,6 @@ if ai_response_text:
             print(f"🎯 FLAGSHIP AI METRIC SUCCESS! Direction Pattern: {ai_coord_map.get('direction')} | Precise Angle: {watermark_angle:.2f}°")
     except Exception as data_fault:
         print(f"⚠️ Visual data parsing trace bypassed: {data_fault}")
-
 
 # ==========================================
 # PHASE A: PART 2 OF 2 (FLAGSHIP MORPHOLOGICAL PIXEL RECONSTRUCTION ENGINE)
@@ -495,7 +527,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Flagship OpenAI GPT-4o Large Multi-Angle Watermark erasure loop finalized flawlessly.")
+print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
 
 
 
