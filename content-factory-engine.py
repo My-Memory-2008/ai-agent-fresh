@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (FLAGSHIP GEMINI 2.5 FLASH BOUNDING TRACER)
+# PHASE A: PART 1 OF 2 (HINT-GUIDED GEMINI PRECISE LOCATOR MATRIX)
 # ==========================================
-print("🧠 Launching Protected Gemini 2.5 Flash Object Localization Tracker...")
+print("🧠 Launching Protected Gemini 2.5 Flash Pattern-Guided Tracker...")
 
 import os
 import re
@@ -269,16 +269,22 @@ is_vertical = False
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to execute an exhaustive multi-directional pixel trace anywhere in the frame
+# 🔥 UPGRADED PATTERN-INTELLIGENCE PROMPT:
+# Provides explicit functional syntax hints to isolate handles, underscores, and channel stamps anywhere on screen.
 vision_prompt = (
-    f"Perform a meticulous pixel scan of this entire frame to locate any form of creator watermark text, username handle, social stamp, or brand logo.\n"
-    f"The watermark can be located anywhere on the screen (corners, center action, or edge margins) and oriented horizontally, vertically, or at a complex diagonal angle slant.\n"
-    f"The exact image resolution is Width: {orig_width} and Height: {orig_height}.\n\n"
+    f"Perform an exhaustive pixel scan of this entire video frame to locate the creator's username watermark, brand handle, or logo stamp.\n"
+    f"The watermark can be anywhere in the image (corners, center action, or edge lanes) and oriented at any slant angle.\n\n"
+    f"💡 TARGET CRITERIA HINTS FOR PRECISION IDENTIFICATION:\n"
+    f"1. Check specifically for social media handle strings starting with the '@' symbol (e.g., '@reel', '@username').\n"
+    f"2. Look for username characters linked by underscores '_' or periods '.' instead of empty spaces (e.g., 'reel_nm', 'user.name').\n"
+    f"3. Scan for typical suffix stamps or short system platform branding strings like '_reels', '.mp4', '.tt', or channel signatures.\n"
+    f"4. The text is usually rendered in a light, high-contrast white or semi-transparent grey value.\n\n"
+    f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n\n"
     f"Tasks:\n"
-    f"Identify the precise four corners enclosing the entire boundary perimeter of the watermark starting from top-left, going clockwise.\n"
-    f"Output your result strictly as a raw JSON map matching this schema: \n"
+    f"Identify the precise four corners enclosing the maximum perimeter boundary of this specific pattern watermark starting from top-left, going clockwise.\n"
+    f"Output your result strictly as a raw JSON map matching this schema:\n"
     f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
-    f"If absolutely no watermark pattern is found on the pixels, output: {{\"found\": false}}.\n"
+    f"If absolutely no watermark pattern matching these handles exists, output: {{\"found\": false}}.\n"
     f"Do not write markdown ticks, json code block headers, or conversational text filling lines."
 )
 
@@ -301,12 +307,12 @@ if openrouter_key and ret_v:
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Flagship Watermark Locator Microservice"
+            "X-Title": "Flagship Pattern-Guided Microservice"
         }
         
         # ANTI-STRIP ENDPOINT MODEL SHIELD:
         current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
-        print(f"📡 Querying Free Vision Endpoint Lane: {current_endpoint}")
+        print(f"📡 Querying Pattern-Guided Vision Endpoint Lane: {current_endpoint}")
         
         payload = {
             "model": current_endpoint,
@@ -318,7 +324,7 @@ if openrouter_key and ret_v:
                 ]
             }],
             "temperature": 0.0,
-            "max_tokens": 200  # 🔥 CRITICAL BUDGET FIXED: Overrides default token reservation blocks to allow free tier calls
+            "max_tokens": 200
         }
 
         with requests.Session() as session:
@@ -328,8 +334,8 @@ if openrouter_key and ret_v:
         if response.status_code == 200:
             ai_data = response.json()
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_response_text = ai_data["choices"][0]["message"]["content"].strip()
-                print("🎉 Flagship Gemini 2.5 Flash successfully scanned frames and extracted text boundary coordinates!")
+                ai_response_text = ai_data["choices"]["message"]["content"].strip()
+                print("🎉 Gemini 2.5 Flash successfully isolated the syntax-pattern watermark coordinates!")
         else:
             print(f"❌ Lane endpoint returned status tracking block code: {response.status_code} | Msg: {response.text}")
                 
@@ -354,9 +360,9 @@ if ai_response_text:
                 box_points = cv2.boxPoints(rect)
                 box_points = np.int32(box_points)
                 
-                watermark_angle = float(rect[2])
-                width_check = float(rect[1][0])
-                height_check = float(rect[1][1])
+                watermark_angle = float(rect)
+                width_check = float(rect)
+                height_check = float(rect)
                 
                 if height_check > width_check:
                     is_vertical = True
@@ -367,22 +373,23 @@ if ai_response_text:
                 center_pt = np.mean(box_points, axis=0)
                 inflated_pts = []
                 for pt in box_points:
-                    dx = float(pt[0] - center_pt[0])
-                    dy = float(pt[1] - center_pt[1])
+                    dx = float(pt - center_pt)
+                    dy = float(pt - center_pt)
                     len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                    fit_x = int(pt[0] + (dx / len_d) * 18) 
-                    fit_y = int(pt[1] + (dy / len_d) * 14)
+                    fit_x = int(pt + (dx / len_d) * 18) 
+                    fit_y = int(pt + (dy / len_d) * 14)
                     inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
                 
                 polygon_vertices = np.array(inflated_pts, dtype=np.int32)
                 watermark_detected = True
-                print(f"🎯 AI VISION LOCK GRANTED! Coordinates Passed to OpenCV -> Angle: {watermark_angle:.2f}°")
+                print(f"🎯 PATTERN MATCH TRACKING LOCK GRANTED! -> Angle: {watermark_angle:.2f}°")
     except Exception as data_fault:
         print(f"⚠️ Target structure parsing anomaly: {data_fault}")
 
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (HARDWARE-ACCELERATED MORPHOLOGICAL RECONSTRUCTION)
+# PHASE A: PART 2 OF 2 (AI-GUIDED PINPOINT PIXEL-PERFECT ERASER)
 # ==========================================
 
 # --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
@@ -396,7 +403,6 @@ video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_h
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
-    # Build localized background mask to process colors inside the calculated area
     temp_mask = np.zeros(sample_img.shape[:2], dtype=np.uint8)
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
@@ -420,8 +426,7 @@ target_w, target_h = rect_w, rect_h
 if is_vertical and target_h > target_w:
     target_w, target_h = target_h, target_w
 
-# 🔥 FIXED ANGLE NORMALIZATION LAYER:
-# Corrects flat inverse loops (like -180, 180, or near-zero slants) to prevent flip-warping errors
+# FIXED ANGLE NORMALIZATION LAYER:
 if abs(watermark_angle) == 180.0 or abs(watermark_angle) == 0.0 or abs(watermark_angle) == 90.0:
     print("🔄 Flat baseline angle vector detected. Normalizing tracking matrix scale to 0.0° baseline...")
     watermark_angle = 0.0
@@ -442,24 +447,38 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 1. MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
+    # 🔥 1. UPGRADE: AI-GUIDED LOCAL PIXEL-PERFECT SEGMENTATION MATTING
+    # Generate the base geometric location mask from Gemini's coordinates
+    geo_zone_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(geo_zone_mask, [polygon_vertices], 255)
     
-    # Dilate the polygon mask outward evenly across ALL angles using an elliptical kernel matrix
-    # This expands the erasure zone by an extra 22 pixels, completely swallowing hidden text halos!
-    dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (22, 22))
-    inflated_mask = cv2.dilate(raw_mask, dilation_kernel, iterations=1)
+    # Isolate every individual pixel text curve inside that specific visual zone
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _, text_pixel_mask = cv2.threshold(gray_frame, 195, 255, cv2.THRESH_BINARY) # Locks onto watermark brightness channels
     
-    # Execute fast marching Telea inpainting on the expanded mask to erase the text cleanly
-    healed_frame = cv2.inpaint(frame, inflated_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
+    # Intersect the two matrices so we ONLY target watermark text pixels, ignoring background noise
+    pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, geo_zone_mask)
     
-    # 2. Overlay color-matched matte patch seamlessly over the original polygon mask vertices
+    # Inflate ONLY the exact text pixel lines outward by 4px to destroy soft anti-aliasing artifacts
+    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4))
+    perfect_erasure_mask = cv2.dilate(pinpoint_watermark_pixels, pixel_kernel, iterations=1)
+    
+    # Also dilate the original boundary shell slightly as a safety fallback channel
+    fallback_dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (12, 12))
+    inflated_geo_mask = cv2.dilate(geo_zone_mask, fallback_dilation_kernel, iterations=1)
+    
+    # Combine the precise pixel mask with the safety boundary patch
+    final_combined_mask = cv2.bitwise_or(perfect_erasure_mask, inflated_geo_mask)
+    
+    # Execute fast marching Telea inpainting on the combined pixel mask to remove the text completely
+    healed_frame = cv2.inpaint(frame, final_combined_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
+    
+    # Layer a color-matched matte patch seamlessly over the original polygon mask vertices
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
     healed_frame = cv2.addWeighted(overlay_roi, 0.50, healed_frame, 0.50, 0)
     
-    # 3. THE ANGLED OVERLAY ENGINE:
+    # 2. THE ANGLED OVERLAY ENGINE:
     text_layer = np.zeros_like(healed_frame)
     
     # Compute precise placement anchor points inside the localized text boundaries
@@ -514,6 +533,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
+
 
 
 # --------------------------------------------------
