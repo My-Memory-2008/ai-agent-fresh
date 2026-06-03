@@ -230,11 +230,10 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
-
 # ==========================================
-# PHASE A: PREMIUM TRANSLUCENT GRADIENT BACKING PLATE ENGINE
+# PHASE A: MULTIMODAL SOLID CHARACTER OBLITERATION ENGINE
 # ==========================================
-print("📥 Activating premium translucent gradient backing plate engine...")
+print("📥 Activating hardware-accelerated solid character obliteration engine...")
 
 import os
 import cv2
@@ -254,7 +253,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# PRECISE TARGETING: Locks directly onto the lower panel area of the short layout
+# PRECISE TARGETING BOUNDS: Completely encloses the lower text layout quadrant
 min_x = int(orig_width * 0.22)
 max_x = int(orig_width * 0.78)
 min_y = int(orig_height * 0.84)
@@ -274,22 +273,20 @@ if ret_v:
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
     
-    brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
-    # Lock crisp white lettering with an elegant dark text shadow outline configuration
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
 else:
-    avg_b, avg_g, avg_r = 35, 35, 35
+    avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
 # --- 3. HARDWARE-ACCELERATED TRANS-GRADIENT RENDER LOOP ---
-print("🎨 Processing frame-by-frame translucent text removals and polished overlays...")
+print("🎨 Processing frame-by-frame absolute text removal and clean overlays...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.70  # Clean, highly readable creator presentation scale
+font_scale = 0.70  
 font_thickness = 2
 
 while cap.isOpened():
@@ -301,20 +298,24 @@ while cap.isOpened():
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, text_pixel_mask = cv2.threshold(gray_frame, 190, 255, cv2.THRESH_BINARY)
+    
+    # 🔥 UPGRADED SENSITIVITY THRESHOLD: Lowered to 140 to trap dark anti-aliasing text ghosts
+    _, text_pixel_mask = cv2.threshold(gray_frame, 140, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # Run a light dilation to erase the old text curves cleanly via inpainting
-    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    perfect_erasure_mask = cv2.dilate(pinpoint_watermark_pixels, pixel_kernel, iterations=1)
-    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
+    # 🔥 UPGRADED MORPHOLOGICAL CLOSE MATRIX: Merges separate character lines into a clean block mask
+    closing_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+    closed_text_mask = cv2.morphologyEx(pinpoint_watermark_pixels, cv2.MORPH_CLOSE, closing_kernel)
     
-    # DYNAMIC GRADIENT BLENDING LAYER
-    # Instead of drawing a solid block, we generate a smooth, clean feather blend overlay
+    # Expand the mask shell outward slightly to fully destroy surrounding halos
+    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
+    perfect_erasure_mask = cv2.dilate(closed_text_mask, pixel_kernel, iterations=1)
+    
+    # Execute fast marching Telea inpainting on the solid block mask
+    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=7, flags=cv2.INPAINT_TELEA)
+    
+    # Blend the background matte layer over the patch cleanly (35% opacity frosting)
     overlay_roi = healed_frame.copy()
-    
-    # We apply a slight alpha blending layer (only 35% opacity) to create an elegant frosted look
-    # This allows the background sand art to show through while hiding any remaining blur artifact outlines!
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
     healed_frame = cv2.addWeighted(overlay_roi, 0.35, healed_frame, 0.65, 0)
     
@@ -326,7 +327,7 @@ while cap.isOpened():
     tx_a = cx_m - (tw // 2)
     ty_a = cy_m + (th // 2)
     
-    # Stamp your brand handle over the clean frosted shadow plate
+    # Stamp your pristine custom branding handle over the clean canvas section
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
@@ -336,7 +337,6 @@ cap.release()
 video_writer.release()
 
 # --- 4. STREAM CLEAN REMUX ---
-# 🔥 FIXED PATH: Modified name mapping string parameter back to strict lowercase linux terminal "ffmpeg" execution
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -345,8 +345,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Frosted shadow backing layer compiled flawlessly.")
-
+print("✅ Phase A Complete: Watermark obliterated down to the pixel level and replaced cleanly!")
 
 
 # --------------------------------------------------
