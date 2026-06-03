@@ -385,13 +385,12 @@ if ai_response_text:
     except Exception as data_fault:
         print(f"⚠️ Target structure parsing anomaly: {data_fault}")
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 (AI-GUIDED PINPOINT PIXEL-PERFECT ERASER)
+# PHASE A: PART 2 OF 2 (ABSOLUTE GEOMETRIC PLACEMENT & INPAINTER CORE)
 # ==========================================
 
 # --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
-print("🎨 Launching frame-by-frame multi-angle content-aware pixel healing matrix...")
+print("🎨 Launching frame-by-frame pinpoint visual pixel healing matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -405,7 +404,7 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # Pristine explicit color channels extraction to prevent 0-d array scalar TypeErrors
+    # 🔥 FIXED: Unpack individual color channel tuple elements explicitly by index positions!
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -418,15 +417,17 @@ else:
 
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
 
-# Assigned unique identifier variables to prevent structural unpacking overlap bugs
-rect_x, rect_y, rect_w, rect_h = cv2.boundingRect(polygon_vertices)
-target_w, target_h = rect_w, rect_h
-if is_vertical and target_h > target_w:
-    target_w, target_h = target_h, target_w
+# Direct Geometric Extraction eliminates OpenCV bounding box warping crashes!
+min_x = int(np.min(polygon_vertices[:, 0]))
+max_x = int(np.max(polygon_vertices[:, 0]))
+min_y = int(np.min(polygon_vertices[:, 1]))
+max_y = int(np.max(polygon_vertices[:, 1]))
 
-# FIXED ANGLE NORMALIZATION LAYER:
-if abs(watermark_angle) == 180.0 or abs(watermark_angle) == 0.0 or abs(watermark_angle) == 90.0:
-    print("🔄 Flat baseline angle vector detected. Normalizing tracking matrix scale to 0.0° baseline...")
+target_w = max_x - min_x
+target_h = max_y - min_y
+
+# Force stabilize flat inverse angles (like -180, 180, 0, or 90)
+if abs(watermark_angle) in [0.0, 90.0, 180.0]:
     watermark_angle = 0.0
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
@@ -436,7 +437,7 @@ font_thickness = 1
 # Adaptive scaling loops to guarantee perfect container fit alignments
 for scale_step in np.arange(0.35, 1.4, 0.02):
     (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
-    if test_w < (target_w * 0.75) and test_h < (target_h * 0.60):
+    if test_w < (target_w * 0.85) and test_h < (target_h * 0.70):
         font_scale = scale_step
     else:
         break
@@ -445,47 +446,41 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 🔥 1. UPGRADE: AI-GUIDED LOCAL PIXEL-PERFECT SEGMENTATION MATTING
-    # Generate the base geometric location mask from Gemini's coordinates
-    geo_zone_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(geo_zone_mask, [polygon_vertices], 255)
+    # 1. MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
+    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     # Isolate every individual pixel text curve inside that specific visual zone
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, text_pixel_mask = cv2.threshold(gray_frame, 195, 255, cv2.THRESH_BINARY) # Locks onto watermark brightness channels
+    _, text_pixel_mask = cv2.threshold(gray_frame, 190, 255, cv2.THRESH_BINARY) # Locks onto watermark brightness channels
     
-    # Intersect the two matrices so we ONLY target watermark text pixels, ignoring background noise
-    pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, geo_zone_mask)
+    # Intersect matrices to focus only on text pixels, eliminating background noise
+    pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # Inflate ONLY the exact text pixel lines outward by 4px to destroy soft anti-aliasing artifacts
-    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4))
+    # Inflate ONLY the exact text pixel lines outward by 6px to destroy soft anti-aliasing artifacts
+    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
     perfect_erasure_mask = cv2.dilate(pinpoint_watermark_pixels, pixel_kernel, iterations=1)
     
-    # Also dilate the original boundary shell slightly as a safety fallback channel
-    fallback_dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (12, 12))
-    inflated_geo_mask = cv2.dilate(geo_zone_mask, fallback_dilation_kernel, iterations=1)
+    # Apply a broader geometric shield dilation layer to fully destroy underlying shadows
+    fallback_dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (22, 22))
+    inflated_geo_mask = cv2.dilate(raw_mask, fallback_dilation_kernel, iterations=1)
     
-    # Combine the precise pixel mask with the safety boundary patch
+    # Merge the exact pixel target mask with the background safety mask
     final_combined_mask = cv2.bitwise_or(perfect_erasure_mask, inflated_geo_mask)
     
-    # Execute fast marching Telea inpainting on the combined pixel mask to remove the text completely
+    # Execute fast marching Telea inpainting on the expanded mask to erase the text cleanly
     healed_frame = cv2.inpaint(frame, final_combined_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
-    # Layer a color-matched matte patch seamlessly over the original polygon mask vertices
+    # Layer an elegant color-matched matte patch seamlessly over the original polygon mask vertices
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(overlay_roi, 0.50, healed_frame, 0.50, 0)
+    healed_frame = cv2.addWeighted(overlay_roi, 0.45, healed_frame, 0.55, 0)
     
-    # 2. THE ANGLED OVERLAY ENGINE:
-    text_layer = np.zeros_like(healed_frame)
-    
-    # Compute precise placement anchor points inside the localized text boundaries
-    moments = cv2.moments(polygon_vertices)
-    if moments["m00"] != 0:
-        cx_m = int(moments["m10"] / moments["m00"])
-        cy_m = int(moments["m01"] / moments["m00"])
-    else:
-        cx_m, cy_m = rect_x + rect_w//2, rect_y + rect_h//2
+    # FIXED PINPOINT PLACEMENT SYSTEM:
+    # Directly calculates the center of gravity using absolute mathematical boundaries 
+    # to guarantee your new brand name is stamped exactly on top of the original watermark section!
+    cx_m = min_x + (target_w // 2)
+    cy_m = min_y + (target_h // 2)
         
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     
@@ -502,6 +497,7 @@ while cap.isOpened():
         tx_a = cx_m - (tw // 2)
         ty_a = cy_m + (th // 2)
         
+        text_layer = np.zeros_like(healed_frame)
         cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
         cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
         
@@ -531,6 +527,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
+
 
 
 
