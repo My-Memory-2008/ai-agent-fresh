@@ -230,7 +230,6 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
-
 # ==========================================
 # PHASE A: PART 1 OF 2 (HINT-GUIDED GEMINI PRECISE LOCATOR MATRIX)
 # ==========================================
@@ -269,8 +268,7 @@ is_vertical = False
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# 🔥 UPGRADED PATTERN-INTELLIGENCE PROMPT:
-# Provides explicit functional syntax hints to isolate handles, underscores, and channel stamps anywhere on screen.
+# UPGRADED PATTERN-INTELLIGENCE PROMPT:
 vision_prompt = (
     f"Perform an exhaustive pixel scan of this entire video frame to locate the creator's username watermark, brand handle, or logo stamp.\n"
     f"The watermark can be anywhere in the image (corners, center action, or edge lanes) and oriented at any slant angle.\n\n"
@@ -333,8 +331,9 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
+            # 🔥 FIXED: Explicit choice array unboxing [0] handles OpenRouter's payload cleanly
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_response_text = ai_data["choices"]["message"]["content"].strip()
+                ai_response_text = ai_data["choices"][0]["message"]["content"].strip()
                 print("🎉 Gemini 2.5 Flash successfully isolated the syntax-pattern watermark coordinates!")
         else:
             print(f"❌ Lane endpoint returned status tracking block code: {response.status_code} | Msg: {response.text}")
@@ -360,9 +359,9 @@ if ai_response_text:
                 box_points = cv2.boxPoints(rect)
                 box_points = np.int32(box_points)
                 
-                watermark_angle = float(rect)
-                width_check = float(rect)
-                height_check = float(rect)
+                watermark_angle = float(rect[2])
+                width_check = float(rect[1][0])
+                height_check = float(rect[1][1])
                 
                 if height_check > width_check:
                     is_vertical = True
@@ -373,11 +372,11 @@ if ai_response_text:
                 center_pt = np.mean(box_points, axis=0)
                 inflated_pts = []
                 for pt in box_points:
-                    dx = float(pt - center_pt)
-                    dy = float(pt - center_pt)
+                    dx = float(pt[0] - center_pt[0])
+                    dy = float(pt[1] - center_pt[1])
                     len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                    fit_x = int(pt + (dx / len_d) * 18) 
-                    fit_y = int(pt + (dy / len_d) * 14)
+                    fit_x = int(pt[0] + (dx / len_d) * 18) 
+                    fit_y = int(pt[1] + (dy / len_d) * 14)
                     inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
                 
                 polygon_vertices = np.array(inflated_pts, dtype=np.int32)
@@ -385,7 +384,6 @@ if ai_response_text:
                 print(f"🎯 PATTERN MATCH TRACKING LOCK GRANTED! -> Angle: {watermark_angle:.2f}°")
     except Exception as data_fault:
         print(f"⚠️ Target structure parsing anomaly: {data_fault}")
-
 
 
 # ==========================================
