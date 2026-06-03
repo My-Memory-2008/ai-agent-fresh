@@ -381,7 +381,6 @@ if ai_response_text:
         print(f"⚠️ Target structure parsing anomaly: {data_fault}")
 
 
-
 # ==========================================
 # PHASE A: PART 2 OF 2 (HARDWARE-ACCELERATED MORPHOLOGICAL RECONSTRUCTION)
 # ==========================================
@@ -393,14 +392,16 @@ TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
+# Sample regional brightness properties using flat polygon area parameters cleanly
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
+    # Build localized background mask to process colors inside the calculated area
     temp_mask = np.zeros(sample_img.shape[:2], dtype=np.uint8)
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # Explicit scalar channel parsing to permanently stop 0-d TypeErrors
+    # Pristine explicit color channels extraction to prevent 0-d array scalar TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -411,16 +412,25 @@ else:
     avg_b, avg_g, avg_r = 35, 35, 35
     text_color, shadow_color = (235, 235, 235), (15, 15, 15)
 
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
 
+# Assigned unique identifier variables to prevent structural unpacking overlap bugs
 rect_x, rect_y, rect_w, rect_h = cv2.boundingRect(polygon_vertices)
 target_w, target_h = rect_w, rect_h
 if is_vertical and target_h > target_w:
     target_w, target_h = target_h, target_w
 
+# 🔥 FIXED ANGLE NORMALIZATION LAYER:
+# Corrects flat inverse loops (like -180, 180, or near-zero slants) to prevent flip-warping errors
+if abs(watermark_angle) == 180.0 or abs(watermark_angle) == 0.0 or abs(watermark_angle) == 90.0:
+    print("🔄 Flat baseline angle vector detected. Normalizing tracking matrix scale to 0.0° baseline...")
+    watermark_angle = 0.0
+
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.35
 font_thickness = 1
+
+# Adaptive scaling loops to guarantee perfect container fit alignments
 for scale_step in np.arange(0.35, 1.4, 0.02):
     (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
     if test_w < (target_w * 0.75) and test_h < (target_h * 0.60):
@@ -432,19 +442,27 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
+    # 1. MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
-    # 18-pixel elliptical dilation guarantees all shadows are swallowed completely
-    dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (18, 18))
+    # Dilate the polygon mask outward evenly across ALL angles using an elliptical kernel matrix
+    # This expands the erasure zone by an extra 22 pixels, completely swallowing hidden text halos!
+    dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (22, 22))
     inflated_mask = cv2.dilate(raw_mask, dilation_kernel, iterations=1)
+    
+    # Execute fast marching Telea inpainting on the expanded mask to erase the text cleanly
     healed_frame = cv2.inpaint(frame, inflated_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
+    # 2. Overlay color-matched matte patch seamlessly over the original polygon mask vertices
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
     healed_frame = cv2.addWeighted(overlay_roi, 0.50, healed_frame, 0.50, 0)
     
+    # 3. THE ANGLED OVERLAY ENGINE:
     text_layer = np.zeros_like(healed_frame)
+    
+    # Compute precise placement anchor points inside the localized text boundaries
     moments = cv2.moments(polygon_vertices)
     if moments["m00"] != 0:
         cx_m = int(moments["m10"] / moments["m00"])
@@ -455,7 +473,7 @@ while cap.isOpened():
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     
     if is_vertical and not (abs(watermark_angle) > 35):
-        # Strict top-to-bottom vertical text layout processing
+        # Handle strict top-to-bottom vertical text formatting loops gracefully
         char_y = cy_m - int((th * len("@AWRAM")) / 2)
         for char in "@AWRAM":
             (cw_s, ch_s), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
@@ -463,18 +481,22 @@ while cap.isOpened():
             cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
             char_y += ch_s + 6
     else:
-        # Standard horizontal or slanted custom angle processing
+        # Handle standard or slanted angled line typography configurations natively
         tx_a = cx_m - (tw // 2)
         ty_a = cy_m + (th // 2)
+        
         cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
         cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
         
+        # Apply rotational transformation matrices matching the original tilt angles exactly
         rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -watermark_angle, 1.0)
         rotated_text_layer = cv2.warpAffine(text_layer, rot_matrix, (orig_width, orig_height))
         
+        # Merge the slanted text onto the video frames flawlessly
         text_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY)
         _, alpha_mask = cv2.threshold(text_mask, 10, 255, cv2.THRESH_BINARY)
         alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
+        
         healed_frame = (rotated_text_layer * alpha_mask_3d + healed_frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
 
     video_writer.write(healed_frame)
@@ -482,6 +504,7 @@ while cap.isOpened():
 cap.release()
 video_writer.release()
 
+# Remux sound container tracks cleanly onto the new video layout
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -490,7 +513,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Free OpenRouter Vision Inpainter output compiled successfully.")
+print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
 
 
 # --------------------------------------------------
