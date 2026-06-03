@@ -230,23 +230,18 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
-
 # ==========================================
-# PHASE A: PART 1 OF 2 (HINT-GUIDED GEMINI PRECISE LOCATOR MATRIX)
+# PHASE A: HIGH-PRECISION VISUAL SEGMENTATION ERASER & EXACT-SCALE BRANDING
 # ==========================================
-print("🧠 Launching Protected Gemini 2.5 Flash Pattern-Guided Tracker...")
+print("📥 Launching high-precision visual segmentation and exact-scale mapping engine...")
 
 import os
-import re
 import cv2
-import json
-import base64
 import random
 import numpy as np
 import subprocess
-import requests
 
-# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
+# --- 1. CAPTURE STRUCTURAL LAYOUT CONDITIONS ---
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -258,148 +253,48 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# BOTTOM-CENTER OVERRIDE MATRIX:
-# Hardens the default fallback parameters to sit exactly where the chopped text lives
-polygon_vertices = np.array([[int(orig_width * 0.35), int(orig_height * 0.93)], 
-                             [int(orig_width * 0.65), int(orig_height * 0.93)], 
-                             [int(orig_width * 0.65), int(orig_height * 0.98)], 
-                             [int(orig_width * 0.35), int(orig_height * 0.98)]], dtype=np.int32)
-watermark_detected = False
-watermark_angle = 0.0
-is_vertical = False
+# Global target defaults for the bottom center watermark region (83% - 98% height layout)
+min_x = int(orig_width * 0.22)
+max_x = int(orig_width * 0.78)
+min_y = int(orig_height * 0.83)
+max_y = int(orig_height * 0.98)
 
-openrouter_key = secrets.get_secret("OPENROUTER_KEY")
+target_w = max_x - min_x
+target_h = max_y - min_y
+polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [min_x, max_y]], dtype=np.int32)
 
-# UPGRADED PATTERN-INTELLIGENCE PROMPT WITH STRUCTURAL HINTS:
-vision_prompt = (
-    f"Perform an exhaustive pixel scan of this entire video frame to locate the creator's username watermark, brand handle, or logo stamp.\n"
-    f"The watermark can be anywhere in the image (corners, center action, or edge lanes) and oriented at any slant angle.\n\n"
-    f"💡 TARGET CRITERIA HINTS FOR PRECISION IDENTIFICATION:\n"
-    f"1. Check specifically for social media handle strings starting with the '@' symbol (e.g., '@sand.tagious', '@sa...ious').\n"
-    f"2. Look for username characters linked by periods '.' or underscores '_', even if partially obscured or cut in half.\n"
-    f"3. Look heavily near the bottom center edge margin of the vertical image canvas.\n\n"
-    f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n\n"
-    f"Tasks:\n"
-    f"Identify the precise four corners enclosing the maximum perimeter boundary of this specific pattern watermark starting from top-left, going clockwise.\n"
-    f"Output your result strictly as a raw JSON map matching this schema:\n"
-    f"{{\n  \"found\": true,\n  \"direction\": \"vertical_or_horizontal_or_slanted\",\n  \"p1\": [x1,y1],\n  \"p2\": [x2,y2],\n  \"p3\": [x3,y3],\n  \"p4\": [x4,y4]\n}}.\n"
-    f"If absolutely no watermark pattern matching these handles exists, output: {{\"found\": false}}.\n"
-    f"Do not write markdown ticks, json code block headers, or conversational text filling lines."
-)
+# --- 2. LOCAL AI-STYLE TEXT COMPONENT DETECTION CORE ---
+# Dynamically reads pixels to track text curves and extract exact dimensions natively
+measured_text_w = target_w * 0.65  # Dynamic fallbacks
+measured_text_h = target_h * 0.40
 
-ai_response_text = None
+if ret_v:
+    gray_frame = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
+    _, binary_mask = cv2.threshold(gray_frame, 200, 255, cv2.THRESH_BINARY)
+    
+    # Isolate lower text margins to eliminate visual background activity noise
+    roi_strip = np.zeros_like(binary_mask)
+    cv2.fillPoly(roi_strip, [polygon_vertices], 255)
+    isolated_text = cv2.bitwise_and(binary_mask, roi_strip)
+    
+    # Connect separate character paths cleanly into a single block matrix structure
+    morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 8))
+    connected_letters = cv2.morphologyEx(isolated_text, cv2.MORPH_CLOSE, morph_kernel)
+    
+    contours, _ = cv2.findContours(connected_letters, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        # Pick the largest text shape matrix located in the bottom lane
+        largest_cnt = max(contours, key=cv2.contourArea)
+        rx, ry, rw, rh = cv2.boundingRect(largest_cnt)
+        if rw > 20 and rh > 5:
+            min_x, min_y, target_w, target_h = rx, ry, rw, rh
+            polygon_vertices = np.array([[rx, ry], [rx + rw, ry], [rx + rw, ry + rh], [rx, ry + rh]], dtype=np.int32)
+            # Record the exact bounding size of the original text letters
+            measured_text_w = rw
+            measured_text_h = rh
+            print(f"🎯 EXACT MATCH LOCKED! Detected Text Dimensions -> Width: {rw}px | Height: {rh}px")
 
-if openrouter_key and ret_v:
-    try:
-        TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
-        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
-        with open(TEMP_SCAN_JPG, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
-            
-        # ANTI-STRIP URL CONCATENATION SHIELD:
-        protocol_prefix = "https" + ":" + chr(47) + chr(47)
-        router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
-        url = f"{protocol_prefix}{router_host}"
-        
-        headers = {
-            "Authorization": f"Bearer {openrouter_key.strip()}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Flagship Pattern-Guided Microservice"
-        }
-        
-        current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
-        print(f"📡 Querying Pattern-Guided Vision Endpoint Lane: {current_endpoint}")
-        
-        payload = {
-            "model": current_endpoint,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": vision_prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                ]
-            }],
-            "temperature": 0.0,
-            "max_tokens": 200
-        }
-
-        with requests.Session() as session:
-            session.trust_env = False
-            response = session.post(url, headers=headers, json=payload, timeout=35)
-            
-        if response.status_code == 200:
-            ai_data = response.json()
-            if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_response_text = ai_data["choices"][0]["message"]["content"].strip()
-                print("🎉 Gemini 2.5 Flash successfully isolated the syntax-pattern watermark coordinates!")
-        else:
-            print(f"❌ Lane endpoint returned status tracking block code: {response.status_code} | Msg: {response.text}")
-                
-    except Exception as vision_fault:
-        print(f"⚠️ OpenRouter Vision AI layer challenged: {vision_fault}")
-
-if ai_response_text:
-    try:
-        json_match = re.search(r'\{.*\}', ai_response_text, re.DOTALL)
-        if json_match:
-            clean_json = json_match.group(0)
-            ai_coord_map = json.loads(clean_json)
-            
-            if ai_coord_map.get("found") is True:
-                p1 = ai_coord_map.get("p1")
-                p2 = ai_coord_map.get("p2")
-                p3 = ai_coord_map.get("p3")
-                p4 = ai_coord_map.get("p4")
-                
-                raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
-                rect = cv2.minAreaRect(raw_pts)
-                box_points = cv2.boxPoints(rect)
-                box_points = np.int32(box_points)
-                
-                watermark_angle = float(rect[2])
-                width_check = float(rect[1][0])
-                height_check = float(rect[1][1])
-                
-                if height_check > width_check:
-                    is_vertical = True
-                    watermark_angle -= 90.0
-                if ai_coord_map.get("direction") == "vertical":
-                    is_vertical = True
-                    
-                center_pt = np.mean(box_points, axis=0)
-                inflated_pts = []
-                for pt in box_points:
-                    dx = float(pt[0] - center_pt[0])
-                    dy = float(pt[1] - center_pt[1])
-                    len_d = np.sqrt(dx*dx + dy*dy) if (dx*dx + dy*dy) > 0 else 1.0
-                    fit_x = int(pt[0] + (dx / len_d) * 18) 
-                    fit_y = int(pt[1] + (dy / len_d) * 14)
-                    inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
-                
-                test_poly = np.array(inflated_pts, dtype=np.int32)
-                if cv2.contourArea(test_poly) > 100:
-                    polygon_vertices = test_poly
-                    watermark_detected = True
-                    print(f"🎯 PATTERN MATCH TRACKING LOCK GRANTED! -> Angle: {watermark_angle:.2f}°")
-                else:
-                    print("📐 AI returned miniature shapes. Utilizing bottom-center macro lane protection fallback.")
-    except Exception as data_fault:
-        print(f"⚠️ Target structure parsing anomaly: {data_fault}")
-
-# ==========================================
-# PHASE A: PART 2 OF 2 (HARDWARE-ACCELERATED MORPHOLOGICAL RECONSTRUCTION)
-# ==========================================
-
-# --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
-print("🎨 Launching frame-by-frame pinpoint visual pixel healing matrix...")
-cap = cv2.VideoCapture(output_path)
-TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
-
-# Sample regional brightness properties using flat polygon area parameters cleanly
+# --- 3. REGIONAL BACKGROUND ADAPTIVE COLOR FILTER ---
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
@@ -407,41 +302,38 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # Explicit scalar channel parsing to permanently stop 0-d TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
     
     brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
-    text_color, shadow_color = ((45, 45, 45), (230, 230, 230)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
+    text_color, shadow_color = ((45, 45, 45), (235, 235, 235)) if brightness > 127 else ((235, 235, 235), (15, 15, 15))
 else:
     avg_b, avg_g, avg_r = 35, 35, 35
     text_color, shadow_color = (235, 235, 235), (15, 15, 15)
 
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
+cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-min_x = int(np.min(polygon_vertices[:, 0]))
-max_x = int(np.max(polygon_vertices[:, 0]))
-min_y = int(np.min(polygon_vertices[:, 1]))
-max_y = int(np.max(polygon_vertices[:, 1]))
-
-target_w = max_x - min_x
-target_h = max_y - min_y
-
-if abs(watermark_angle) in [0.0, 90.0, 180.0]:
-    print("🔄 Flat baseline angle vector detected. Normalizing tracking matrix scale to 0.0° baseline...")
-    watermark_angle = 0.0
-
+# --- 4. PRECISE FONT DIMENSION MATH FILTER ---
+# 🔥 EXACT SIZE MATCHING LAYER: 
+# Dynamically adjusts font scale parameters until the pixel area matches the original text height
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.35
+font_scale = 0.30
 font_thickness = 1
 
-for scale_step in np.arange(0.35, 1.4, 0.02):
-    (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
-    if test_w < (target_w * 0.85) and test_h < (target_h * 0.70):
+for scale_step in np.arange(0.30, 1.5, 0.01):
+    (text_w, text_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
+    if text_h <= (measured_text_h * 0.95) and text_w <= (measured_text_w * 1.15):
         font_scale = scale_step
     else:
         break
+
+# --- 5. HARDWARE-ACCELERATED RENDER LOOP ---
+print("🎨 Rendering pixel-perfect text removal and exact-scale branding layers...")
+cap = cv2.VideoCapture(output_path)
+TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -452,56 +344,41 @@ while cap.isOpened():
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     _, text_pixel_mask = cv2.threshold(gray_frame, 190, 255, cv2.THRESH_BINARY)
-    
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
+    # 6px morphological dilation completely clears out original broken font outlines
     pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
     perfect_erasure_mask = cv2.dilate(pinpoint_watermark_pixels, pixel_kernel, iterations=1)
     
-    fallback_dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (22, 22))
+    fallback_dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (16, 16))
     inflated_geo_mask = cv2.dilate(raw_mask, fallback_dilation_kernel, iterations=1)
     
     final_combined_mask = cv2.bitwise_or(perfect_erasure_mask, inflated_geo_mask)
     healed_frame = cv2.inpaint(frame, final_combined_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
+    # Draw smooth background color plate to seal the blurry texture artifacts cleanly
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
     healed_frame = cv2.addWeighted(overlay_roi, 0.45, healed_frame, 0.55, 0)
     
+    # Calculate perfect central anchor positions
     cx_m = min_x + (target_w // 2)
     cy_m = min_y + (target_h // 2)
-        
-    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     
-    if is_vertical and not (abs(watermark_angle) > 35):
-        char_y = cy_m - int((th * len("@AWRAM")) / 2)
-        for char in "@AWRAM":
-            (cw_s, ch_s), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
-            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
-            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-            char_y += ch_s + 6
-    else:
-        tx_a = cx_m - (tw // 2)
-        ty_a = cy_m + (th // 2)
-        
-        text_layer = np.zeros_like(healed_frame)
-        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
-        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-        
-        rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -watermark_angle, 1.0)
-        rotated_text_layer = cv2.warpAffine(text_layer, rot_matrix, (orig_width, orig_height))
-        
-        text_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY)
-        _, alpha_mask = cv2.threshold(text_mask, 10, 255, cv2.THRESH_BINARY)
-        alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
-        
-        healed_frame = (rotated_text_layer * alpha_mask_3d + healed_frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
-
+    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    tx_a = cx_m - (tw // 2)
+    ty_a = cy_m + (th // 2)
+    
+    # Stamp custom branding handle at the exact size matching the original text block
+    cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
+    cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    
     video_writer.write(healed_frame)
 
 cap.release()
 video_writer.release()
 
+# --- 6. AUDIO CONTAINER REMUX ---
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -510,8 +387,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
-
+print("✅ Phase A Complete: Watermark erased and brand name scaled to match the original text block perfectly.")
 
 
 
