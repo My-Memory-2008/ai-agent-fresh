@@ -231,7 +231,6 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 
-
 # ==========================================
 # PHASE A: PART 1 OF 2 (HINT-GUIDED GEMINI PRECISE LOCATOR MATRIX)
 # ==========================================
@@ -259,25 +258,26 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global default parameter shapes if no watermark text shape is localized
-polygon_vertices = np.array([[int(orig_width*0.05), int(orig_height*0.05)], 
-                             [int(orig_width*0.35), int(orig_height*0.05)], 
-                             [int(orig_width*0.35), int(orig_height*0.11)], 
-                             [int(orig_width*0.05), int(orig_height*0.11)]], dtype=np.int32)
+# BOTTOM-CENTER OVERRIDE MATRIX:
+# Hardens the default fallback parameters to sit exactly where the chopped text lives
+polygon_vertices = np.array([[int(orig_width * 0.35), int(orig_height * 0.93)], 
+                             [int(orig_width * 0.65), int(orig_height * 0.93)], 
+                             [int(orig_width * 0.65), int(orig_height * 0.98)], 
+                             [int(orig_width * 0.35), int(orig_height * 0.98)]], dtype=np.int32)
 watermark_detected = False
 watermark_angle = 0.0
 is_vertical = False
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# UPGRADED PATTERN-INTELLIGENCE PROMPT WITH STRUCTURAL SCAN HINTS:
+# UPGRADED PATTERN-INTELLIGENCE PROMPT WITH STRUCTURAL HINTS:
 vision_prompt = (
     f"Perform an exhaustive pixel scan of this entire video frame to locate the creator's username watermark, brand handle, or logo stamp.\n"
     f"The watermark can be anywhere in the image (corners, center action, or edge lanes) and oriented at any slant angle.\n\n"
     f"💡 TARGET CRITERIA HINTS FOR PRECISION IDENTIFICATION:\n"
-    f"1. Check specifically for social media handle strings starting with the '@' symbol (e.g., '@sand.tagious', '@reel').\n"
-    f"2. Look for username characters linked by periods '.' or underscores '_' instead of empty spaces.\n"
-    f"3. The text is usually rendered in a light, high-contrast white or semi-transparent grey value.\n\n"
+    f"1. Check specifically for social media handle strings starting with the '@' symbol (e.g., '@sand.tagious', '@sa...ious').\n"
+    f"2. Look for username characters linked by periods '.' or underscores '_', even if partially obscured or cut in half.\n"
+    f"3. Look heavily near the bottom center edge margin of the vertical image canvas.\n\n"
     f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n\n"
     f"Tasks:\n"
     f"Identify the precise four corners enclosing the maximum perimeter boundary of this specific pattern watermark starting from top-left, going clockwise.\n"
@@ -353,7 +353,6 @@ if ai_response_text:
                 p3 = ai_coord_map.get("p3")
                 p4 = ai_coord_map.get("p4")
                 
-                # 🔥 CRITICAL DATA TYPE MAPPING FIX: Hardened structure back to exact native NumPy array specifications
                 raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
                 rect = cv2.minAreaRect(raw_pts)
                 box_points = cv2.boxPoints(rect)
@@ -379,15 +378,18 @@ if ai_response_text:
                     fit_y = int(pt[1] + (dy / len_d) * 14)
                     inflated_pts.append([np.clip(fit_x, 0, orig_width-2), np.clip(fit_y, 0, orig_height-2)])
                 
-                polygon_vertices = np.array(inflated_pts, dtype=np.int32)
-                watermark_detected = True
-                print(f"🎯 PATTERN MATCH TRACKING LOCK GRANTED! -> Angle: {watermark_angle:.2f}°")
+                test_poly = np.array(inflated_pts, dtype=np.int32)
+                if cv2.contourArea(test_poly) > 100:
+                    polygon_vertices = test_poly
+                    watermark_detected = True
+                    print(f"🎯 PATTERN MATCH TRACKING LOCK GRANTED! -> Angle: {watermark_angle:.2f}°")
+                else:
+                    print("📐 AI returned miniature shapes. Utilizing bottom-center macro lane protection fallback.")
     except Exception as data_fault:
         print(f"⚠️ Target structure parsing anomaly: {data_fault}")
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 (ABSOLUTE GEOMETRIC PLACEMENT & INPAINTER CORE)
+# PHASE A: PART 2 OF 2 (HARDWARE-ACCELERATED MORPHOLOGICAL RECONSTRUCTION)
 # ==========================================
 
 # --- 2. HARDWARE-ACCELERATED CONTENT-AWARE PIXEL HEALING MATRIX ---
@@ -405,7 +407,7 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # 🔥 FIXED: Unpack individual color channel tuple elements explicitly by index positions!
+    # Explicit scalar channel parsing to permanently stop 0-d TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -418,7 +420,6 @@ else:
 
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
 
-# Direct Geometric Extraction eliminates OpenCV bounding box warping crashes!
 min_x = int(np.min(polygon_vertices[:, 0]))
 max_x = int(np.max(polygon_vertices[:, 0]))
 min_y = int(np.min(polygon_vertices[:, 1]))
@@ -427,15 +428,14 @@ max_y = int(np.max(polygon_vertices[:, 1]))
 target_w = max_x - min_x
 target_h = max_y - min_y
 
-# Force stabilize flat inverse angles (like -180, 180, 0, or 90)
 if abs(watermark_angle) in [0.0, 90.0, 180.0]:
+    print("🔄 Flat baseline angle vector detected. Normalizing tracking matrix scale to 0.0° baseline...")
     watermark_angle = 0.0
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.35
 font_thickness = 1
 
-# Adaptive scaling loops to guarantee perfect container fit alignments
 for scale_step in np.arange(0.35, 1.4, 0.02):
     (test_w, test_h), _ = cv2.getTextSize("@AWRAM", font_face, scale_step, font_thickness)
     if test_w < (target_w * 0.85) and test_h < (target_h * 0.70):
@@ -447,46 +447,33 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 1. MORPHOLOGICAL TENSOR MASK INFLATION ENGINE
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
-    # Isolate every individual pixel text curve inside that specific visual zone
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, text_pixel_mask = cv2.threshold(gray_frame, 190, 255, cv2.THRESH_BINARY) # Locks onto watermark brightness channels
+    _, text_pixel_mask = cv2.threshold(gray_frame, 190, 255, cv2.THRESH_BINARY)
     
-    # Intersect matrices to focus only on text pixels, eliminating background noise
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # Inflate ONLY the exact text pixel lines outward by 6px to destroy soft anti-aliasing artifacts
     pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
     perfect_erasure_mask = cv2.dilate(pinpoint_watermark_pixels, pixel_kernel, iterations=1)
     
-    # Apply a broader geometric shield dilation layer to fully destroy underlying shadows
     fallback_dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (22, 22))
     inflated_geo_mask = cv2.dilate(raw_mask, fallback_dilation_kernel, iterations=1)
     
-    # Merge the exact pixel target mask with the background safety mask
     final_combined_mask = cv2.bitwise_or(perfect_erasure_mask, inflated_geo_mask)
-    
-    # Execute fast marching Telea inpainting on the expanded mask to erase the text cleanly
     healed_frame = cv2.inpaint(frame, final_combined_mask, inpaintRadius=6, flags=cv2.INPAINT_TELEA)
     
-    # Layer an elegant color-matched matte patch seamlessly over the original polygon mask vertices
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
     healed_frame = cv2.addWeighted(overlay_roi, 0.45, healed_frame, 0.55, 0)
     
-    # FIXED PINPOINT PLACEMENT SYSTEM:
-    # Directly calculates the center of gravity using absolute mathematical boundaries 
-    # to guarantee your new brand name is stamped exactly on top of the original watermark section!
     cx_m = min_x + (target_w // 2)
     cy_m = min_y + (target_h // 2)
         
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     
     if is_vertical and not (abs(watermark_angle) > 35):
-        # Handle strict top-to-bottom vertical text formatting loops gracefully
         char_y = cy_m - int((th * len("@AWRAM")) / 2)
         for char in "@AWRAM":
             (cw_s, ch_s), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
@@ -494,7 +481,6 @@ while cap.isOpened():
             cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
             char_y += ch_s + 6
     else:
-        # Handle standard or slanted angled line typography configurations natively
         tx_a = cx_m - (tw // 2)
         ty_a = cy_m + (th // 2)
         
@@ -502,11 +488,9 @@ while cap.isOpened():
         cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
         cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
         
-        # Apply rotational transformation matrices matching the original tilt angles exactly
         rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -watermark_angle, 1.0)
         rotated_text_layer = cv2.warpAffine(text_layer, rot_matrix, (orig_width, orig_height))
         
-        # Merge the slanted text onto the video frames flawlessly
         text_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY)
         _, alpha_mask = cv2.threshold(text_mask, 10, 255, cv2.THRESH_BINARY)
         alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
@@ -518,7 +502,6 @@ while cap.isOpened():
 cap.release()
 video_writer.release()
 
-# Remux sound container tracks cleanly onto the new video layout
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -528,6 +511,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: Flagship Multi-Angle Watermark erasure loop finalized flawlessly.")
+
 
 
 
