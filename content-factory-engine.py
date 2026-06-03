@@ -230,6 +230,8 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
+
+
 # ==========================================
 # PHASE A: PART 1 OF 2 (HINT-GUIDED GEMINI PRECISE LOCATOR MATRIX)
 # ==========================================
@@ -268,15 +270,14 @@ is_vertical = False
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# UPGRADED PATTERN-INTELLIGENCE PROMPT:
+# UPGRADED PATTERN-INTELLIGENCE PROMPT WITH STRUCTURAL SCAN HINTS:
 vision_prompt = (
     f"Perform an exhaustive pixel scan of this entire video frame to locate the creator's username watermark, brand handle, or logo stamp.\n"
     f"The watermark can be anywhere in the image (corners, center action, or edge lanes) and oriented at any slant angle.\n\n"
     f"💡 TARGET CRITERIA HINTS FOR PRECISION IDENTIFICATION:\n"
-    f"1. Check specifically for social media handle strings starting with the '@' symbol (e.g., '@reel', '@username').\n"
-    f"2. Look for username characters linked by underscores '_' or periods '.' instead of empty spaces (e.g., 'reel_nm', 'user.name').\n"
-    f"3. Scan for typical suffix stamps or short system platform branding strings like '_reels', '.mp4', '.tt', or channel signatures.\n"
-    f"4. The text is usually rendered in a light, high-contrast white or semi-transparent grey value.\n\n"
+    f"1. Check specifically for social media handle strings starting with the '@' symbol (e.g., '@sand.tagious', '@reel').\n"
+    f"2. Look for username characters linked by periods '.' or underscores '_' instead of empty spaces.\n"
+    f"3. The text is usually rendered in a light, high-contrast white or semi-transparent grey value.\n\n"
     f"The image parameters are Width: {orig_width} and Height: {orig_height}.\n\n"
     f"Tasks:\n"
     f"Identify the precise four corners enclosing the maximum perimeter boundary of this specific pattern watermark starting from top-left, going clockwise.\n"
@@ -308,7 +309,6 @@ if openrouter_key and ret_v:
             "X-Title": "Flagship Pattern-Guided Microservice"
         }
         
-        # ANTI-STRIP ENDPOINT MODEL SHIELD:
         current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
         print(f"📡 Querying Pattern-Guided Vision Endpoint Lane: {current_endpoint}")
         
@@ -331,7 +331,6 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
-            # 🔥 FIXED: Explicit choice array unboxing [0] handles OpenRouter's payload cleanly
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
                 ai_response_text = ai_data["choices"][0]["message"]["content"].strip()
                 print("🎉 Gemini 2.5 Flash successfully isolated the syntax-pattern watermark coordinates!")
@@ -354,6 +353,7 @@ if ai_response_text:
                 p3 = ai_coord_map.get("p3")
                 p4 = ai_coord_map.get("p4")
                 
+                # 🔥 CRITICAL DATA TYPE MAPPING FIX: Hardened structure back to exact native NumPy array specifications
                 raw_pts = np.array([p1, p2, p3, p4], dtype=np.int32)
                 rect = cv2.minAreaRect(raw_pts)
                 box_points = cv2.boxPoints(rect)
@@ -384,6 +384,7 @@ if ai_response_text:
                 print(f"🎯 PATTERN MATCH TRACKING LOCK GRANTED! -> Angle: {watermark_angle:.2f}°")
     except Exception as data_fault:
         print(f"⚠️ Target structure parsing anomaly: {data_fault}")
+
 
 # ==========================================
 # PHASE A: PART 2 OF 2 (ABSOLUTE GEOMETRIC PLACEMENT & INPAINTER CORE)
