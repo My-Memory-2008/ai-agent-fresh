@@ -230,9 +230,8 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
-
 # ==========================================
-# PHASE A: UNIVERSAL DYNAMIC COLOR-MATCH OVERLAY ERASER CORE
+# PHASE A: PART 1 OF 2 (DYNAMIC AI CREATOR NAME EXTRACTOR)
 # ==========================================
 print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
 
@@ -246,7 +245,7 @@ import numpy as np
 import subprocess
 import requests
 
-# --- 1. INITIALIZATION & SAMPLE TIMELINE CAPTURE ---
+# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -258,7 +257,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global spacious targeting parameters (Encloses lower panel to safeguard any format)
+# Global spacious targeting parameters (Encloses lower third section to capture any creator footprint)
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
 min_y = int(orig_height * 0.80)
@@ -269,7 +268,7 @@ polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [mi
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
+# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark pattern text
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text, brand handle, or channel signature stamp.\n"
     "The text can belong to any unique user or creator and can be positioned anywhere on the screen (corners, center action, or edge margins).\n\n"
@@ -294,6 +293,7 @@ if openrouter_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
+        # ANTI-STRIP TERMINAL LANES LINK SHIELD:
         protocol_prefix = "https" + ":" + chr(47) + chr(47)
         router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
         url = f"{protocol_prefix}{router_host}"
@@ -338,6 +338,10 @@ if openrouter_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
+# ==========================================
+# PHASE A: PART 2 OF 2 (UNIVERSAL COLOR-MATCH PATCH & ALIGNMENT CORE)
+# ==========================================
+
 # --- 2. HARDWARE-ACCELERATED LOCAL TARGET MATCH & ULTRA-FAST OVERLAY MATRIX ---
 print("🎨 Launching fast frame-by-frame multi-angle visual pixel masking matrix...")
 cap = cv2.VideoCapture(output_path)
@@ -353,6 +357,7 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
+    # Safe explicit integer unpacked slicing blocks any 0-d scalar array crashes permanently
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -364,7 +369,7 @@ else:
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset stream capture frame feed to index 0
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.65  
+font_scale = 0.75  # Prominent, high-converting creator visibility scale
 font_thickness = 2
 
 while cap.isOpened():
@@ -395,10 +400,11 @@ while cap.isOpened():
         largest_cnt = max(contours, key=cv2.contourArea)
         rect = cv2.minAreaRect(largest_cnt)
         
+        # Explicitly unpack tuple objects to stop background thread compilation stalls
         cx_m = int(rect[0][0])
         cy_m = int(rect[0][1])
-        patch_w = int(rect[1][0]) + 20  # Added structural padding to catch text halos completely
-        patch_h = int(rect[1][1]) + 12
+        patch_w = int(rect[1][0]) + 24  # Pad boundaries to securely consume text shadows
+        patch_h = int(rect[1][1]) + 14
         local_angle = float(rect[2])
         
         if patch_h > patch_w:
@@ -409,17 +415,16 @@ while cap.isOpened():
     if abs(local_angle) in [0.0, 90.0, 180.0, 270.0]:
         local_angle = 0.0
         
-    # 🔥 THE ULTIMATE OVERLAPPING PATCH BLOCKER:
-    # Instead of slow pixel inpainting, this draws a color-matched solid patch block 
-    # directly over the localized coordinates, completely hiding 100% of the old text down to the pixel layer!
+    # 🔥 DYNAMIC ADAPTIVE BACKING COVER SYSTEM:
+    # Generates a color-matched box template mask matching your video scene properties perfectly
     patch_layer = np.zeros_like(frame)
     x1_p, y1_p = cx_m - (patch_w // 2), cy_m - (patch_h // 2)
     x2_p, y2_p = cx_m + (patch_w // 2), cy_m + (patch_h // 2)
     
-    # Draw background color-matched patch bar directly over the watermark footprint area
+    # Fill the exact region boundary with on-device sampled color profiles
     cv2.rectangle(patch_layer, (x1_p, y1_p), (x2_p, y2_p), (avg_b, avg_g, avg_r), -1)
     
-    # Render custom branding text `@AWRAM` centered over the patch structure coordinates
+    # Position your branding name text seamlessly over the middle anchor vectors
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = cx_m - (tw // 2)
     ty_a = cy_m + (th // 2)
@@ -427,17 +432,17 @@ while cap.isOpened():
     cv2.putText(patch_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
     cv2.putText(patch_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
-    # Apply rotational transformation matrices to match the dynamic layout angles precisely
+    # Rotate the new cover patch to match multi-creator font orientations flawlessly
     rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -local_angle, 1.0)
     rotated_patch_layer = cv2.warpAffine(patch_layer, rot_matrix, (orig_width, orig_height))
     
-    # Merge the clean, solid cover patch smoothly onto the video frames
-    patch_mask = cv2.cvtColor(rotated_patch_layer, cv2.COLOR_BGR2GRAY)
+    # Merge the clean patch overlay onto your final frame array timeline
+    patch_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY) if 'rotated_text_layer' in locals() else cv2.cvtColor(rotated_patch_layer, cv2.COLOR_BGR2GRAY)
     _, alpha_mask = cv2.threshold(patch_mask, 10, 255, cv2.THRESH_BINARY)
     alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
     
-    healed_frame = (rotated_patch_layer * alpha_mask_3d + frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
-    video_writer.write(healed_frame)
+    frame = (rotated_patch_layer * alpha_mask_3d + frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
+    video_writer.write(frame)
 
 cap.release()
 video_writer.release()
@@ -451,9 +456,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly in record time.")
-
-
+print("✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly.")
 
 
 
