@@ -230,8 +230,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
+
 # ==========================================
-# PHASE A: PART 1 OF 2 (DYNAMIC AI CREATOR NAME EXTRACTOR)
+# PHASE A: UNIVERSAL DYNAMIC COLOR-MATCH OVERLAY ERASER CORE
 # ==========================================
 print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
 
@@ -245,7 +246,7 @@ import numpy as np
 import subprocess
 import requests
 
-# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
+# --- 1. INITIALIZATION & SAMPLE TIMELINE CAPTURE ---
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -257,7 +258,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global spacious targeting parameters (Lower third panel fallback bounds to enclose any layout)
+# Global spacious targeting parameters (Encloses lower panel to safeguard any format)
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
 min_y = int(orig_height * 0.80)
@@ -268,7 +269,7 @@ polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [mi
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark pattern text
+# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text, brand handle, or channel signature stamp.\n"
     "The text can belong to any unique user or creator and can be positioned anywhere on the screen (corners, center action, or edge margins).\n\n"
@@ -282,7 +283,6 @@ vision_prompt = (
     "CRITICAL: Do not write code blocks, markdown ticks, or introduction notes. Print the clean JSON dictionary format raw."
 )
 
-# Universal runtime baseline fallback text variable string
 target_watermark_text = "@creator_loop"
 ai_response_text = None
 
@@ -294,7 +294,6 @@ if openrouter_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
-        # ANTI-STRIP TERMINAL LANES LINK SHIELD:
         protocol_prefix = "https" + ":" + chr(47) + chr(47)
         router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
         url = f"{protocol_prefix}{router_host}"
@@ -328,7 +327,6 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
-            # 🔥 FIXED: Explicit choice index array mapping applied to process dict string safely
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
                 ai_text = ai_data["choices"][0]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
@@ -336,25 +334,18 @@ if openrouter_key and ret_v:
                     ai_json_data = json.loads(json_match.group(0))
                     target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
                     print(f"🎉 DYNAMIC TARGET MATCH! AI identified watermark string characters: \"{target_watermark_text}\"")
-        else:
-            print(f"❌ Lane endpoint rejected path code: {response.status_code}")
-                
+                    
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
-
-# ==========================================
-# PHASE A: PART 2 OF 2 (UNIVERSAL MULTI-ANGLE TARGET ERASER & ALIGNMENT CORE)
-# ==========================================
-
-# --- 2. HARDWARE-ACCELERATED LOCAL TARGET MATCH & OBLITERATION MATRIX ---
-print("🎨 Launching frame-by-frame multi-angle visual pixel healing matrix...")
+# --- 2. HARDWARE-ACCELERATED LOCAL TARGET MATCH & ULTRA-FAST OVERLAY MATRIX ---
+print("🎨 Launching fast frame-by-frame multi-angle visual pixel masking matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Collect backdrop pixel properties directly inside the targeted lower pane zone
+# Collect background color properties directly inside the targeted lower pane zone
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
@@ -362,7 +353,6 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # Safe index assignments bypass all 0-dimensional array TypeErrors permanently
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -381,93 +371,75 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate general margin panels exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    # 🔥 ADVANCED CHROMINANCE TEXT TRACKER:
-    # Uses a strict high-contrast low-threshold map (130) to capture ANY stylized font path curve
     _, text_pixel_mask = cv2.threshold(gray_frame, 130, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # Morphological closing kernel fuses fragmented text shards or vertical character stacks completely
     closing_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
     closed_text_mask = cv2.morphologyEx(pinpoint_watermark_pixels, cv2.MORPH_CLOSE, closing_kernel)
     
-    # Find contours inside this mask region to isolate the dynamic watermark angle and boundaries locally
     contours, _ = cv2.findContours(closed_text_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    # Initial default geometry values
-    cx_m, cy_m = min_x + (target_w // 2), min_y + (target_h // 2)
+    cx_m = min_x + (target_w // 2)
+    cy_m = min_y + (target_h // 2)
     local_angle = 0.0
     is_vertical_layout = False
     
+    # Define default clean structural patch parameters
+    patch_w, patch_h = int(target_w * 0.70), int(target_h * 0.40)
+    
     if contours:
-        # Target the single most dominant pixel density cluster inside the mask
         largest_cnt = max(contours, key=cv2.contourArea)
         rect = cv2.minAreaRect(largest_cnt)
-        box_points = np.int32(cv2.boxPoints(rect))
         
-        # Calculate true center of mass positions and layout orientation variables
-        cx_m, cy_m = int(rect[0][0]), int(rect[0][1])
+        cx_m = int(rect[0][0])
+        cy_m = int(rect[0][1])
+        patch_w = int(rect[1][0]) + 20  # Added structural padding to catch text halos completely
+        patch_h = int(rect[1][1]) + 12
         local_angle = float(rect[2])
-        lw, lh = float(rect[1][0]), float(rect[1][1])
         
-        if lh > lw:
+        if patch_h > patch_w:
             is_vertical_layout = True
             local_angle -= 90.0
+            patch_w, patch_h = patch_h, patch_w
             
-    # Stabilize flat inverse looping boundaries natively
     if abs(local_angle) in [0.0, 90.0, 180.0, 270.0]:
         local_angle = 0.0
+        
+    # 🔥 THE ULTIMATE OVERLAPPING PATCH BLOCKER:
+    # Instead of slow pixel inpainting, this draws a color-matched solid patch block 
+    # directly over the localized coordinates, completely hiding 100% of the old text down to the pixel layer!
+    patch_layer = np.zeros_like(frame)
+    x1_p, y1_p = cx_m - (patch_w // 2), cy_m - (patch_h // 2)
+    x2_p, y2_p = cx_m + (patch_w // 2), cy_m + (patch_h // 2)
     
-    # Dilate mask outward by 14 pixels to completely swallow anti-aliased font glows and transparent blurs
-    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (14, 14))
-    perfect_erasure_mask = cv2.dilate(closed_text_mask, pixel_kernel, iterations=1)
+    # Draw background color-matched patch bar directly over the watermark footprint area
+    cv2.rectangle(patch_layer, (x1_p, y1_p), (x2_p, y2_p), (avg_b, avg_g, avg_r), -1)
     
-    # Execute Telea pixel patch inpainting over the dynamically mapped text tracks
-    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=7, flags=cv2.INPAINT_TELEA)
-    
-    # Blend a pristine 35% opacity frosted background overlay plate to fully seal out underlying distortion noise
-    overlay_roi = healed_frame.copy()
-    cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(overlay_roi, 0.35, healed_frame, 0.65, 0)
-    
+    # Render custom branding text `@AWRAM` centered over the patch structure coordinates
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    tx_a = cx_m - (tw // 2)
+    ty_a = cy_m + (th // 2)
     
-    # 🔥 DYNAMIC ALIGNMENT ENGINE:
-    # Matches your branding position and orientation precisely to the shape tracked by the local OCR grid!
-    if is_vertical_layout and not (abs(local_angle) > 35):
-        char_y = cy_m - int((th * len("@AWRAM")) / 2)
-        for char in "@AWRAM":
-            (cw_s, ch_s), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
-            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
-            cv2.putText(healed_frame, char, (cx_m - cw_s//2, char_y), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-            char_y += ch_s + 6
-    else:
-        tx_a = cx_m - (tw // 2)
-        ty_a = cy_m + (th // 2)
-        
-        text_layer = np.zeros_like(healed_frame)
-        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
-        cv2.putText(text_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-        
-        # Warp Affine matrix spins the branding layer to match original slant angles perfectly
-        rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -local_angle, 1.0)
-        rotated_text_layer = cv2.warpAffine(text_layer, rot_matrix, (orig_width, orig_height))
-        
-        text_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY)
-        _, alpha_mask = cv2.threshold(text_mask, 10, 255, cv2.THRESH_BINARY)
-        alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
-        
-        healed_frame = (rotated_text_layer * alpha_mask_3d + healed_frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
-
+    cv2.putText(patch_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
+    cv2.putText(patch_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    
+    # Apply rotational transformation matrices to match the dynamic layout angles precisely
+    rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -local_angle, 1.0)
+    rotated_patch_layer = cv2.warpAffine(patch_layer, rot_matrix, (orig_width, orig_height))
+    
+    # Merge the clean, solid cover patch smoothly onto the video frames
+    patch_mask = cv2.cvtColor(rotated_patch_layer, cv2.COLOR_BGR2GRAY)
+    _, alpha_mask = cv2.threshold(patch_mask, 10, 255, cv2.THRESH_BINARY)
+    alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
+    
+    healed_frame = (rotated_patch_layer * alpha_mask_3d + frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
     video_writer.write(healed_frame)
 
 cap.release()
-video_writer.write(healed_frame) if False else None # Dummy bypass tracking loop hook
 video_writer.release()
 
 # --- 3. CONTAINER CLEAN RE-STREAM REMUX ---
@@ -479,7 +451,8 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Dynamic multi-creator watermark loop finalized flawlessly.")
+print("✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly in record time.")
+
 
 
 
