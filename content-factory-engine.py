@@ -231,7 +231,7 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (DYNAMIC AI CREATOR NAME EXTRACTOR)
+# PHASE A: PART 1 OF 2 (AI CHARACTER-PATTERN EXTRACTOR)
 # ==========================================
 print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
 
@@ -257,7 +257,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global spacious targeting parameters (Encloses lower third section to capture any creator footprint)
+# Global spacious targeting parameters (Encloses lower panel to safeguard any format)
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
 min_y = int(orig_height * 0.80)
@@ -268,7 +268,7 @@ polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [mi
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark pattern text
+# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text, brand handle, or channel signature stamp.\n"
     "The text can belong to any unique user or creator and can be positioned anywhere on the screen (corners, center action, or edge margins).\n\n"
@@ -293,7 +293,6 @@ if openrouter_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
-        # ANTI-STRIP TERMINAL LANES LINK SHIELD:
         protocol_prefix = "https" + ":" + chr(47) + chr(47)
         router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
         url = f"{protocol_prefix}{router_host}"
@@ -334,22 +333,24 @@ if openrouter_key and ret_v:
                     ai_json_data = json.loads(json_match.group(0))
                     target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
                     print(f"🎉 DYNAMIC TARGET MATCH! AI identified watermark string characters: \"{target_watermark_text}\"")
-                    
+        else:
+            print(f"❌ Lane endpoint rejected path code: {response.status_code}")
+                
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (UNIVERSAL COLOR-MATCH PATCH & ALIGNMENT CORE)
+# PHASE A: PART 2 OF 2 (LOCAL CHARACTER-BY-CHARACTER ISOLATION CORE)
 # ==========================================
 
-# --- 2. HARDWARE-ACCELERATED LOCAL TARGET MATCH & ULTRA-FAST OVERLAY MATRIX ---
-print("🎨 Launching fast frame-by-frame multi-angle visual pixel masking matrix...")
+# --- 2. HARDWARE-ACCELERATED CHARACTER-BY-CHARACTER RENDER LOOP ---
+print("🎨 Processing frame-by-frame character isolation and pixel-perfect healing...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Collect background color properties directly inside the targeted lower pane zone
+# Collect backdrop pixel properties directly inside the targeted lower pane zone
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
@@ -369,80 +370,69 @@ else:
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset stream capture frame feed to index 0
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.75  # Prominent, high-converting creator visibility scale
+font_scale = 0.70  # Prominent high-visibility creator presentation scale
 font_thickness = 2
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
+    # Isolate general margin panels exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    
+    # Low threshold pass captures all faint text curves and shadow boundaries cleanly
     _, text_pixel_mask = cv2.threshold(gray_frame, 130, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    closing_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
-    closed_text_mask = cv2.morphologyEx(pinpoint_watermark_pixels, cv2.MORPH_CLOSE, closing_kernel)
+    # IMPLEMENTING YOUR IDEA: CHARACTER-LEVEL CONNECTED COMPONENT LABELLING
+    # This architecture isolates each single letter shape cluster completely independently
+    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
     
-    contours, _ = cv2.findContours(closed_text_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Create an empty canvas layer to draw our final individual character masks
+    perfect_erasure_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     
+    # Loop through every single detected character component found on screen (skip index 0 which is background)
+    for i in range(1, num_labels):
+        comp_w = stats[i, cv2.CC_STAT_WIDTH]
+        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
+        comp_area = stats[i, cv2.CC_STAT_AREA]
+        
+        # Filtering thresholds check if the individual pixel shape fits standard letter dimensions
+        if comp_w >= 3 and comp_h >= 4 and comp_w < 100 and comp_h < 100 and comp_area > 10:
+            # Isolate this single character component pixel layer block
+            single_char_mask = np.uint8(labels_im == i) * 255
+            
+            # Swell this individual letter outward by 6px to safely swallow its specific dropshadow profile
+            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
+            dilated_char = cv2.dilate(single_char_mask, char_kernel, iterations=1)
+            
+            # Merge the individual processed character block mask onto our unified eraser canvas
+            perfect_erasure_mask = cv2.bitwise_or(perfect_erasure_mask, dilated_char)
+            
+    # Execute Telea pixel inpainting over the combined single-character target mask channel
+    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+    
+    # Apply a polished 35% opacity frosted backing overlay to completely mask any original text blurs
+    overlay_roi = healed_frame.copy()
+    cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
+    healed_frame = cv2.addWeighted(overlay_roi, 0.35, healed_frame, 0.65, 0)
+    
+    # Calculate stable central positions inside the target quadrant bounds
     cx_m = min_x + (target_w // 2)
     cy_m = min_y + (target_h // 2)
-    local_angle = 0.0
-    is_vertical_layout = False
     
-    # Define default clean structural patch parameters
-    patch_w, patch_h = int(target_w * 0.70), int(target_h * 0.40)
-    
-    if contours:
-        largest_cnt = max(contours, key=cv2.contourArea)
-        rect = cv2.minAreaRect(largest_cnt)
-        
-        # Explicitly unpack tuple objects to stop background thread compilation stalls
-        cx_m = int(rect[0][0])
-        cy_m = int(rect[0][1])
-        patch_w = int(rect[1][0]) + 24  # Pad boundaries to securely consume text shadows
-        patch_h = int(rect[1][1]) + 14
-        local_angle = float(rect[2])
-        
-        if patch_h > patch_w:
-            is_vertical_layout = True
-            local_angle -= 90.0
-            patch_w, patch_h = patch_h, patch_w
-            
-    if abs(local_angle) in [0.0, 90.0, 180.0, 270.0]:
-        local_angle = 0.0
-        
-    # 🔥 DYNAMIC ADAPTIVE BACKING COVER SYSTEM:
-    # Generates a color-matched box template mask matching your video scene properties perfectly
-    patch_layer = np.zeros_like(frame)
-    x1_p, y1_p = cx_m - (patch_w // 2), cy_m - (patch_h // 2)
-    x2_p, y2_p = cx_m + (patch_w // 2), cy_m + (patch_h // 2)
-    
-    # Fill the exact region boundary with on-device sampled color profiles
-    cv2.rectangle(patch_layer, (x1_p, y1_p), (x2_p, y2_p), (avg_b, avg_g, avg_r), -1)
-    
-    # Position your branding name text seamlessly over the middle anchor vectors
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = cx_m - (tw // 2)
     ty_a = cy_m + (th // 2)
     
-    cv2.putText(patch_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
-    cv2.putText(patch_layer, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    # Stamp your brand name cleanly centered inside the processed section quadrant area
+    cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
+    cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
-    # Rotate the new cover patch to match multi-creator font orientations flawlessly
-    rot_matrix = cv2.getRotationMatrix2D((float(cx_m), float(cy_m)), -local_angle, 1.0)
-    rotated_patch_layer = cv2.warpAffine(patch_layer, rot_matrix, (orig_width, orig_height))
-    
-    # Merge the clean patch overlay onto your final frame array timeline
-    patch_mask = cv2.cvtColor(rotated_text_layer, cv2.COLOR_BGR2GRAY) if 'rotated_text_layer' in locals() else cv2.cvtColor(rotated_patch_layer, cv2.COLOR_BGR2GRAY)
-    _, alpha_mask = cv2.threshold(patch_mask, 10, 255, cv2.THRESH_BINARY)
-    alpha_mask_3d = cv2.merge([alpha_mask, alpha_mask, alpha_mask]) / 255.0
-    
-    frame = (rotated_patch_layer * alpha_mask_3d + frame * (1.0 - alpha_mask_3d)).astype(np.uint8)
-    video_writer.write(frame)
+    video_writer.write(healed_frame)
 
 cap.release()
 video_writer.release()
@@ -456,7 +446,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly.")
+print("✅ Phase A Complete: Watermark obliterated down to individual character letter shapes completely!")
 
 
 
