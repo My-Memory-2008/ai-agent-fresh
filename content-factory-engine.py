@@ -230,10 +230,12 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
+
+
 # ==========================================
-# PHASE A: PART 1 OF 2 (DYNAMIC AI NAME SCANNER & ANCHOR MAP)
+# PHASE A: PART 1 OF 2 (AI DYNAMIC TEXT TRACKER & DIMENSION WORKSPACE)
 # ==========================================
-print("🧠 Launching Gemini Dynamic Pattern Scanner & Stationary Anchor Core...")
+print("🧠 Launching Gemini Dynamic Pattern Scanner & Adaptive Color Tracker Core...")
 
 import os
 import re
@@ -257,7 +259,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# EXTENDED LOWER MARGIN CONTAINER: Opens up boundaries down to 99% height to fully trap the low text footprints
+# Spacious lower panel quadrant to trap any multi-creator format layout safely
 min_x_fallback = int(orig_width * 0.15)
 max_x_fallback = int(orig_width * 0.85)
 min_y_fallback = int(orig_height * 0.82)
@@ -322,7 +324,6 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
-            # 🔥 CRITICAL FIX: Target the first choice index element [0] explicitly to process OpenRouter list array correctly!
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
                 ai_text = ai_data["choices"][0]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
@@ -333,16 +334,10 @@ if openrouter_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
-# --- 2. AUTOMATED BACKSTAGE CHANNEL SAMPLING & FIXED ANCHOR LOCK ---
+# --- 2. STATIONARY LOCK LAYER ANCHOR ASSIGNMENT ---
 if ret_v:
     temp_mask = np.zeros(sample_frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
-    avg_channels = cv2.mean(sample_frame, mask=temp_mask)
-    avg_b = int(avg_channels[0])
-    avg_g = int(avg_channels[1])
-    avg_r = int(avg_channels[2])
-    text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
-    
     gray_sample = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
     _, text_mask_sample = cv2.threshold(gray_sample, 125, 255, cv2.THRESH_BINARY)
     pinpoint_sample = cv2.bitwise_and(text_mask_sample, temp_mask)
@@ -361,35 +356,36 @@ if ret_v:
             
     if sample_x_points and sample_y_points:
         fixed_cx = int(np.min(sample_x_points)) + ((int(np.max(sample_x_points)) - int(np.min(sample_x_points))) // 2)
-        fixed_cy = int(np.min(sample_y_points)) + ((int(np.max(sample_y_points)) - int(np.min(sample_y_points))) // 2) - 12
+        fixed_cy = int(np.min(sample_y_points)) + ((int(np.max(sample_y_points)) - int(np.min(sample_y_points))) // 2) - 10
     else:
         fixed_cx = min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
-        fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2) - 12
+        fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2) - 10
 else:
-    avg_b, avg_g, avg_r = 240, 240, 240
-    text_color, shadow_color = (255, 255, 255), (15, 15, 15)
     fixed_cx = min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
-    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2) - 12
+    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2) - 10
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER OVERPAINT & LOCKED STATIONARY OVERLAY)
+# PHASE A: PART 2 OF 2 (PINPOINT LOCALIZED NEIGHBORHOOD CHARACTER OVERPAINT ENGINE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED CHARACTER SEPARATION & OVERPAINT PASS ---
-print("🎨 Processing frame-by-frame letter isolation and overpainting loops...")
+# --- 3. HARDWARE-ACCELERATED CHARACTER SEPARATION & REAL-TIME NEIGHBORHOOD PAINT Matrix ---
+print("🎨 Processing frame-by-frame letter isolation and adaptive neighborhood overpainting loops...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.50  # Clean presentation scale matching the native text width profile
+font_scale = 0.52  # Clean presentation scale matching the native text width profile
 font_thickness = 2
 
 split_characters_list = list(target_watermark_text)
+
+# Force-calculate high-visibility presentation typography colors
+text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -416,20 +412,44 @@ while cap.isOpened():
         comp_w = stats[i, cv2.CC_STAT_WIDTH]
         comp_h = stats[i, cv2.CC_STAT_HEIGHT]
         comp_area = stats[i, cv2.CC_STAT_AREA]
+        comp_x = stats[i, cv2.CC_STAT_LEFT]
+        comp_y = stats[i, cv2.CC_STAT_TOP]
         
         if comp_w >= 2 and comp_h >= 3 and comp_w < 65 and comp_h < 65 and comp_area > 4:
+            # Isolate the exact boolean pixel matrix index of this single letter down to the pixel curve
             single_char_mask = (labels_im == i)
             
-            # 🔥 ACTION 1: TARGETED REPLACEMENT OBLITERATION
-            # Overpaints *only* the specific letter paths with surrounding sand colors frame-by-frame
-            # No area-wide box layout or background plate is drawn here
-            frame[single_char_mask] = [avg_b, avg_g, avg_r]
+            # 🔥 THE REAL-TIME NEIGHBORHOOD SAMPLER:
+            # Instead of a static color box, define a tiny sampling boundary 2px outside this exact character bounding box
+            sample_y1 = max(0, comp_y - 2)
+            sample_y2 = min(frame.shape[0], comp_y + comp_h + 2)
+            sample_x1 = max(0, comp_x - 2)
+            sample_x2 = min(frame.shape[1], comp_x + comp_w + 2)
             
-            # Record coordinates into erasure map for localized inpaint healing
+            # Crop a small neighborhood block around the character and build a local text exclusion mask
+            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
+            local_text_roi = pinpoint_watermark_pixels[sample_y1:sample_y2, sample_x1:sample_x2]
+            local_bg_mask = cv2.bitwise_not(local_text_roi)
+            
+            # Sample the mean background color of the sand surrounding *only* this specific character box
+            local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
+            local_b = int(local_avg_channels[0])
+            local_g = int(local_avg_channels[1])
+            local_r = int(local_avg_channels[2])
+            
+            # Fallback to general dark gray color if sampling window collapses
+            if local_b == 0 and local_g == 0 and local_r == 0:
+                local_b, local_g, local_r = 230, 230, 230
+            
+            # 🔥 PINPOINT ADAPTIVE OVERPAINT:
+            # Overpaints *only* the specific letter paths with its dynamically matched surrounding color on this exact frame
+            frame[single_char_mask] = [local_b, local_g, local_r]
+            
+            # Record coordinates into erasure map for localized inpaint healing passes
             character_erasure_map[single_char_mask] = 255
             char_counter += 1
             
-    # 🔥 Banish text shadows and halos up to 8px out without drawing background box overlays
+    # Banish text shadows and halos up to 8px out smoothly without drawing block overlays
     if cv2.countNonZero(character_erasure_map) > 0:
         dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
         inflated_erasure_mask = cv2.dilate(character_erasure_map, dilation_kernel, iterations=1)
@@ -440,7 +460,7 @@ while cap.isOpened():
         inflated_fallback_mask = cv2.dilate(raw_mask, micro_kernel, iterations=1)
         frame = cv2.inpaint(frame, inflated_fallback_mask, inpaintRadius=2, flags=cv2.INPAINT_NS)
         
-    # --- ACTION 2: STATIONARY OVERLAY GENERATION ---
+    # --- LOCKED STATIONARY OVERLAY GENERATION ---
     # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
@@ -463,8 +483,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Watermark string obliterated letter-by-letter with 0% area-smudging flaws.")
-
+print("✅ Phase A Complete: Watermark string overpainted and obliterated letter-by-letter with 0% block smudging flaws.")
 
 
 # --------------------------------------------------
