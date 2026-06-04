@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI DYNAMIC IDENTIFIER & COLOR MATRIX BUILDER)
+# PHASE A: PART 1 OF 2 (AI CHARACTER TRACKER & STATIONARY ANCHOR MAP)
 # ==========================================
-print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
+print("🧠 Launching Gemini Dynamic Pattern Scanner & Stationary Anchor Core...")
 
 import os
 import re
@@ -258,7 +258,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global target parameters (Spacious container to enclose any lower third creator format layout)
+# Global spacious targeting parameters (Encloses lower panel to safeguard any creator format layout)
 min_x_fallback = int(orig_width * 0.22)
 max_x_fallback = int(orig_width * 0.78)
 min_y_fallback = int(orig_height * 0.84)
@@ -341,34 +341,62 @@ if openrouter_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
-# AUTOMATED BACKSTAGE CHANNEL SAMPLING Matrix
+# --- 2. AUTOMATED BACKSTAGE CHANNEL SAMPLING & FIXED ANCHOR LOCK ---
 if ret_v:
+    # 1. Sample backdrop colors cleanly out of the tuple format mapping
     temp_mask = np.zeros(sample_frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_frame, mask=temp_mask)
-    
-    # Map raw numeric color index primitives explicitly to avoid tuple crashes
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
+    
+    # 2. 🔥 THE STATIONARY LOCK: Scan the static image ONCE to calculate a permanent center anchor point
+    gray_sample = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
+    _, text_mask_sample = cv2.threshold(gray_sample, 125, 255, cv2.THRESH_BINARY)
+    pinpoint_sample = cv2.bitwise_and(text_mask_sample, temp_mask)
+    num_labels_s, _, stats_s, _ = cv2.connectedComponentsWithStats(pinpoint_sample)
+    
+    sample_x_points = []
+    sample_y_points = []
+    for i in range(1, num_labels_s):
+        sw = stats_s[i, cv2.CC_STAT_WIDTH]
+        sh = stats_s[i, cv2.CC_STAT_HEIGHT]
+        sx = stats_s[i, cv2.CC_STAT_LEFT]
+        sy = stats_s[i, cv2.CC_STAT_TOP]
+        if sw >= 2 and sh >= 3 and sw < 60 and sh < 60:
+            sample_x_points.extend([sx, sx + sw])
+            sample_y_points.extend([sy, sy + sh])
+            
+    if sample_x_points and sample_y_points:
+        fixed_cx = int(np.min(sample_x_points)) + ((int(np.max(sample_x_points)) - int(np.min(sample_x_points))) // 2)
+        fixed_cy = int(np.min(sample_y_points)) + ((int(np.max(sample_y_points)) - int(np.min(sample_y_points))) // 2)
+    else:
+        fixed_cx = min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
+        fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2)
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
+    fixed_cx = min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
+    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2)
+
+print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
+
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (ABSOLUTE GEOMETRIC OVERPAINT & CENTERED OVERLAY CORE)
+# PHASE A: PART 2 OF 2 (STATIONARY OVERLAY & MULTI-CREATOR LETTER PAINT CORE)
 # ==========================================
 
-# --- 2. HARDWARE-ACCELERATED CHARACTER SEPARATION & TARGETED OVERPAINT MATRIX ---
-print("🎨 Processing frame-by-frame character tracking, overpainting, and centered overlay blocks...")
+# --- 3. HARDWARE-ACCELERATED CHARACTER SEPARATION & TARGETED OVERPAINT MATRIX ---
+print("🎨 Processing frame-by-frame character paint masking and stationary overlay stabilization...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.70  # Clean, highly visible creator branding scale
+font_scale = 0.70  # Clean, highly visible presentation scale
 font_thickness = 2
 
 # Explode the dynamic text handle returned by Gemini into individual character track elements
@@ -379,7 +407,7 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate general margin panels exclusively
+    # Isolate general lower third container canvas exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
@@ -392,82 +420,38 @@ while cap.isOpened():
     # Map isolated character cluster pixel connectivity tables
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
     
-    # Store exact spatial coordinate limits to bind only the true text area geometry
-    discovered_x_points = []
-    discovered_y_points = []
     char_counter = 0
     
-    # Create an explicit target overpaint mask canvas layer
-    text_overpaint_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    
+    # Loop through every single separate letter component detected on screen
     for i in range(1, num_labels):
         if char_counter >= len(split_characters_list): break
         
         comp_w = stats[i, cv2.CC_STAT_WIDTH]
         comp_h = stats[i, cv2.CC_STAT_HEIGHT]
         comp_area = stats[i, cv2.CC_STAT_AREA]
-        comp_x = stats[i, cv2.CC_STAT_LEFT]
-        comp_y = stats[i, cv2.CC_STAT_TOP]
         
         # Verify the pixel cluster fits individual letter boundary dimensions
         if comp_w >= 2 and comp_h >= 3 and comp_w < 60 and comp_h < 60 and comp_area > 5:
-            single_char_mask = np.uint8(labels_im == i) * 255
+            # Isolate the exact pixel footprint of this single letter down to the pixel curve
+            single_char_mask = (labels_im == i)
             
-            # Swell this specific letter out by a tight 3px margin to trap anti-aliasing text halos
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_char = cv2.dilate(single_char_mask, char_kernel, iterations=1)
-            
-            # Merge this individual character target shape onto our unified overpaint map
-            text_overpaint_mask = cv2.bitwise_or(text_overpaint_mask, dilated_char)
-            
-            # Record literal bounding coordinate limits of the text lines
-            discovered_x_points.extend([comp_x, comp_x + comp_w])
-            discovered_y_points.extend([comp_y, comp_y + comp_h])
+            # 🔥 ACTION 1: OVERPAINT THE EXACT CHARACTER PIXELS WITH THE SURROUNDING BACKDROP COLOR
+            # Replaces the old text paths frame-by-frame with matching background tones to hide text layers completely
+            frame[single_char_mask] = [avg_b, avg_g, avg_r]
             char_counter += 1
             
-    # Calculate absolute geometric center anchors directly from the extracted text bounding box limits
-    if discovered_x_points and discovered_y_points:
-        text_min_x = int(np.min(discovered_x_coords)) if 'discovered_x_coords' in locals() else int(np.min(discovered_x_points))
-        text_max_x = int(np.max(discovered_x_coords)) if 'discovered_x_coords' in locals() else int(np.max(discovered_x_points))
-        text_min_y = int(np.min(discovered_y_coords)) if 'discovered_y_coords' in locals() else int(np.min(discovered_y_points))
-        text_max_y = int(np.max(discovered_y_coords)) if 'discovered_y_coords' in locals() else int(np.max(discovered_y_points))
-        
-        box_w = text_max_x - text_min_x
-        box_h = text_max_y - text_min_y
-        
-        cx_m = text_min_x + (box_w // 2)
-        cy_m = text_min_y + (box_h // 2)
-        
-        # Expand target bounding parameters slightly as a safety padding envelope
-        pad_x = 10
-        pad_y = 6
-        target_patch_vertices = np.array([
-            [np.clip(text_min_x - pad_x, 0, orig_width-1), np.clip(text_min_y - pad_y, 0, orig_height-1)],
-            [np.clip(text_max_x + pad_x, 0, orig_width-1), np.clip(text_min_y - pad_y, 0, orig_height-1)],
-            [np.clip(text_max_x + pad_x, 0, orig_width-1), np.clip(text_max_y + pad_y, 0, orig_height-1)],
-            [np.clip(text_min_x - pad_x, 0, orig_width-1), np.clip(text_max_y + pad_y, 0, orig_height-1)]
-        ], dtype=np.int32)
-    else:
-        # Secure static fallback center centered flawlessly inside the base panel quadrant bounds
-        cx_m = min_x_fallback + (target_w_fallback // 2) if 'target_w_fallback' in locals() else min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
-        cy_m = min_y_fallback + (target_h_fallback // 2) if 'target_h_fallback' in locals() else min_y_fallback + ((max_y_fallback - min_y_fallback) // 2)
-        target_patch_vertices = polygon_vertices
-
-    # 🔥 STEP 1 IN ACTION: OVERPAINT THE ENTIRE OLD WATERMARK REGION WITH SURROUNDING BACKDROP COLOR
-    # Completely replaces the text pixels with a smooth, solid color plate, ensuring 0% of the old text remains visible
-    cv2.fillPoly(frame, [target_patch_vertices], (avg_b, avg_g, avg_r))
+    # Draw an ultra-light vignette backdrop bar to fully swallow residual character dropshadow outlines
+    overlay_roi = frame.copy()
+    cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
+    frame = cv2.addWeighted(overlay_roi, 0.22, frame, 0.78, 0)
     
-    # Clean out any sharp edge lines left by the color plate pass smoothly
-    blur_roi = cv2.dilate(text_overpaint_mask if cv2.countNonZero(text_overpaint_mask) > 0 else raw_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-    frame = cv2.inpaint(frame, blur_roi, inpaintRadius=3, flags=cv2.INPAINT_NS)
-    
-    # Compute sizing footprint for your new custom handle typography layer
+    # Compute size parameters for the custom brand handle typography layer
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     
-    # 🔥 STEP 2 IN ACTION: STAMP NEW BRAND HANDLE EXACTLY CENTERED OVER THE PAINTED SECTION
-    # Completely covers the patch area with absolute coordinate accuracy so it never drifts out of alignment!
-    tx_a = cx_m - (tw // 2)
-    ty_a = cy_m + (th // 2)
+    # 🔥 ACTION 2: STAMP THE NEW BRAND HANDLE FLUSH ON TOP USING FIXED STATIONARY ANCHORS
+    # Uses the single coordinate set saved before the loop to guarantee 0% bouncing jitter!
+    tx_a = fixed_cx - (tw // 2)
+    ty_a = fixed_cy + (th // 2)
     
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
@@ -486,7 +470,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Old watermark completely overpainted and replaced with your precise centered brand handle!")
+print("✅ Phase A Complete: Multi-creator characters dynamically overpainted with stationary layout anchoring!")
 
 
 
