@@ -341,8 +341,9 @@ if openrouter_key and ret_v:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT ADAPTIVE SPLIT-CHARACTER INPAINTER)
+# PHASE A: PART 2 OF 2 (PINPOINT ISOLATED CHARACTER MATRIX & INPAINTER CORE)
 # ==========================================
 
 # --- 2. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT REMOVER ---
@@ -352,7 +353,7 @@ TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Sample regional backdrop pixel brightness to perfectly adjust brand font tones
+# Collect background color properties directly inside the targeted lower pane zone
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
@@ -379,6 +380,14 @@ font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.70  # Clean highly visible brand representation scale
 font_thickness = 2
 
+# Extract baseline geometry limits cleanly from the main polygon shell upfront
+base_min_x = int(np.min(polygon_vertices[:, 0]))
+base_max_x = int(np.max(polygon_vertices[:, 0]))
+base_min_y = int(np.min(polygon_vertices[:, 1]))
+base_max_y = int(np.max(polygon_vertices[:, 1]))
+base_w = base_max_x - base_min_x
+base_h = base_max_y - base_min_y
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
@@ -389,17 +398,19 @@ while cap.isOpened():
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # 🔥 UPGRADE: HIGH-SENSITIVITY THRESHOLD MATRIX
-    # Lowered to 95 to trap ultra-faint, curved text curves and font aliasing glows perfectly
+    # High-sensitivity threshold matrix traps ultra-faint, curved text loops and font aliasing glows perfectly
     _, text_pixel_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # Run Connected Components analysis to parse individual character pixel clusters
+    # Run Connected Components analysis to parse individual character pixel clusters independently
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
     
     # Create a clean pixel mask canvas
     perfect_erasure_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     char_counter = 0
+    
+    # Track localized coordinate variables for character centroids inside the loop safely
+    frame_cx, frame_cy = base_min_x + (base_w // 2), base_min_y + (base_h // 2)
     
     for i in range(1, num_labels):
         if char_counter >= len(split_characters_list): break
@@ -417,29 +428,35 @@ while cap.isOpened():
             dilated_char = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
             perfect_erasure_mask = cv2.bitwise_or(perfect_erasure_mask, dilated_char)
+            
+            # Dynamically shift positioning anchors relative to active character centroids discovered
+            frame_cx = int(centroids[i][0])
+            frame_cy = int(centroids[i][1])
             char_counter += 1
 
-    # If component matching drops parameters, fall back to a clean background shield mask automatically
+    # 🔥 FIXED LAYER PROTECTION OVERRIDE:
+    # If the threshold mask is empty, automatically use a localized feather path to prevent blocky bars!
     if cv2.countNonZero(perfect_erasure_mask) == 0:
-        perfect_erasure_mask = cv2.dilate(raw_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6)))
+        perfect_erasure_mask = cv2.dilate(raw_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
         
-    # 🔥 PIXEL-PERFECT HEALING: Erases the letters down to the pixel level using fluid mechanics inpainting
-    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=5, flags=cv2.INPAINT_NS)
+    # Erases the letters down to the pixel level completely using fluid mechanics image inpainting
+    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_NS)
     
-    # Soft translucent background plate (30% opacity) smooths out the underlying sand text halos cleanly
-    overlay_roi = healed_frame.copy()
-    cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(overlay_roi, 0.30, healed_frame, 0.70, 0)
+    # 🔥 REMOVED THE SOLID BLOCK: We use a soft, localized alpha feather overlay layer instead
+    # This prevents blocky bars and allows the surrounding background textures to show through completely!
+    alpha_overlay = healed_frame.copy()
+    cv2.fillPoly(alpha_overlay, [polygon_vertices], (avg_b, avg_g, avg_r))
+    healed_frame = cv2.addWeighted(alpha_overlay, 0.12, healed_frame, 0.88, 0) # Ultra-light blending path
     
-    # Calculate stable central positions inside the target quadrant bounds
-    cx_m = min_x + (target_w // 2)
-    cy_m = min_y + (target_h // 2)
+    # Use stabilized center coordinates relative to the quadrant bounding constraints
+    final_cx = base_min_x + (base_w // 2)
+    final_cy = base_min_y + (base_h // 2)
     
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-    tx_a = cx_m - (tw // 2)
-    ty_a = cy_m + (th // 2)
+    tx_a = final_cx - (tw // 2)
+    ty_a = final_cy + (th // 2)
     
-    # Stamp your pristine custom branding handle directly over the erased section quadrant area
+    # Stamp your brand name cleanly centered inside the processed section quadrant area
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
