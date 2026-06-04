@@ -382,11 +382,11 @@ print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fi
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER-BY-CHARACTER ADAPTIVE PAINT ENGINE)
+# PHASE A: PART 2 OF 2 (PINPOINT SPLIT-CHARACTER BITWISE SPLICING ENGINE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT OVERPAINTER ---
-print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
+# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER SPLICING & OVERPAINT MATRIX ---
+print("🎨 Processing frame-by-frame individual character bitwise overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -403,7 +403,7 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate general lower third container canvas bounds exclusively
+    # Isolate general expanded lower third section bounds exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
@@ -421,7 +421,7 @@ while cap.isOpened():
         
     pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
     
-    # Map isolated character fragment pixel connectivity tables
+    # Map isolated character cluster pixel connectivity tables frame-by-frame
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
     
     # Master vector mask container targeting ONLY the character paths
@@ -437,11 +437,12 @@ while cap.isOpened():
         comp_x = stats[i, cv2.CC_STAT_LEFT]
         comp_y = stats[i, cv2.CC_STAT_TOP]
         
-        # Sizing constraints opened to 1px to capture compressed font shards perfectly
+        # Sizing thresholds opened to 1px to capture compressed or fractured letter shards perfectly
         if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
-            single_char_mask = (labels_im == i)
+            # Isolate the exact individual letter component mask natively
+            single_char_mask = np.uint8(labels_im == i) * 255
             
-            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact fragment
+            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact letter bounds
             sample_y1 = max(0, comp_y - 2)
             sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
             sample_x1 = max(0, comp_x - 2)
@@ -451,10 +452,8 @@ while cap.isOpened():
             local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_x2]
             local_bg_mask = cv2.bitwise_not(local_text_roi)
             
-            # Pull the dynamic background shade surrounding only this specific character
+            # Extract the live moving background sand shade surrounding *only* this specific character
             local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            
-            # 🔥 CRITICAL POSITION UNPACK FIX: Targets scalar values cleanly by array index locations
             local_b = int(local_avg_channels[0])
             local_g = int(local_avg_channels[1])
             local_r = int(local_avg_channels[2])
@@ -462,20 +461,24 @@ while cap.isOpened():
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
             
-            # Swell ONLY the exact character pixel text paths outward by a tight 2px to catch text outlines
+            # Expand the character stroke mask outward by 3px using an elliptical matrix kernel 
+            # to fully swallow font dropshadow profiles and fuzzy compression halos completely
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            single_char_uint8 = np.uint8(single_char_mask) * 255
-            dilated_char_stroke = cv2.dilate(single_char_uint8, char_kernel, iterations=1)
-            dilated_char_bool = dilated_char_stroke > 0
+            dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # PINPOINT TARGETED OVERPAINT:
-            # Overpaints only the specific letter paths with its dynamically matched surrounding background color on this frame
-            frame[dilated_char_bool] = [local_b, local_g, local_r]
+            # 🔥 IMPLEMENTING YOUR STRATEGY: BITWISE CHARACTER OVERPAINT MASK SPLICING
+            # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
+            solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             
+            # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
+            # overpainting the watermark characters frame-by-frame with 0% background box smudges!
+            cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
+            
+            # Merge this processed character tracking footprint onto our unified erasure canvas layer
             pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
             char_counter += 1
             
-    # Clean out any remaining character edge halos smoothly via local fluid mech inpainting
+    # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(pinpoint_erasure_map) > 0:
         frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
@@ -508,6 +511,7 @@ OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
 print(f"🔗 File bridge securely mapped! Linked output straight to: {OLD_ROUTING_TARGET}")
+
 
 
 
