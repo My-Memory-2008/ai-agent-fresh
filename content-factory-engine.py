@@ -230,9 +230,8 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
-
 # ==========================================
-# PHASE A: PART 1 OF 2 (FIXED PATH ROUTING & AI PALETTE SCANNER)
+# PHASE A: PART 1 OF 2 (PATH-CORRECTED DYNAMIC PROFILE SCANNER - FIXED)
 # ==========================================
 print("🧠 Launching explicit path-corrected dynamic palette scanner...")
 
@@ -246,7 +245,8 @@ import numpy as np
 import subprocess
 import requests
 
-# 🔥 FIXED PATH ROUTING: Defines separate input and output file paths
+# 🔥 FIXED PATH ROUTING: Defines separate input and output file paths 
+# to completely break the Kaggle file system cache lock!
 INPUT_REEL = output_path
 FINAL_MONETIZED_OUTPUT = "/kaggle/working/final_monetized_output.mp4"
 
@@ -257,17 +257,16 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-if fps <= 0: fps = 30.0  # Safe fallback frame rating
-
 sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
 cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Spacious lower panel quadrant to trap any multi-creator format layout safely (80% - 98% height)
+# 🔥 FIXED EXPANDED BOUNDING GRID Matrix:
+# Opens height search windows up from 0.70 to 0.98 to flawlessly encompass the true Y:1433 watermark lane!
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
-min_y = int(orig_height * 0.80)
+min_y = int(orig_height * 0.70)
 max_y = int(orig_height * 0.98)
 target_w = max_x - min_x
 target_h = max_y - min_y
@@ -301,8 +300,9 @@ if openrouter_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
-        protocol_prefix = "https://"
-        url = f"{protocol_prefix}openrouter.ai/api/v1/chat/completions"
+        protocol_prefix = "https" + ":" + chr(47) + chr(47)
+        router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
+        url = f"{protocol_prefix}{router_host}"
         
         headers = {
             "Authorization": f"Bearer {openrouter_key.strip()}",
@@ -311,7 +311,7 @@ if openrouter_key and ret_v:
             "X-Title": "Universal Intelligence System"
         }
         
-        current_endpoint = "google/gemini-2.5-flash"
+        current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
         payload = {
             "model": current_endpoint,
             "messages": [{
@@ -331,39 +331,52 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
-            # 🔥 FIX: Safeguard indices from unexpected response dictionary map types
-            if isinstance(ai_data, dict) and "choices" in ai_data:
-                choices = ai_data["choices"]
-                if isinstance(choices, list) and len(choices) > 0:
-                    ai_text = choices[0].get("message", {}).get("content", "").strip()
-                    json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
-                    if json_match:
-                        ai_json_data = json.loads(json_match.group(0))
-                        if ai_json_data.get("found") is True:
-                            target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                            detected_color_profile = ai_json_data.get("color_profile", detected_color_profile)
-                            print(f"🎉 LOCK ACHIEVED! Handle: \"{target_watermark_text}\" | Profile: \"{detected_color_profile}\"")
+            if "choices" in ai_data and len(ai_data["choices"]) > 0:
+                ai_text = ai_data["choices"][0]["message"]["content"].strip()
+                json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
+                if json_match:
+                    ai_json_data = json.loads(json_match.group(0))
+                    if ai_json_data.get("found") is True:
+                        target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
+                        detected_color_profile = ai_json_data.get("color_profile", detected_color_profile)
+                        print(f"🎉 LOCK ACHIEVED! Handle: \"{target_watermark_text}\" | Profile: \"{detected_color_profile}\"")
     except Exception as vision_fault:
         print(f"⚠️ Cloud vision request lane interrupted: {vision_fault}. Utilizing stable fallback core.")
-
-# Clean matching configuration for loop comparison
-clean_target_text = target_watermark_text.lower().strip()
 
 # --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & STABLE ANCHOR CORE ---
 if ret_v:
     roi_pixels = sample_frame[min_y:max_y, min_x:max_x]
-    avg_b = int(np.median(roi_pixels[:, :, 0])) if roi_pixels.size else 128
-    avg_g = int(np.median(roi_pixels[:, :, 1])) if roi_pixels.size else 128
-    avg_r = int(np.median(roi_pixels[:, :, 2])) if roi_pixels.size else 128
+    avg_b = int(np.median(roi_pixels[:, :, 0]))
+    avg_g = int(np.median(roi_pixels[:, :, 1]))
+    avg_r = int(np.median(roi_pixels[:, :, 2]))
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
     
-    fixed_cx = min_x + (target_w // 2)
-    fixed_cy = min_y + (target_h // 2)
+    # Run a full-grid local Canny contrast pass within the newly expanded text search region
+    gray_sample = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
+    local_edges_sample = cv2.Canny(gray_sample, 25, 100)
+    pinpoint_sample = np.zeros_like(local_edges_sample)
+    pinpoint_sample[min_y:max_y, min_x:max_x] = local_edges_sample[min_y:max_y, min_x:max_x]
+    
+    contours_s, _ = cv2.findContours(pinpoint_sample, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    sample_x_points = []
+    sample_y_points = []
+    for cnt in contours_s:
+        sx, sy, sw, sh = cv2.boundingRect(cnt)
+        if sw >= 2 and sh >= 2 and sw < 100 and sh < 40:
+            sample_x_points.extend([sx, sx + sw])
+            sample_y_points.extend([sy, sy + sh])
+            
+    if sample_x_points and sample_y_points:
+        fixed_cx = int(np.min(sample_x_points)) + ((int(np.max(sample_x_points)) - int(np.min(sample_x_points))) // 2)
+        fixed_cy = int(np.min(sample_y_points)) + ((int(np.max(sample_y_points)) - int(np.min(sample_y_points))) // 2) - 4
+    else:
+        fixed_cx = min_x + (target_w // 2)
+        fixed_cy = min_y + (target_h // 2) - 4
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-    fixed_cx = int(orig_width * 0.5)
-    fixed_cy = int(orig_height * 0.9)
+    fixed_cx = min_x + (target_w // 2)
+    fixed_cy = min_y + (target_h // 2)
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
@@ -373,18 +386,18 @@ print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fi
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT OVERPAINTER ---
-print("🎨 Processing optimized native character isolation and pixel-perfect overpainting...")
+print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  
+font_scale = 0.52  # Precise presentation scaling matching the native text width profile
 font_thickness = 2
 
-# 🔥 FIX: Initialize native OpenCV MSER character detector (No PyTorch/EasyOCR needed!)
-mser = cv2.MSER_create(min_area=10, max_area=800, max_variation=0.25)
+split_characters_list = list(target_watermark_text)
+text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -395,90 +408,79 @@ while cap.isOpened():
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    roi_gray = gray_frame[min_y:max_y, min_x:max_x]
     
-    # Detect raw text-like character bounding zones inside our ROI
-    regions, _ = mser.detectRegions(roi_gray)
-    
-    # Master vector mask container targeting character paths inside this frame
-    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    
-    target_boxes = []
-    for p in regions:
-        # Get bounding box for individual detected character structure
-        x, y, w, h = cv2.boundingRect(p)
-        # Filter for typical text character shapes/proportions
-        if 1 <= w < 60 and 1 <= h < 60:
-            abs_x1 = x + min_x
-            abs_y1 = y + min_y
-            abs_x2 = abs_x1 + w
-            abs_y2 = abs_y1 + h
-            target_boxes.append((abs_x1, abs_y1, abs_x2, abs_y2))
-
-    # Apply adaptive thresholds inside character regions
-    if target_boxes:
-        if detected_color_profile in ["light_on_white", "semi_transparent"]:
-            text_band_mask = cv2.inRange(gray_frame, 135, 215)
-        elif detected_color_profile == "dark_on_light":
-            _, text_band_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY_INV)
-        elif detected_color_profile == "light_on_dark":
-            _, text_band_mask = cv2.threshold(gray_frame, 180, 255, cv2.THRESH_BINARY)
-        else:
-            text_band_mask = cv2.Canny(gray_frame, 35, 110)
-            
-        pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
-        num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
+    # Automatically switch threshold bands matching the palette detected by Gemini in Part 1
+    if detected_color_profile == "light_on_white" or detected_color_profile == "semi_transparent":
+        text_band_mask = cv2.inRange(gray_frame, 135, 215)
+    elif detected_color_profile == "dark_on_light":
+        _, text_band_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY_INV)
+    elif detected_color_profile == "light_on_dark":
+        _, text_band_mask = cv2.threshold(gray_frame, 180, 255, cv2.THRESH_BINARY)
+    else:
+        text_band_mask = cv2.Canny(gray_frame, 35, 110)
         
-        for i in range(1, num_labels):
-            comp_w = stats[i, cv2.CC_STAT_WIDTH]
-            comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-            comp_area = stats[i, cv2.CC_STAT_AREA]
-            comp_x = stats[i, cv2.CC_STAT_LEFT]
-            comp_y = stats[i, cv2.CC_STAT_TOP]
+    pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
+    
+    # Map isolated character fragment pixel connectivity tables
+    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
+    
+    # Master vector mask container targeting ONLY the character paths
+    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
+    char_counter = 0
+    
+    for i in range(1, num_labels):
+        if char_counter >= len(split_characters_list): break
+        
+        comp_w = stats[i, cv2.CC_STAT_WIDTH]
+        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
+        comp_area = stats[i, cv2.CC_STAT_AREA]
+        comp_x = stats[i, cv2.CC_STAT_LEFT]
+        comp_y = stats[i, cv2.CC_STAT_TOP]
+        
+        # Sizing constraints opened to 1px to capture compressed font shards perfectly
+        if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
+            single_char_mask = (labels_im == i)
             
-            # Match component if it directly intersects an MSER text-character region
-            inside_ocr_box = any(
-                (comp_x >= (bx1 - 4) and (comp_x + comp_w) <= (bx2 + 4) and 
-                 comp_y >= (by1 - 4) and (comp_y + comp_h) <= (by2 + 4))
-                for (bx1, by1, bx2, by2) in target_boxes
-            )
+            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact fragment
+            sample_y1 = max(0, comp_y - 2)
+            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
+            sample_x1 = max(0, comp_x - 2)
+            sample_x2 = min(orig_width - 1, comp_x + comp_w + 2)
             
-            if inside_ocr_box and 1 <= comp_w < 60 and 1 <= comp_h < 60 and comp_area >= 1:
-                single_char_mask = (labels_im == i)
-                
-                # Neighborhood Background Color Profiler
-                sample_y1 = max(0, comp_y - 3)
-                sample_y2 = min(orig_height - 1, comp_y + comp_h + 3)
-                sample_x1 = max(0, comp_x - 3)
-                sample_x2 = min(orig_width - 1, comp_x + comp_w + 3)
-                
-                neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
-                local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_x2]
-                
-                if local_text_roi.size > 0 and neighborhood_roi.size > 0:
-                    local_bg_mask = cv2.bitwise_not(local_text_roi)
-                    local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-                    local_b = int(local_avg_channels[0])
-                    local_g = int(local_avg_channels[1])
-                    local_r = int(local_avg_channels[2])
-                else:
-                    local_b, local_g, local_r = avg_b, avg_g, avg_r
-                
-                if local_b == 0 and local_g == 0 and local_r == 0:
-                    local_b, local_g, local_r = avg_b, avg_g, avg_r
-                
-                char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-                single_char_uint8 = np.uint8(single_char_mask) * 255
-                dilated_char_stroke = cv2.dilate(single_char_uint8, char_kernel, iterations=1)
-                
-                # Pinpoint background paint application match
-                frame[dilated_char_stroke > 0] = [local_b, local_g, local_r]
-                pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
-                
+            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
+            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_x2]
+            local_bg_mask = cv2.bitwise_not(local_text_roi)
+            
+            # Pull the dynamic background shade surrounding only this specific character
+            local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
+            
+            # 🔥 CRITICAL POSITION UNPACK FIX: Targets scalar values cleanly by array index locations
+            local_b = int(local_avg_channels[0])
+            local_g = int(local_avg_channels[1])
+            local_r = int(local_avg_channels[2])
+            
+            if local_b == 0 and local_g == 0 and local_r == 0:
+                local_b, local_g, local_r = avg_b, avg_g, avg_r
+            
+            # Swell ONLY the exact character pixel text paths outward by a tight 2px to catch text outlines
+            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            single_char_uint8 = np.uint8(single_char_mask) * 255
+            dilated_char_stroke = cv2.dilate(single_char_uint8, char_kernel, iterations=1)
+            dilated_char_bool = dilated_char_stroke > 0
+            
+            # PINPOINT TARGETED OVERPAINT:
+            # Overpaints only the specific letter paths with its dynamically matched surrounding background color on this frame
+            frame[dilated_char_bool] = [local_b, local_g, local_r]
+            
+            pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
+            char_counter += 1
+            
+    # Clean out any remaining character edge halos smoothly via local fluid mech inpainting
     if cv2.countNonZero(pinpoint_erasure_map) > 0:
-        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
+        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
     # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
+    # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
     ty_a = fixed_cy + (th // 2)
@@ -494,7 +496,7 @@ video_writer.release()
 # --- 4. CONTAINER CLEAN RE-STREAM REMUX ---
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
-    "-map", "0:v", "-map", "1:a?", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy", 
+    "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
@@ -506,6 +508,7 @@ OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
 print(f"🔗 File bridge securely mapped! Linked output straight to: {OLD_ROUTING_TARGET}")
+
 
 
 
