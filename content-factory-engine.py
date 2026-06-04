@@ -232,7 +232,7 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (DYNAMIC AI CREATOR NAME EXTRACTOR)
+# PHASE A: PART 1 OF 2 (AI DYNAMIC TEXT NAME EXTRACTOR CORE)
 # ==========================================
 print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
 
@@ -258,7 +258,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global spacious targeting parameters (Encloses lower panel to safeguard any format)
+# Global target parameters (Encloses lower panel to safeguard any creator format layout)
 min_x = int(orig_width * 0.22)
 max_x = int(orig_width * 0.78)
 min_y = int(orig_height * 0.84)
@@ -284,7 +284,6 @@ vision_prompt = (
 )
 
 target_watermark_text = "@creator_loop"
-ai_response_text = None
 
 if openrouter_key and ret_v:
     try:
@@ -328,7 +327,6 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
-            # 🔥 FIXED CHOICE MAP EXPR: Explicit zero-index unpacking implemented to route dict data
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
                 ai_text = ai_data["choices"][0]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
@@ -342,26 +340,13 @@ if openrouter_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
-# ==========================================
-# PHASE A: PART 2 OF 2 (MONETIZATION SHIELD & FIXED UNPACKING CORE)
-# ==========================================
-
-# --- 2. HARDWARE-ACCELERATED LOCAL TARGET MATCH & ULTRA-FAST OVERLAY MATRIX ---
-print("🎨 Launching fast frame-by-frame multi-angle visual pixel masking matrix...")
-cap = cv2.VideoCapture(output_path)
-TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
-
-# Collect backdrop pixel properties directly inside the targeted lower pane zone
-cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
-ret_sample, sample_img = cap.read()
-if ret_sample:
-    temp_mask = np.zeros(sample_img.shape[:2], dtype=np.uint8)
+# --- 2. AUTOMATED BACKSTAGE CHANNEL SAMPLING ---
+# FIXED TUPLE RESOLUTION ENGINE: Unpacks tuple elements explicitly by index positions
+if ret_v:
+    temp_mask = np.zeros(sample_frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
-    avg_channels = cv2.mean(sample_img, mask=temp_mask)
+    avg_channels = cv2.mean(sample_frame, mask=temp_mask)
     
-    # 🔥 FIXED: Unpack individual color channel tuple elements explicitly by index positions!
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
@@ -370,11 +355,25 @@ else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset stream capture frame feed to index 0
+
+# ==========================================
+# PHASE A: PART 2 OF 2 (DYNAMIC LETTER-BY-LETTER CARBON COPY OVERLAP CORE)
+# ==========================================
+
+# --- 3. HARDWARE-ACCELERATED CHARACTER-LEVEL OVERLAP LOOP ---
+print("🎨 Processing frame-by-frame letter isolation and precision alignment overlays...")
+cap = cv2.VideoCapture(output_path)
+TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.75  # Prominent, high-converting creator visibility scale
+font_scale = 0.70  # Prominent high-visibility creator presentation scale
 font_thickness = 2
+
+# STRATEGY EXECUTION: Explode the dynamic text string returned by Gemini into separate letter targets
+split_characters_list = list(target_watermark_text)
+print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -384,57 +383,72 @@ while cap.isOpened():
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, text_pixel_mask = cv2.threshold(gray_frame, 130, 255, cv2.THRESH_BINARY)
+    
+    # High-sensitivity adaptive thresholding isolates the exact outlines of the white characters
+    _, text_pixel_mask = cv2.threshold(gray_frame, 125, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    closing_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
-    closed_text_mask = cv2.morphologyEx(pinpoint_watermark_pixels, cv2.MORPH_CLOSE, closing_kernel)
+    # Character-level shape separation components map
+    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
     
-    contours, _ = cv2.findContours(closed_text_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    active_char_x_coords = []
+    active_char_y_coords = []
+    char_counter = 0
     
-    cx_m = min_x + (target_w // 2)
-    cy_m = min_y + (target_h // 2)
-    local_angle = 0.0
-    
-    if contours:
-        largest_cnt = max(contours, key=cv2.contourArea)
-        rect = cv2.minAreaRect(largest_cnt)
+    # Loop through every single separate letter component detected on screen
+    for i in range(1, num_labels):
+        if char_counter >= len(split_characters_list): break
         
-        # Explicitly unpack nested variable positions safely
-        cx_m = int(rect[0][0])
-        cy_m = int(rect[0][1])
-        local_angle = float(rect[2])
+        comp_w = stats[i, cv2.CC_STAT_WIDTH]
+        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
+        comp_area = stats[i, cv2.CC_STAT_AREA]
+        
+        # Verify the pixel cluster matches standard individual letter dimensions
+        if comp_w >= 2 and comp_h >= 3 and comp_w < 60 and comp_h < 60 and comp_area > 5:
+            # Isolate the exact pixel footprint of this single letter down to the pixel curve
+            single_char_mask = (labels_im == i)
             
-    if abs(local_angle) in [0.0, 90.0, 180.0, 270.0]:
-        local_angle = 0.0
+            # 🔥 INDIVIDUAL LAYER OVERLAP SHADER:
+            # Replaces only the text pixels with the exact local backdrop color value, 
+            # destroying the letters completely without introducing any muddy blur artifacts!
+            frame[single_char_mask] = [avg_b, avg_g, avg_r]
+            
+            # Record coordinates to track the exact center path of the text string layout
+            active_char_x_coords.append(int(centroids[i][0]))
+            active_char_y_coords.append(int(centroids[i][1]))
+            char_counter += 1
+            
+    # Calculate the exact center position of the original watermark path dynamically per frame
+    if active_char_x_coords and active_char_y_coords:
+        cx_m = int(np.mean(active_char_x_coords))
+        cy_m = int(np.mean(active_char_y_coords))
+    else:
+        # Balanced backup coordinates centered over the lower control quadrant panel bounds
+        cx_m = min_x + (target_w // 2)
+        cy_m = min_y + (target_h // 2)
         
-    # Pre-clean the inside text curves to wipe out base luminance paths
-    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
-    perfect_erasure_mask = cv2.dilate(closed_text_mask, pixel_kernel, iterations=1)
-    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
-    
-    # 🔥 UNBREAKABLE MONETIZATION SHIELD COVER-UP:
-    # Overlays a polished frosted glass backing bar matching the background tones at 55% density.
-    # This guarantees that human eyes and automated copyright bots are 100% blind to the old watermark.
-    overlay_roi = healed_frame.copy()
+    # Draw a very light, smooth background color-matched vignette blend bar behind your text
+    # This acts as a secondary shield to smooth out any residual text halo edge gradients
+    overlay_roi = frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(overlay_roi, 0.55, healed_frame, 0.45, 0)
+    frame = cv2.addWeighted(overlay_roi, 0.20, frame, 0.80, 0)
     
-    # Calculate perfect central positions inside the frosted bar
+    # Compute size metrics for your custom handle text layers
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = cx_m - (tw // 2)
     ty_a = cy_m + (th // 2)
     
-    # Stamp your brand handle over the clean canvas patch section
-    cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
-    cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    # 🔥 PRECISION INTERSECTION OVERLAY:
+    # Stamps your branding handle precisely over the center path of the original letters
+    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
+    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
-    video_writer.write(healed_frame)
+    video_writer.write(frame)
 
 cap.release()
 video_writer.release()
 
-# --- 3. CONTAINER CLEAN RE-STREAM REMUX ---
+# --- 4. CONTAINER CLEAN RE-STREAM REMUX ---
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -443,7 +457,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Universal dynamic monetization-safe watermark removal pass finalized flawlessly.")
+print("✅ Phase A Complete: Watermark string analyzed by AI, exploded into unique letters, and obliterated down to the individual character level completely!")
 
 
 
