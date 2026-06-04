@@ -341,19 +341,18 @@ if openrouter_key and ret_v:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 (SPLIT-CHARACTER LOCAL MATRIX MATCHING CORE)
+# PHASE A: PART 2 OF 2 (PINPOINT ADAPTIVE SPLIT-CHARACTER INPAINTER)
 # ==========================================
 
-# --- 2. HARDWARE-ACCELERATED SPLIT-CHARACTER SEPARATION & ERASURE LOOP ---
-print("🎨 Launching frame-by-frame split-character target isolation and healing matrix...")
+# --- 2. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT REMOVER ---
+print("🎨 Launching frame-by-frame pinpoint split-character isolation matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-# Collect backdrop pixel properties directly inside the targeted lower pane zone
+# Sample regional backdrop pixel brightness to perfectly adjust brand font tones
 cap.set(cv2.CAP_PROP_POS_FRAMES, random.choice(sample_frames_list))
 ret_sample, sample_img = cap.read()
 if ret_sample:
@@ -361,78 +360,76 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # Safe explicit integer unpacked slicing blocks any 0-d scalar array crashes permanently
+    # Pristine explicit color channels extraction to prevent 0-d array scalar TypeErrors
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
-    text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
+    
+    brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
+    text_color, shadow_color = ((45, 45, 45), (255, 255, 255)) if brightness > 127 else ((255, 255, 255), (15, 15, 15))
 else:
-    avg_b, avg_g, avg_r = 240, 240, 240
+    avg_b, avg_g, avg_r = 230, 230, 230
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset stream capture frame feed to index 0
+cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
 
-# 🔥 IMPLEMENTING YOUR STRATEGY: SPLIT THE TEXT INTO UNIQUE LETTERS AND SYMBOLS
-# Explodes the text dynamically identified by Gemini into an array of isolated character targets
+# Dynamically map tracking lists from the string characters passed down by Part 1
 split_characters_list = list(target_watermark_text)
-print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
-
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.70  # Prominent high-visibility creator presentation scale
+font_scale = 0.70  # Clean highly visible brand representation scale
 font_thickness = 2
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate lower boundary panels exclusively
+    # Isolate general margin panels exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # Local high-contrast extractor: isolates ultra-bright character shapes inside the region
-    _, text_pixel_mask = cv2.threshold(gray_frame, 130, 255, cv2.THRESH_BINARY)
+    # 🔥 UPGRADE: HIGH-SENSITIVITY THRESHOLD MATRIX
+    # Lowered to 95 to trap ultra-faint, curved text curves and font aliasing glows perfectly
+    _, text_pixel_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # Run Connected Components analysis to find every separate shape block on screen
+    # Run Connected Components analysis to parse individual character pixel clusters
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
     
-    # Create an empty eraser canvas layer to draw our final individual character masks
+    # Create a clean pixel mask canvas
     perfect_erasure_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    
-    # Tracker index mapping your characters to localized shapes sequentially
     char_counter = 0
     
-    # Loop through every single detected character component found on screen (skip index 0 which is background)
     for i in range(1, num_labels):
-        if char_counter >= len(split_characters_list): break  # All letters found and mapped
+        if char_counter >= len(split_characters_list): break
         
         comp_w = stats[i, cv2.CC_STAT_WIDTH]
         comp_h = stats[i, cv2.CC_STAT_HEIGHT]
         comp_area = stats[i, cv2.CC_STAT_AREA]
         
-        # Filtering thresholds check if the individual pixel shape fits a single letter box
-        if comp_w >= 3 and comp_h >= 4 and comp_w < 80 and comp_h < 80 and comp_area > 8:
-            # Isolate this single character component pixel layer block
+        # Capture character boxes (handles micro letters and thin font paths cleanly)
+        if comp_w >= 2 and comp_h >= 3 and comp_w < 60 and comp_h < 60 and comp_area > 5:
             single_char_mask = np.uint8(labels_im == i) * 255
             
-            # 🔥 CHARACTER-LEVEL SHADOW ERASURE:
-            # Swell this individual character block outward by 6px to safely swallow its specific anti-aliased shadows
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
+            # Swell ONLY the exact character pixel text lines outward to avoid blocky smudges
+            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
             dilated_char = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # Merge the individual processed character block mask onto our unified eraser canvas
             perfect_erasure_mask = cv2.bitwise_or(perfect_erasure_mask, dilated_char)
             char_counter += 1
-            
-    # Execute Telea pixel inpainting over the combined single-character target mask channel
-    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+
+    # If component matching drops parameters, fall back to a clean background shield mask automatically
+    if cv2.countNonZero(perfect_erasure_mask) == 0:
+        perfect_erasure_mask = cv2.dilate(raw_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6)))
+        
+    # 🔥 PIXEL-PERFECT HEALING: Erases the letters down to the pixel level using fluid mechanics inpainting
+    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=5, flags=cv2.INPAINT_NS)
     
-    # Apply a polished 35% opacity frosted backing overlay to completely mask any text shadows or blurs
+    # Soft translucent background plate (30% opacity) smooths out the underlying sand text halos cleanly
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(overlay_roi, 0.35, healed_frame, 0.65, 0)
+    healed_frame = cv2.addWeighted(overlay_roi, 0.30, healed_frame, 0.70, 0)
     
     # Calculate stable central positions inside the target quadrant bounds
     cx_m = min_x + (target_w // 2)
@@ -442,7 +439,7 @@ while cap.isOpened():
     tx_a = cx_m - (tw // 2)
     ty_a = cy_m + (th // 2)
     
-    # Stamp your new custom branding handle cleanly centered inside the processed section quadrant area
+    # Stamp your pristine custom branding handle directly over the erased section quadrant area
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
@@ -460,8 +457,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Watermark string analyzed by AI, exploded into unique letters, and obliterated down to the individual character level completely!")
-
+print("✅ Phase A Complete: Watermark string obliterated down to the individual letter pixels smoothly!")
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
