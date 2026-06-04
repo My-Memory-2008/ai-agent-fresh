@@ -362,10 +362,10 @@ print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fi
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PATH-CORRECTED VECTOR INVERSE MASKING LOOP)
+# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER-BY-CHARACTER ADAPTIVE PAINT ENGINE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC OVERPAINT PASS ---
+# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT OVERPAINTER ---
 print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -373,7 +373,7 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Precise presentation typography scaling matching standard guidelines
+font_scale = 0.52  # Precise presentation scaling matching the native text width profile
 font_thickness = 2
 
 split_characters_list = list(target_watermark_text)
@@ -383,29 +383,25 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
+    # Isolate general lower third container canvas bounds exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # INTELLIGENT PROFILE OVERRIDE ENGINE:
-    # Dynamically tunes pixel extraction thresholds according to the palette metadata flagged by Gemini
+    # Automatically switch threshold bands matching the palette detected by Gemini in Part 1
     if detected_color_profile == "light_on_white" or detected_color_profile == "semi_transparent":
-        # Flips threshold ranges to bypass blinding canvas reflection spikes (>215) and isolate faint text grooves
         text_band_mask = cv2.inRange(gray_frame, 135, 215)
     elif detected_color_profile == "dark_on_light":
-        # Locks strictly onto dark alphanumeric ink paths (<95) over flat light canvases
         _, text_band_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY_INV)
     elif detected_color_profile == "light_on_dark":
-        # Targets bright white high-luminance stamps (>180) resting over dark backing bars
         _, text_band_mask = cv2.threshold(gray_frame, 180, 255, cv2.THRESH_BINARY)
     else:
-        # High-sensitivity Canny contrast tracking baseline fallback matrix
         text_band_mask = cv2.Canny(gray_frame, 35, 110)
         
     pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
     
-    # Map isolated character cluster pixel connectivity tables
+    # Map isolated character fragment pixel connectivity tables
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
     
     # Master vector mask container targeting ONLY the character paths
@@ -421,39 +417,37 @@ while cap.isOpened():
         comp_x = stats[i, cv2.CC_STAT_LEFT]
         comp_y = stats[i, cv2.CC_STAT_TOP]
         
-        # Verify the pixel cluster fits individual letter boundary dimensions inside the sand area
-        if comp_w >= 2 and comp_h >= 3 and comp_w < 55 and comp_h < 55 and comp_area > 4:
+        # 🔥 CRITICAL FIX: Sizing constraints opened to 1px to capture compressed font shards perfectly
+        if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
             single_char_mask = (labels_im == i)
             
-            sample_y1 = max(0, comp_y - 3)
-            sample_y2 = min(orig_height - 1, comp_y + comp_h + 3)
-            sample_x1 = max(0, comp_x - 3)
-            sample_x2 = min(orig_width - 1, comp_x + comp_w + 3)
+            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact fragment
+            sample_y1 = max(0, comp_y - 2)
+            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
+            sample_x1 = max(0, comp_x - 2)
+            sample_x2 = min(orig_width - 1, comp_x + comp_w + 2)
             
             neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
             local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_x2]
             local_bg_mask = cv2.bitwise_not(local_text_roi)
             
+            # Pull the dynamic background shade surrounding *only* this specific character
             local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            
-            # 🔥 FIXED: Unpack loop tuple data explicitly by absolute channel array indices to prevent type crashes!
             local_b = int(local_avg_channels[0])
             local_g = int(local_avg_channels[1])
             local_r = int(local_avg_channels[2])
             
-            # Safe text contrast fallback if sampling array collapses
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
             
-            # Swell ONLY the exact character pixel text stroke paths outward by an ultra-tight 3px 
-            # to securely consume font drop-shadows and anti-aliasing outlines without blurring sand textures
+            # Swell ONLY the exact character pixel text paths outward by a tight 2px to catch text outlines
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             single_char_uint8 = np.uint8(single_char_mask) * 255
             dilated_char_stroke = cv2.dilate(single_char_uint8, char_kernel, iterations=1)
             dilated_char_bool = dilated_char_stroke > 0
             
-            # PINPOINT TARGETED OVERPAINT:
-            # Replaces *only* the specific letter paths with its dynamically matched surrounding color on this frame
+            # 🔥 PINPOINT TARGETED OVERPAINT:
+            # Overpaints *only* the specific letter paths with its dynamically matched surrounding background color on this frame
             frame[dilated_char_bool] = [local_b, local_g, local_r]
             
             pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
@@ -478,7 +472,6 @@ cap.release()
 video_writer.release()
 
 # --- 4. CONTAINER CLEAN RE-STREAM REMUX ---
-# Writes the final presentation asset directly to your output directory path destination
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
@@ -489,8 +482,6 @@ if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
 # THE AUTOMATED SYMLINK BRIDGE:
-# Dynamically mirrors and links the file assets right onto the old path signature name.
-# This ensures your next cell (the editing phase) runs flawlessly with zero path errors!
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
