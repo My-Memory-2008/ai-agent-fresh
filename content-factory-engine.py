@@ -232,7 +232,7 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI DYNAMIC TEXT NAME EXTRACTOR & ANCHOR CORE)
+# PHASE A: PART 1 OF 2 (AI CHARACTER TRACKER & ABSOLUTE BASELINE LOCK)
 # ==========================================
 print("🧠 Launching Gemini Dynamic Pattern Scanner & Stationary Anchor Core...")
 
@@ -258,11 +258,11 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global target parameters (Encloses the lower 84% - 96% height zone where the watermark lives)
-min_x_fallback = int(orig_width * 0.20)
-max_x_fallback = int(orig_width * 0.80)
-min_y_fallback = int(orig_height * 0.84)
-max_y_fallback = int(orig_height * 0.95)
+# Spacious lower panel quadrant to trap any multi-creator format layout safely (82% - 99% height)
+min_x_fallback = int(orig_width * 0.15)
+max_x_fallback = int(orig_width * 0.85)
+min_y_fallback = int(orig_height * 0.82)
+max_y_fallback = int(orig_height * 0.99)
 polygon_vertices = np.array([[min_x_fallback, min_y_fallback], 
                              [max_x_fallback, min_y_fallback], 
                              [max_x_fallback, max_y_fallback], 
@@ -270,7 +270,6 @@ polygon_vertices = np.array([[min_x_fallback, min_y_fallback],
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text, brand handle, or channel signature stamp.\n"
     "The text can belong to any unique user or creator and can be positioned anywhere on the screen (corners, center action, or edge margins).\n\n"
@@ -324,9 +323,8 @@ if openrouter_key and ret_v:
             
         if response.status_code == 200:
             ai_data = response.json()
-            # FIXED: Target the first choice index element explicitly to process OpenRouter list array correctly
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_text = ai_data["choices"][0]["message"]["content"].strip()
+                ai_text = ai_data["choices"]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
                 if json_match:
                     ai_json_data = json.loads(json_match.group(0))
@@ -346,92 +344,89 @@ if ret_v:
     
     # Calculate absolute baseline geometry anchors
     fixed_cx = min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
-    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2)
+    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2) - 10
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
     fixed_cx = min_x_fallback + ((max_x_fallback - min_x_fallback) // 2)
-    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2)
+    fixed_cy = min_y_fallback + ((max_y_fallback - min_y_fallback) // 2) - 10
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER-BY-CHARACTER OVERPAINT MATRIX)
+# PHASE A: PART 2 OF 2 (PURE BITWISE LETTER OVERPAINT & ALIGNMENT CORE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC STEPPED CHARACTER OVERPAINT ENGINE ---
-print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
+# --- 3. HARDWARE-ACCELERATED VECTOR BITWISE OVERPAINT PASS ---
+print("🎨 Processing frame-by-frame pinpoint stroke isolation and overpainting loops...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.60  # Clean presentation scale matching the native text width profile
+font_scale = 0.52  # Presentation scale matching native typography footprint dimensions
 font_thickness = 2
 
-# Explode the text string string returned by Gemini into individual character targets
 split_characters_list = list(target_watermark_text)
-num_chars = len(split_characters_list)
-
-# Define clean formatting colors for your new branding handle typography
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # 🔥 THE STEPPED SPATIAL SWEEP:
-    # Instead of filtering pixels, calculate the precise box coordinates for each letter
-    # by splitting the horizontal target window into evenly spaced character sub-sections.
-    char_box_w = float(target_w_fallback) / num_chars if 'target_w_fallback' in locals() else float(max_x_fallback - min_x_fallback) / num_chars
-    char_box_h = float(target_h_fallback) if 'target_h_fallback' in locals() else float(max_y_fallback - min_y_fallback)
+    # 1. 🔥 THE PURE BITWISE CHARACTER STROKE MATRIX:
+    # Build an isolation lane strictly over the lower margin window quadrant bounds
+    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
-    # Master erasure mask container tracking processed character bounds
-    character_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
+    # Extract the fine high-frequency text outlines natively inside the frame
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _, high_contrast_mask = cv2.threshold(gray_frame, 120, 255, cv2.THRESH_BINARY)
+    pinpoint_character_strokes = cv2.bitwise_and(high_contrast_mask, raw_mask)
     
-    for idx in range(num_chars):
-        # Calculate the exact pixel boundaries enclosing this individual letter channel
-        start_x = int(min_x_fallback + (idx * char_box_w))
-        end_x = int(min_x_fallback + ((idx + 1) * char_box_w))
-        start_y = int(min_y_fallback)
-        end_y = int(max_y_fallback)
+    # Isolate independent character pixel clusters to run dimension checks
+    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
+    
+    # Master vector mask container targeting ONLY the character paths
+    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
+    char_counter = 0
+    
+    for i in range(1, num_labels):
+        if char_counter >= len(split_characters_list): break
         
-        # Pull a local neighborhood color sample 4px wide directly to the left and right of the character bounds
-        sample_left_x = max(0, start_x - 4)
-        sample_right_x = min(frame.shape[1] - 1, end_x + 4)
+        comp_w = stats[i, cv2.CC_STAT_WIDTH]
+        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
+        comp_area = stats[i, cv2.CC_STAT_AREA]
         
-        bg_sample_left = frame[start_y:end_y, sample_left_x:start_x]
-        bg_sample_right = frame[start_y:end_y, end_x:sample_right_x]
-        
-        # Calculate the exact background color of the sand surrounding *only* this specific character
-        if bg_sample_left.size > 0 and bg_sample_right.size > 0:
-            local_b = int((np.median(bg_sample_left[:, :, 0]) + np.median(bg_sample_right[:, :, 0])) / 2)
-            local_g = int((np.median(bg_sample_left[:, :, 1]) + np.median(bg_sample_right[:, :, 1])) / 2)
-            local_r = int((np.median(bg_sample_left[:, :, 2]) + np.median(bg_sample_right[:, :, 2])) / 2)
-        else:
-            local_b, local_g, local_r = avg_b, avg_g, avg_r
+        # Micro filter isolates literal letter paths, ignoring broad background block artifacts
+        if comp_w >= 2 and comp_h >= 3 and comp_w < 55 and comp_h < 55 and comp_area > 4:
+            single_char_mask = (labels_im == i)
             
-        # Add a 1px tight internal safety inset to avoid touching edge artifacts
-        inset_start_x = start_x + 1
-        inset_end_x = end_x - 1
-        inset_start_y = start_y + 1
-        inset_end_y = end_y - 1
+            # Swell ONLY the exact character pixel text stroke paths outward by an ultra-tight 2px 
+            # to securely consume font drop-shadows and anti-aliasing outlines without blurring sand textures
+            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            single_char_uint8 = np.uint8(single_char_mask) * 255
+            dilated_char_stroke = cv2.dilate(single_char_uint8, char_kernel, iterations=1)
+            
+            # Merge this individual character stroke onto our unified eraser vector canvas
+            pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
+            char_counter += 1
+            
+    # Apply a direct boolean map mask channel
+    erasure_indices = pinpoint_erasure_map > 0
+    
+    # 🔥 ピンポイント上書き (THE PINPOINT OVERPAINT):
+    # Paints *only* the specific letter stroke coordinates with the matching background sand color.
+    # Completely strips out the rectangle box drawing layers to keep adjacent textures 100% untouched!
+    frame[erasure_indices] = [avg_b, avg_g, avg_r]
+    
+    # Run a localized fluid mapping patch over the exact 2px letter coordinates to smooth trace paths
+    if cv2.countNonZero(pinpoint_erasure_map) > 0:
+        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
-        # 🔥 Pinpoint Overpaint: Paints *only* the specific letter block path frame by frame
-        # with its matched local background color, rendering the old text completely invisible.
-        frame[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = [local_b, local_g, local_r]
-        
-        # Track the individual character region inside the erasure canvas layer
-        character_erasure_map[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = 255
-        
-    # Run a fast fluid marching patch pass to smooth out any residual letter boundaries
-    if cv2.countNonZero(character_erasure_map) > 0:
-        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4))
-        inflated_erasure_mask = cv2.dilate(character_erasure_map, dilation_kernel, iterations=1)
-        frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
-        
-    # --- ACTION 2: STATIONARY OVERLAY GENERATION ---
+    # --- 2. LOCKED STATIONARY OVERLAY GENERATION ---
     # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
@@ -455,6 +450,7 @@ subprocess.run([
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print("✅ Phase A Complete: Watermark string overpainted and obliterated letter-by-letter with 0% block smudging flaws.")
+
 
 
 # --------------------------------------------------
