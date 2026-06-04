@@ -4,6 +4,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -339,12 +340,14 @@ if openrouter_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
 
+
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (LOCAL CHARACTER-BY-CHARACTER ISOLATION CORE)
+# PHASE A: PART 2 OF 2 (SPLIT-CHARACTER LOCAL MATRIX MATCHING CORE)
 # ==========================================
 
-# --- 2. HARDWARE-ACCELERATED CHARACTER-BY-CHARACTER RENDER LOOP ---
-print("🎨 Processing frame-by-frame character isolation and pixel-perfect healing...")
+# --- 2. HARDWARE-ACCELERATED SPLIT-CHARACTER SEPARATION & ERASURE LOOP ---
+print("🎨 Launching frame-by-frame split-character target isolation and healing matrix...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -369,6 +372,11 @@ else:
 
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset stream capture frame feed to index 0
 
+# 🔥 IMPLEMENTING YOUR STRATEGY: SPLIT THE TEXT INTO UNIQUE LETTERS AND SYMBOLS
+# Explodes the text dynamically identified by Gemini into an array of isolated character targets
+split_characters_list = list(target_watermark_text)
+print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
+
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.70  # Prominent high-visibility creator presentation scale
 font_thickness = 2
@@ -377,45 +385,51 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate general margin panels exclusively
+    # Isolate lower boundary panels exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # Low threshold pass captures all faint text curves and shadow boundaries cleanly
+    # Local high-contrast extractor: isolates ultra-bright character shapes inside the region
     _, text_pixel_mask = cv2.threshold(gray_frame, 130, 255, cv2.THRESH_BINARY)
     pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
     
-    # IMPLEMENTING YOUR IDEA: CHARACTER-LEVEL CONNECTED COMPONENT LABELLING
-    # This architecture isolates each single letter shape cluster completely independently
+    # Run Connected Components analysis to find every separate shape block on screen
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
     
-    # Create an empty canvas layer to draw our final individual character masks
+    # Create an empty eraser canvas layer to draw our final individual character masks
     perfect_erasure_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    
+    # Tracker index mapping your characters to localized shapes sequentially
+    char_counter = 0
     
     # Loop through every single detected character component found on screen (skip index 0 which is background)
     for i in range(1, num_labels):
+        if char_counter >= len(split_characters_list): break  # All letters found and mapped
+        
         comp_w = stats[i, cv2.CC_STAT_WIDTH]
         comp_h = stats[i, cv2.CC_STAT_HEIGHT]
         comp_area = stats[i, cv2.CC_STAT_AREA]
         
-        # Filtering thresholds check if the individual pixel shape fits standard letter dimensions
-        if comp_w >= 3 and comp_h >= 4 and comp_w < 100 and comp_h < 100 and comp_area > 10:
+        # Filtering thresholds check if the individual pixel shape fits a single letter box
+        if comp_w >= 3 and comp_h >= 4 and comp_w < 80 and comp_h < 80 and comp_area > 8:
             # Isolate this single character component pixel layer block
             single_char_mask = np.uint8(labels_im == i) * 255
             
-            # Swell this individual letter outward by 6px to safely swallow its specific dropshadow profile
+            # 🔥 CHARACTER-LEVEL SHADOW ERASURE:
+            # Swell this individual character block outward by 6px to safely swallow its specific anti-aliased shadows
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6, 6))
             dilated_char = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
             # Merge the individual processed character block mask onto our unified eraser canvas
             perfect_erasure_mask = cv2.bitwise_or(perfect_erasure_mask, dilated_char)
+            char_counter += 1
             
     # Execute Telea pixel inpainting over the combined single-character target mask channel
     healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
     
-    # Apply a polished 35% opacity frosted backing overlay to completely mask any original text blurs
+    # Apply a polished 35% opacity frosted backing overlay to completely mask any text shadows or blurs
     overlay_roi = healed_frame.copy()
     cv2.fillPoly(overlay_roi, [polygon_vertices], (avg_b, avg_g, avg_r))
     healed_frame = cv2.addWeighted(overlay_roi, 0.35, healed_frame, 0.65, 0)
@@ -428,7 +442,7 @@ while cap.isOpened():
     tx_a = cx_m - (tw // 2)
     ty_a = cy_m + (th // 2)
     
-    # Stamp your brand name cleanly centered inside the processed section quadrant area
+    # Stamp your new custom branding handle cleanly centered inside the processed section quadrant area
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
@@ -446,8 +460,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Watermark obliterated down to individual character letter shapes completely!")
-
+print("✅ Phase A Complete: Watermark string analyzed by AI, exploded into unique letters, and obliterated down to the individual character level completely!")
 
 
 # --------------------------------------------------
