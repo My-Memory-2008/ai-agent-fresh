@@ -230,262 +230,147 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
-# ==========================================
-# PHASE A: PART 1 OF 2 (FIXED PATH ROUTING & AI PALETTE SCANNER)
-# ==========================================
-print("🧠 Launching explicit path-corrected dynamic palette scanner...")
 
-import os
-import re
-import cv2
-import json
-import base64
-import random
-import numpy as np
-import subprocess
-import requests
 
-# 🔥 FIXED PATH ROUTING: Defines separate input and output file paths 
-# to completely break the Kaggle file system cache lock!
-INPUT_REEL = output_path
-FINAL_MONETIZED_OUTPUT = "/kaggle/working/final_monetized_output.mp4"
-
-# 1. Capture absolute frame parameters from your target clip to compile structural lanes
-cap = cv2.VideoCapture(INPUT_REEL)
+# --------------------------------------------------
+# PHASE A: MULTI-FRAME WATERMARK DETECTOR & ADAPTIVE FRAME BAKER
+# --------------------------------------------------
+print("👁️ Scanning frame layers for handle signatures containing '@' text tags...")
+cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
-ret_v, sample_frame = cap.read()
-cap.release()
+# Guard rail to verify the new video actually opened
+if frame_count <= 0 or orig_width == 0 or orig_height == 0:
+    cap.release()
+    raise ValueError(f"❌ Error: Cannot read the video file at {output_path}")
 
-# Spacious lower panel quadrant to trap any multi-creator format layout safely (82% - 99% height)
-min_x = int(orig_width * 0.20)
-max_x = int(orig_width * 0.80)
-min_y = int(orig_height * 0.84)
-max_y = int(orig_height * 0.95)
-target_w = max_x - min_x
-target_h = max_y - min_y
-polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [min_x, max_y]], dtype=np.int32)
+sample_frames = [
+    int(frame_count * 0.10), 
+    int(frame_count * 0.30), 
+    int(frame_count * 0.50), 
+    int(frame_count * 0.70), 
+    int(frame_count * 0.90)
+]
 
-openrouter_key = secrets.get_secret("OPENROUTER_KEY")
-
-vision_prompt = (
-    "Examine this vertical video frame carefully. Identify the creator's username watermark text handle or logo stamp.\n"
-    "The watermark can belong to any unique creator, sit anywhere on screen, and feature any visual color shade.\n\n"
-    "Tasks:\n"
-    "1. Extract the literal text string characters of the handle (e.g., '@sand.tagious', '@reel_name').\n"
-    "2. Determine the color property profile of the letters choosing strictly from: 'light_on_white', 'light_on_dark', 'dark_on_light', or 'semi_transparent'.\n\n"
-    "Output your result strictly as a raw JSON map matching this schema:\n"
-    "{\n"
-    "  \"found\": true,\n"
-    "  \"watermark_text\": \"the exact characters found\",\n"
-    "  \"color_profile\": \"light_on_white_OR_light_on_dark_OR_dark_on_light_OR_semi_transparent\"\n"
-    "}\n\n"
-    "CRITICAL: Do not write markdown ticks or code blocks. Print the raw JSON dictionary format completely clean."
-)
-
-target_watermark_text = "@creator_loop"
-detected_color_profile = "semi_transparent"
-
-if openrouter_key and ret_v:
-    try:
-        TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
-        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
-        with open(TEMP_SCAN_JPG, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
-            
-        protocol_prefix = "https" + ":" + chr(47) + chr(47)
-        router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
-        url = f"{protocol_prefix}{router_host}"
-        
-        headers = {
-            "Authorization": f"Bearer {openrouter_key.strip()}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Universal Intelligence System"
-        }
-        
-        current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
-        payload = {
-            "model": current_endpoint,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": vision_prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                ]
-            }],
-            "temperature": 0.0,
-            "max_tokens": 150
-        }
-
-        with requests.Session() as session:
-            session.trust_env = False
-            response = session.post(url, headers=headers, json=payload, timeout=35)
-            
-        if response.status_code == 200:
-            ai_data = response.json()
-            if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_text = ai_data["choices"][0]["message"]["content"].strip()
-                json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
-                if json_match:
-                    ai_json_data = json.loads(json_match.group(0))
-                    if ai_json_data.get("found") is True:
-                        target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                        detected_color_profile = ai_json_data.get("color_profile", detected_color_profile)
-                        print(f"🎉 LOCK ACHIEVED! Handle: \"{target_watermark_text}\" | Profile: \"{detected_color_profile}\"")
-    except Exception as vision_fault:
-        print(f"⚠️ Cloud vision request lane interrupted: {vision_fault}. Utilizing stable fallback core.")
-
-# --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & STABLE ANCHOR CORE ---
-if ret_v:
-    roi_pixels = sample_frame[min_y:max_y, min_x:max_x]
-    avg_b = int(np.median(roi_pixels[:, :, 0]))
-    avg_g = int(np.median(roi_pixels[:, :, 1]))
-    avg_r = int(np.median(roi_pixels[:, :, 2]))
-    text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
+for idx in sample_frames:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    ret, frame = cap.read()
+    if not ret: continue
     
-    fixed_cx = min_x + (target_w // 2)
-    fixed_cy = min_y + (target_h // 2)
-else:
-    avg_b, avg_g, avg_r = 240, 240, 240
-    text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-    fixed_cx = min_x + (target_w // 2)
-    fixed_cy = min_y + (target_h // 2)
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ocr_data = pytesseract.image_to_data(gray_frame, output_type=Output.DICT)
+    
+    for i in range(len(ocr_data['text'])):
+        detected_word = str(ocr_data['text'][i]).strip().lower()
+        clean_target = str(username).strip().lower()
+        
+        if '@' in detected_word or (len(detected_word) > 2 and (detected_word in clean_target or clean_target in detected_word)):
+            x = ocr_data['left'][i]
+            y = ocr_data['top'][i]
+            w = ocr_data['width'][i]
+            h = ocr_data['height'][i]
+            
+            padding_box = (max(0, x - 12), max(0, y - 8), w + 24, h + 16)
+            watermark_bounding_boxes.append(padding_box)
 
-print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
+cap.release()
+unique_boxes = list(set(watermark_bounding_boxes))
 
-
-# ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER-BY-CHARACTER ADAPTIVE PAINT ENGINE)
-# ==========================================
-
-# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT OVERPAINTER ---
-print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
-cap = cv2.VideoCapture(INPUT_REEL)
-TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
+print("🎨 Initializing Native Pixel Inpainter & Adaptive Color Matching Engine...")
+cap = cv2.VideoCapture(output_path)
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Precise presentation scaling matching the native text width profile
-font_thickness = 2
+font_scale = 0.52
+font_thickness = 1
 
-split_characters_list = list(target_watermark_text)
-text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret: break
-    
-    # Isolate general lower third container canvas bounds exclusively
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
-    
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    # Automatically switch threshold bands matching the palette detected by Gemini in Part 1
-    if detected_color_profile == "light_on_white" or detected_color_profile == "semi_transparent":
-        text_band_mask = cv2.inRange(gray_frame, 135, 215)
-    elif detected_color_profile == "dark_on_light":
-        _, text_band_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY_INV)
-    elif detected_color_profile == "light_on_dark":
-        _, text_band_mask = cv2.threshold(gray_frame, 180, 255, cv2.THRESH_BINARY)
+# FIXED: Wrapped processing in try/finally block to guarantee resource unlocking 
+try:
+    if unique_boxes:
+        bx, by, bw, bh = unique_boxes[0]
+        print(f"🎯 Exact native coordinate match locked -> X:{bx}, Y:{by}, W:{bw}, H:{bh}")
+        
+        (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+        tx = bx + int((bw - text_w) / 2)
+        ty = by + int((bh + text_h) / 2)
+        
+        cap.set(cv2.CAP_PROP_POS_FRAMES, sample_frames[2])
+        ret, sample_img = cap.read()
+        if ret:
+            sample_zone = sample_img[max(0, by-10):min(orig_height, by+bh+10), max(0, bx-10):min(orig_width, bx+bw+10)]
+            avg_color_per_row = np.average(sample_zone, axis=0)
+            avg_color = np.average(avg_color_per_row, axis=0)
+            b_match, g_match, r_match = int(avg_color[0]), int(avg_color[1]), int(avg_color[2])
+            
+            bg_brightness = (0.299 * r_match) + (0.587 * g_match) + (0.114 * b_match)
+            
+            if bg_brightness > 127:
+                text_color = (40, 40, 40)
+                shadow_color = (220, 220, 220)
+            else:
+                text_color = (225, 225, 225)
+                shadow_color = (20, 20, 20)
+        else:
+            b_match, g_match, r_match = 30, 30, 30
+            text_color, shadow_color = (230, 230, 230), (10, 10, 10)
+            
+        print(f"🎨 Sampled Background Color Vector locked -> B:{b_match}, G:{g_match}, R:{r_match}")
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
+            
+            raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+            cv2.rectangle(raw_mask, (bx, by), (bx + bw, by + bh), 255, -1)
+            healed_frame = cv2.inpaint(frame, raw_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+            
+            overlay_roi = healed_frame[by:by+bh, bx:bx+bw].copy()
+            cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (b_match, g_match, r_match), -1) 
+            
+            alpha_blend = 0.50
+            healed_frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, alpha_blend, healed_frame[by:by+bh, bx:bx+bw], 1.0 - alpha_blend, 0)
+            
+            cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, shadow_color, font_thickness + 1, cv2.LINE_AA)
+            cv2.putText(healed_frame, "@AWRAM", (tx, ty), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+            
+            video_writer.write(healed_frame)
     else:
-        text_band_mask = cv2.Canny(gray_frame, 35, 110)
+        print("✨ Clean Layout Check! Zero handle watermarks found. Rendering fallback branding overlays...")
+        bx, by, bw, bh = int(orig_width * 0.4), int(orig_height * 0.1), 180, 45
+        (text_w, text_h), baseline = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+        tx, ty = bx + int((bw - text_w) / 2), by + int((bh + text_h) / 2)
         
-    pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
-    
-    # Map isolated character fragment pixel connectivity tables
-    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
-    
-    # Master vector mask container targeting ONLY the character paths
-    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    char_counter = 0
-    
-    for i in range(1, num_labels):
-        if char_counter >= len(split_characters_list): break
-        
-        comp_w = stats[i, cv2.CC_STAT_WIDTH]
-        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-        comp_area = stats[i, cv2.CC_STAT_AREA]
-        comp_x = stats[i, cv2.CC_STAT_LEFT]
-        comp_y = stats[i, cv2.CC_STAT_TOP]
-        
-        # 🔥 CRITICAL FIX: Sizing constraints opened to 1px to capture compressed font shards perfectly
-        if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
-            single_char_mask = (labels_im == i)
-            
-            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact fragment
-            sample_y1 = max(0, comp_y - 2)
-            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
-            sample_x1 = max(0, comp_x - 2)
-            sample_x2 = min(orig_width - 1, comp_x + comp_w + 2)
-            
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
-            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_x2]
-            local_bg_mask = cv2.bitwise_not(local_text_roi)
-            
-            # Pull the dynamic background shade surrounding *only* this specific character
-            local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            local_b = int(local_avg_channels[0])
-            local_g = int(local_avg_channels[1])
-            local_r = int(local_avg_channels[2])
-            
-            if local_b == 0 and local_g == 0 and local_r == 0:
-                local_b, local_g, local_r = avg_b, avg_g, avg_r
-            
-            # Swell ONLY the exact character pixel text paths outward by a tight 2px to catch text outlines
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            single_char_uint8 = np.uint8(single_char_mask) * 255
-            dilated_char_stroke = cv2.dilate(single_char_uint8, char_kernel, iterations=1)
-            dilated_char_bool = dilated_char_stroke > 0
-            
-            # 🔥 PINPOINT TARGETED OVERPAINT:
-            # Overpaints *only* the specific letter paths with its dynamically matched surrounding background color on this frame
-            frame[dilated_char_bool] = [local_b, local_g, local_r]
-            
-            pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
-            char_counter += 1
-            
-    # Clean out any remaining character edge halos smoothly via local fluid mech inpainting
-    if cv2.countNonZero(pinpoint_erasure_map) > 0:
-        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
-        
-    # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
-    # Centered over the frozen coordinate paths with 0% bouncing jitter
-    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-    tx_a = fixed_cx - (tw // 2)
-    ty_a = fixed_cy + (th // 2)
-    
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-    
-    video_writer.write(frame)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # FIXED: Reset capture device to starting frame
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
+            overlay_roi = frame[by:by+bh, bx:bx+bw].copy()
+            cv2.rectangle(overlay_roi, (0, 0), (bw, bh), (20, 20, 20), -1)
+            frame[by:by+bh, bx:bx+bw] = cv2.addWeighted(overlay_roi, 0.35, frame[by:by+bh, bx:bx+bw], 0.65, 0)
+            cv2.putText(frame, "@AWRAM", (tx, ty), font_face, font_scale, (220, 220, 220), font_thickness, cv2.LINE_AA)
+            video_writer.write(frame)
 
-cap.release()
-video_writer.release()
+finally:
+    # FIXED: This block executes even if video reading crashes, forcing open files to close
+    cap.release()
+    video_writer.release()
 
-# --- 4. CONTAINER CLEAN RE-STREAM REMUX ---
+# Run audio stitching
 subprocess.run([
-    "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
+    "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
-    FINAL_MONETIZED_OUTPUT
+    CLEAN_INPUT_STAGE1
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print(f"✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
+if os.path.exists(TEMP_HEALED_MP4): 
+    os.remove(TEMP_HEALED_MP4)
 
-# THE AUTOMATED SYMLINK BRIDGE:
-OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
-if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
-os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
-print(f"🔗 File bridge securely mapped! Linked output straight to: {OLD_ROUTING_TARGET}")
+print("✅ Phase A Complete: Adaptive background color matching loop finalized successfully.")
 
 
 # --------------------------------------------------
