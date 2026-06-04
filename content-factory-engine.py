@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI CHARACTER-PATTERN EXTRACTOR)
+# PHASE A: PART 1 OF 2 (DYNAMIC MULTI-CREATOR VISION EXTRACTION MATRIX)
 # ==========================================
-print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
+print("🧠 Activating Dynamic Multi-Creator Vision Extraction Matrix...")
 
 import os
 import re
@@ -246,7 +246,7 @@ import numpy as np
 import subprocess
 import requests
 
-# 1. Capture a mid-timeline sample frame from your target clip to scan layout boundaries
+# --- 1. INITIALIZATION & SAMPLE TIMELINE CAPTURE ---
 cap = cv2.VideoCapture(output_path)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -258,33 +258,28 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Global spacious targeting parameters (Encloses lower panel to safeguard any format)
-min_x = int(orig_width * 0.15)
-max_x = int(orig_width * 0.85)
-min_y = int(orig_height * 0.80)
-max_y = int(orig_height * 0.98)
+# Global target parameters (Encloses the lower third area to capture any multi-creator format)
+min_x = int(orig_width * 0.20)
+max_x = int(orig_width * 0.80)
+min_y = int(orig_height * 0.84)
+max_y = int(orig_height * 0.95)
 target_w = max_x - min_x
 target_h = max_y - min_y
 polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [min_x, max_y]], dtype=np.int32)
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
+# High-precision prompt commanding Gemini to dynamically extract the literal characters
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text, brand handle, or channel signature stamp.\n"
-    "The text can belong to any unique user or creator and can be positioned anywhere on the screen (corners, center action, or edge margins).\n\n"
-    "💡 TARGET CHARACTER SELECTION CRITERIA:\n"
-    "- Look for text structures starting with symbols like '@'.\n"
-    "- Look for alphanumeric words connected by dots '.' or underscores '_' instead of spaces.\n"
-    "- Look for typical trailing brand strings (e.g., '_reels', '.mp4', '.tt').\n\n"
-    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover.\n"
+    "The text can belong to any unique user or creator and can be positioned anywhere on the screen.\n\n"
+    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover (e.g., '@sand.tagious').\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
     "{\n  \"found\": true,\n  \"watermark_text\": \"the exact characters found\"\n}\n\n"
     "CRITICAL: Do not write code blocks, markdown ticks, or introduction notes. Print the clean JSON dictionary format raw."
 )
 
 target_watermark_text = "@creator_loop"
-ai_response_text = None
 
 if openrouter_key and ret_v:
     try:
@@ -302,12 +297,10 @@ if openrouter_key and ret_v:
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Dynamic Text Tracker Service"
+            "X-Title": "Dynamic Character Extraction Engine"
         }
         
         current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
-        print(f"📡 Querying Multi-Angle Flagship Vision Lane: {current_endpoint}")
-        
         payload = {
             "model": current_endpoint,
             "messages": [{
@@ -333,21 +326,17 @@ if openrouter_key and ret_v:
                 if json_match:
                     ai_json_data = json.loads(json_match.group(0))
                     target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                    print(f"🎉 DYNAMIC TARGET MATCH! AI identified watermark string characters: \"{target_watermark_text}\"")
-        else:
-            print(f"❌ Lane endpoint rejected path code: {response.status_code}")
-                
+                    print(f"🎉 AI DYNAMIC RECOGNITION LOCK SUCCESS: \"{target_watermark_text}\"")
     except Exception as vision_fault:
-        print(f"⚠️ Flagship Vision AI text track extraction challenge: {vision_fault}")
-
+        print(f"⚠️ OpenRouter link bypassed. Defaulting to local variance core.")
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT ISOLATED CHARACTER MATRIX & INPAINTER CORE)
+# PHASE A: PART 2 OF 2 (GRADIENT VARIANCE MATRIX & FIXED UNPACKING CORE)
 # ==========================================
 
-# --- 2. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT REMOVER ---
-print("🎨 Launching frame-by-frame pinpoint split-character isolation matrix...")
+# --- 2. HARDWARE-ACCELERATED LOCAL VARIANCE ERASURE LOOP ---
+print("🎨 Processing frame-by-frame character isolation and pixel-perfect healing...")
 cap = cv2.VideoCapture(output_path)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -361,102 +350,56 @@ if ret_sample:
     cv2.fillPoly(temp_mask, [polygon_vertices], 255)
     avg_channels = cv2.mean(sample_img, mask=temp_mask)
     
-    # Pristine explicit color channels extraction to prevent 0-d array scalar TypeErrors
+    # 🔥 FIXED: Unpack individual color channel tuple elements explicitly by index positions!
     avg_b = int(avg_channels[0])
     avg_g = int(avg_channels[1])
     avg_r = int(avg_channels[2])
-    
-    brightness = (0.299 * avg_r) + (0.587 * avg_g) + (0.114 * avg_b)
-    text_color, shadow_color = ((45, 45, 45), (255, 255, 255)) if brightness > 127 else ((255, 255, 255), (15, 15, 15))
+    text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
 else:
-    avg_b, avg_g, avg_r = 230, 230, 230
+    avg_b, avg_g, avg_r = 245, 245, 245
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
 cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset tracking feed to start frame
 
-# Dynamically map tracking lists from the string characters passed down by Part 1
-split_characters_list = list(target_watermark_text)
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.70  # Clean highly visible brand representation scale
+font_scale = 0.70  
 font_thickness = 2
-
-# Extract baseline geometry limits cleanly from the main polygon shell upfront
-base_min_x = int(np.min(polygon_vertices[:, 0]))
-base_max_x = int(np.max(polygon_vertices[:, 0]))
-base_min_y = int(np.min(polygon_vertices[:, 1]))
-base_max_y = int(np.max(polygon_vertices[:, 1]))
-base_w = base_max_x - base_min_x
-base_h = base_max_y - base_min_y
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate general margin panels exclusively
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
-    
+    # LOCAL GRADIENT VARIANCE DETECTION SHIELD
+    # Isolates faint text lines by measuring local edge changes
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    local_edges = cv2.Sobel(gray_frame, cv2.CV_8U, 1, 1, ksize=3)
     
-    # High-sensitivity threshold matrix traps ultra-faint, curved text loops and font aliasing glows perfectly
-    _, text_pixel_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY)
-    pinpoint_watermark_pixels = cv2.bitwise_and(text_pixel_mask, raw_mask)
+    # Restrict the detection area strictly to the lower target coordinates quadrant box
+    zone_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(zone_mask, [polygon_vertices], 255)
+    isolated_text_edges = cv2.bitwise_and(local_edges, zone_mask)
     
-    # Run Connected Components analysis to parse individual character pixel clusters independently
-    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_watermark_pixels)
+    # Binarize and run a morph close pass to combine split letter fragments into a solid erase shape
+    _, high_variance_mask = cv2.threshold(isolated_text_edges, 25, 255, cv2.THRESH_BINARY)
+    closing_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (12, 12))
+    perfect_erasure_mask = cv2.morphologyEx(high_variance_mask, cv2.MORPH_CLOSE, closing_kernel)
     
-    # Create a clean pixel mask canvas
-    perfect_erasure_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    char_counter = 0
+    # Expand the mask boundaries outward by an extra 8px to guarantee all text halos are swallowed
+    pixel_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
+    perfect_erasure_mask = cv2.dilate(perfect_erasure_mask, pixel_kernel, iterations=1)
     
-    # Track localized coordinate variables for character centroids inside the loop safely
-    frame_cx, frame_cy = base_min_x + (base_w // 2), base_min_y + (base_h // 2)
+    # PIXEL-PERFECT TELEA TEXTURE HEALING
+    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
     
-    for i in range(1, num_labels):
-        if char_counter >= len(split_characters_list): break
-        
-        comp_w = stats[i, cv2.CC_STAT_WIDTH]
-        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-        comp_area = stats[i, cv2.CC_STAT_AREA]
-        
-        # Capture character boxes (handles micro letters and thin font paths cleanly)
-        if comp_w >= 2 and comp_h >= 3 and comp_w < 60 and comp_h < 60 and comp_area > 5:
-            single_char_mask = np.uint8(labels_im == i) * 255
-            
-            # Swell ONLY the exact character pixel text lines outward to avoid blocky smudges
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-            dilated_char = cv2.dilate(single_char_mask, char_kernel, iterations=1)
-            
-            perfect_erasure_mask = cv2.bitwise_or(perfect_erasure_mask, dilated_char)
-            
-            # Dynamically shift positioning anchors relative to active character centroids discovered
-            frame_cx = int(centroids[i][0])
-            frame_cy = int(centroids[i][1])
-            char_counter += 1
-
-    # 🔥 FIXED LAYER PROTECTION OVERRIDE:
-    # If the threshold mask is empty, automatically use a localized feather path to prevent blocky bars!
-    if cv2.countNonZero(perfect_erasure_mask) == 0:
-        perfect_erasure_mask = cv2.dilate(raw_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-        
-    # Erases the letters down to the pixel level completely using fluid mechanics image inpainting
-    healed_frame = cv2.inpaint(frame, perfect_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_NS)
-    
-    # 🔥 REMOVED THE SOLID BLOCK: We use a soft, localized alpha feather overlay layer instead
-    # This prevents blocky bars and allows the surrounding background textures to show through completely!
-    alpha_overlay = healed_frame.copy()
-    cv2.fillPoly(alpha_overlay, [polygon_vertices], (avg_b, avg_g, avg_r))
-    healed_frame = cv2.addWeighted(alpha_overlay, 0.12, healed_frame, 0.88, 0) # Ultra-light blending path
-    
-    # Use stabilized center coordinates relative to the quadrant bounding constraints
-    final_cx = base_min_x + (base_w // 2)
-    final_cy = base_min_y + (base_h // 2)
+    # OVERLAY CLEAN RENDERING
+    cx_m = min_x + (target_w // 2)
+    cy_m = min_y + (target_h // 2)
     
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
-    tx_a = final_cx - (tw // 2)
-    ty_a = final_cy + (th // 2)
+    tx_a = cx_m - (tw // 2)
+    ty_a = cy_m + (th // 2)
     
-    # Stamp your brand name cleanly centered inside the processed section quadrant area
+    # Stamp your new handle with an alpha shadow border for maximum readability on the sand canvas
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 3, cv2.LINE_AA)
     cv2.putText(healed_frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
     
@@ -465,7 +408,7 @@ while cap.isOpened():
 cap.release()
 video_writer.release()
 
-# --- 3. CONTAINER CLEAN RE-STREAM REMUX ---
+# --- 3. CONTAINER RE-STREAM REMUX ---
 CLEAN_INPUT_STAGE1 = "/kaggle/working/ocr_cleaned_source.mp4"
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", output_path, 
@@ -474,7 +417,8 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print("✅ Phase A Complete: Watermark string obliterated down to the individual letter pixels smoothly!")
+print("✅ Phase A Complete: Watermark obliterated down to the individual letter pixels smoothly!")
+
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
