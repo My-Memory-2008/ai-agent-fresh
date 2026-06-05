@@ -271,13 +271,13 @@ openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 # Commands Gemini to act as a raw spatial detector and return the exact
 # normalized 2D bounding box coordinates [ymin, xmin, ymax, xmax] of the watermark text.
 vision_prompt = (
-    "Examine this vertical video frame carefully. Your primary task is to locate the creator's username watermark text handle (e.g., '@sand.tagious').\n"
+    "Examine this vertical video frame carefully. Your primary task is to locate the creator's username watermark text handle (e.g., '@creator.tagious').\n"
     "Look closely across the entire lower half of the screen. Even if it is faint, transparent, or blended into the white background, locate it.\n\n"
     "Return the exact 2D bounding box coordinates enclosing ONLY the watermark text area as normalized points on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
     "{\n"
     "  \"found\": true,\n"
-    "  \"watermark_text\": \"@sand.tagious\",\n"
+    "  \"watermark_text\": \"@creator.tagious\",\n"
     "  \"ymin\": 700,\n"
     "  \"xmin\": 200,\n"
     "  \"ymax\": 760,\n"
@@ -288,7 +288,7 @@ vision_prompt = (
 
 # Hardcoded pixel data fallbacks extracted directly from your successful telemetry projection logs
 p_ymin, p_xmin, p_ymax, p_xmax = 700, 222, 730, 680
-target_watermark_text = "@sand.tagious"
+target_watermark_text = "@creator_loop"
 
 if openrouter_key and ret_v:
     try:
@@ -379,9 +379,8 @@ print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
 print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
 print("-" * 55 + "\n")
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT ADAPTIVE SPLIT-CHARACTER OVERPAINT MATRIX)
+# PHASE A: PART 2 OF 2 (PINPOINT COMPONENT-LEVEL PIXEL-STICKER SPLICING ENGINE)
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED CHARACTER-BY-CHARACTER PIXEL OVERPAINTER ---
@@ -392,23 +391,27 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Precise presentation scaling matching the native text width profile
+font_scale = 0.52  # Clean presentation scale matching native text footprint profiles
 font_thickness = 2
 
-# Synchronize local loop variables using the true watermark text handle returned by Gemini in Part 1
+# 🔥 THE SYNC BRIDGE:
+# Seamlessly explodes your fixed, successful Gemini cloud handle string into tracking arrays
 split_characters_list = list(target_watermark_text)
 num_chars = len(split_characters_list)
-print(f"✂️ Safe local character variables synced! Total text tokens: {num_chars}")
+print(f"✂️ Safe local character variables synced! Total elements to dissolve: {num_chars}")
 
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 frame_idx = 0
+
+# Construct a strict masking box array using the exact coordinates found by your Gemini script
+polygon_vertices = np.array([[x1_final, y1_final], [x2_final, y1_final], [x2_final, y2_final], [x1_final, y2_final]], dtype=np.int32)
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     frame_idx += 1
     
-    # Run adaptive binarization to map text contours cleanly
+    # Run an on-the-fly local contrast sweep within the target text quadrant bounds exclusively
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     adaptive_text_mask = cv2.adaptiveThreshold(gray_frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
     
@@ -433,9 +436,9 @@ while cap.isOpened():
         comp_x = stats[i, cv2.CC_STAT_LEFT]
         comp_y = stats[i, cv2.CC_STAT_TOP]
         
-        # Sizing thresholds filter out massive background objects to trap literal letter paths exclusively
+        # Sizing rules filter out massive sand ripples or border artifacts to trap literal text curves exclusively
         if comp_w >= 1 and comp_h >= 2 and comp_w < 55 and comp_h < 55 and comp_area > 2:
-            # Isolate the exact individual letter component mask natively
+            # Isolate the exact individual letter component mask natively down to the single bit pixel
             single_char_mask = np.uint8(labels_im == i) * 255
             
             # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact character bounds
@@ -448,7 +451,7 @@ while cap.isOpened():
             local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
             local_bg_mask = cv2.bitwise_not(local_text_roi)
             
-            # Extract the live moving background shade surrounding *only* this specific character
+            # Extract the live moving background sand shade surrounding *only* this specific character
             if neighborhood_roi.size > 0 and local_bg_mask.shape == neighborhood_roi.shape[:2]:
                 local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
                 local_b = int(local_avg_channels[0])
@@ -465,12 +468,11 @@ while cap.isOpened():
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # 🔥 ACTION 1: PINPOINT VECTOR STENCIL OVERPAINT MATRIX SPLICING
-            # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
+            # 🔥 THE SUB-PIXEL FIX: 
+            # Instead of coloring broad rectangular blocks or wide column stripes, 
+            # the cv2.copyTo engine copies color-matched background patch ink EXCLUSIVELY 
+            # onto the fine character stroke paths, keeping 100% of the surrounding video crisp!
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            
-            # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
-            # overpainting the watermark characters frame-by-frame with 0% background box smudges or stripes!
             cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
             
             # Merge this processed character tracking footprint onto our unified erasure canvas layer
@@ -478,7 +480,7 @@ while cap.isOpened():
             frame_coordinates_log.append(f"'{split_characters_list[char_counter]}'@[X:{comp_x},Y:{comp_y}]")
             char_counter += 1
         
-    # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
+    # Run a fast fluid marching patch pass to smooth out any residual letter boundaries smoothly
     if cv2.countNonZero(pinpoint_erasure_map) > 0:
         dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         inflated_erasure_mask = cv2.dilate(pinpoint_erasure_map, dilation_kernel, iterations=1)
@@ -488,14 +490,15 @@ while cap.isOpened():
     if frame_idx % 45 == 0:
         print(f"🎬 Frame {frame_idx:04d} -> Pinpoint Painting Individual Character Columns:")
         if frame_coordinates_log:
-             print(f"   📍 Active Grid Vector: {frame_coordinates_log[0]} ... {frame_coordinates_log[-1]}")
+             print(f"   📍 Active Grid Vector: {frame_coordinates_log} ... {frame_coordinates_log[-1]}")
         else:
              print("   📍 Active Grid Vector: Scanning layout tracking lanes...")
 
     # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
-    # Centered over the frozen coordinate paths with 0% bouncing jitter
+    # Centered over your frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
+    # Positions your new custom brand overlay cleanly right in the middle sand zone where it belongs
     ty_a = fixed_cy + (th // 2)
     
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
