@@ -382,10 +382,10 @@ else:
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT DYNAMIC SPLIT-CHARACTER PAINTER CORE)
+# PHASE A: PART 2 OF 2 (PINPOINT PIXEL-STICKER OVERPAINT CORE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC STEPPED CHARACTER OVERPAINT ENGINE ---
+# --- 3. HARDWARE-ACCELERATED DYNAMIC STEPPED CHARACTER STICKER OVERPAINTER ---
 print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -393,10 +393,10 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Presentation scale matching native typography footprint dimensions
+font_scale = 0.52  # Clean presentation scale matching the native text width profile
 font_thickness = 2
 
-# 🔥 STRATEGY EXECUTION: Explode the dynamic text handle into separate letter array targets
+# Explode the text string returned by Gemini into individual character targets
 split_characters_list = list(target_watermark_text)
 num_chars = len(split_characters_list)
 print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
@@ -409,14 +409,10 @@ while cap.isOpened():
     if not ret: break
     frame_idx += 1
     
-    # 🔥 THE STEPPED SPATIAL SWEEP:
-    # Instead of filtering loose pixels, calculate the precise box coordinates for each letter
-    # by splitting the true horizontal target window into evenly spaced character sub-sections.
+    # Calculate the precise box coordinates for each letter column
     char_box_w = float(target_w) / num_chars
     char_box_h = float(target_h)
     
-    # Master erasure mask container tracking processed character bounds
-    character_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     frame_coordinates_log = []
     
     for idx in range(num_chars):
@@ -447,24 +443,16 @@ while cap.isOpened():
         inset_start_y = start_y + 1
         inset_end_y = end_y - 1
         
-        # 🔥 PINPOINT TARGETED OVERPAINT:
-        # Overpaints *only* the specific letter block path frame-by-frame
-        # with its matched local background color, rendering the old text completely invisible.
+        # 🔥 THE STICKER FIX:
+        # Instead of running a bleeding fluid cv2.inpaint brush that smudges colors down the screen,
+        # we directly drop a clean pixel color patch sticker over ONLY the precise character tracks.
+        # This completely stops the vertical streaks and keeps the video frame 100% crisp!
         frame[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = [local_b, local_g, local_r]
-        
-        # Track the individual character region inside the erasure canvas layer
-        character_erasure_map[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = 255
         frame_coordinates_log.append(f"'{split_characters_list[idx]}'@[X1:{start_x},X2:{end_x}]")
-        
-    # Run a fast fluid marching patch pass to smooth out any residual letter boundaries
-    if cv2.countNonZero(character_erasure_map) > 0:
-        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        inflated_erasure_mask = cv2.dilate(character_erasure_map, dilation_kernel, iterations=1)
-        frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
     # Live Telemetry Coordinate Reporting
     if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> Pinpoint Painting Individual Character Columns:")
+        print(f"🎬 Frame {frame_idx:04d} -> Pinpoint Sticker Painting Individual Character Columns:")
         print(f"   📍 Active Grid: {frame_coordinates_log[0]} ... {frame_coordinates_log[-1]}")
 
     # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
@@ -495,6 +483,7 @@ OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
 print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
+
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
