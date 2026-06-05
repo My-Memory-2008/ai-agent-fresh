@@ -381,9 +381,8 @@ else:
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER SPLICING ENGINE & LIVE CONSOLE TELEmetry)
+# PHASE A: PART 2 OF 2 (COORDINATE TRACKING & PIXEL-PERFECT SPLICING ENGINE)
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER SPLICING & OVERPAINT MATRIX ---
@@ -394,26 +393,25 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Precise presentation scaling matching the native text width profile
+font_scale = 0.52  
 font_thickness = 2
 
 split_characters_list = list(target_watermark_text)
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
 frame_idx = 0
+first_lock_printed = False
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     frame_idx += 1
     
-    # Isolate general expanded lower third section bounds exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # Automatically switch threshold bands matching the palette detected by Gemini in Part 1
     if detected_color_profile == "light_on_white" or detected_color_profile == "semi_transparent":
         text_band_mask = cv2.inRange(gray_frame, 135, 215)
     elif detected_color_profile == "dark_on_light":
@@ -424,14 +422,12 @@ while cap.isOpened():
         text_band_mask = cv2.Canny(gray_frame, 35, 110)
         
     pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
-    
-    # Map isolated character cluster pixel connectivity tables frame-by-frame
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
     
-    # Master vector mask container targeting ONLY the character paths
     pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     char_counter = 0
     painted_this_frame = 0
+    frame_coordinates_log = []
     
     for i in range(1, num_labels):
         if char_counter >= len(split_characters_list): break
@@ -442,11 +438,9 @@ while cap.isOpened():
         comp_x = stats[i, cv2.CC_STAT_LEFT]
         comp_y = stats[i, cv2.CC_STAT_TOP]
         
-        # Sizing thresholds opened to 1px to capture compressed or fractured letter shards perfectly
         if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
             single_char_mask = np.uint8(labels_im == i) * 255
             
-            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact letter bounds
             sample_y1 = max(0, comp_y - 2)
             sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
             sample_x1 = max(0, comp_x - 2)
@@ -456,7 +450,6 @@ while cap.isOpened():
             local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
             local_bg_mask = cv2.bitwise_not(local_text_roi)
             
-            # Extract the live moving background sand shade surrounding *only* this specific character
             local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
             local_b = int(local_avg_channels[0])
             local_g = int(local_avg_channels[1])
@@ -465,33 +458,37 @@ while cap.isOpened():
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
             
-            # Expand the character stroke mask outward by 3px using an elliptical matrix kernel 
-            # to fully swallow font dropshadow profiles and fuzzy compression halos completely
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # BITWISE CHARACTER OVERPAINT MASK SPLICING
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            
-            # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
-            # overpainting the watermark characters frame-by-frame with 0% background box smudges!
             cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
             
-            # Merge this processed character tracking footprint onto our unified erasure canvas layer
             pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
+            
+            # Save literal processing coordinates coordinates map for live telemetry trace logs
+            frame_coordinates_log.append(f"Char '{split_characters_list[char_counter]}' @ [X:{comp_x}, Y:{comp_y}, W:{comp_w}, H:{comp_h}]")
             char_counter += 1
             painted_this_frame += 1
-            
-    # 🔥 LIVE CONSOLE METRICS: Reports the exact processing status of the paint engine
-    if frame_idx % 30 == 0:
-         print(f"🎬 Frame {frame_idx:04d} -> Isolated and overpainted {painted_this_frame:02d} separate character tokens successfully.")
-            
-    # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
+
+    # 🔥 Live Coordinate Telemetry Reporting Lanes
+    if painted_this_frame > 0 and not first_lock_printed:
+        print("\n🔍 INITIAL WATERMARK GEOMETRY LOCK CAPTURED (First frame hit):")
+        for coord_line in frame_coordinates_log:
+            print(f"   👉 {coord_line}")
+        print("-" * 65 + "\n")
+        first_lock_printed = True
+
+    if frame_idx % 45 == 0:
+        print(f"🎬 Frame {frame_idx:04d} -> Splicing ink over character paths:")
+        if frame_coordinates_log:
+             print(f"   📍 Current Stroke Vector: {frame_coordinates_log[0]} ... {frame_coordinates_log[-1]}")
+        else:
+             print("   📍 Current Stroke Vector: Searching tracking lanes...")
+
     if cv2.countNonZero(pinpoint_erasure_map) > 0:
         frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
-    # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
-    # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
     ty_a = fixed_cy + (th // 2)
@@ -512,13 +509,17 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print(f"✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
+print(f"✅ Phase A Complete: Watermark removalpass finalized to: {FINAL_MONETIZED_OUTPUT}")
 
-# THE AUTOMATED SYMLINK BRIDGE:
+# 🔥 THE PERMANENT FILE SWAP FORCE: Wipes out the old file name path completely 
+# and explicitly re-saves the finished file as ocr_cleaned_source.mp4.
+# This cuts right through browser preview caches and forces the next cell to read the painted frames!
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
-os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
-print(f"🔗 File bridge securely mapped! Linked output straight to: {OLD_ROUTING_TARGET}")
+
+# Direct copy action avoids symlink mapping drops completely
+subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
+print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
 
 
 # --------------------------------------------------
