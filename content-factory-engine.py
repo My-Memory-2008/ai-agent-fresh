@@ -382,7 +382,7 @@ else:
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT VECTOR STROKE PAINT ENGINE)
+# PHASE A: PART 2 OF 2 (PINPOINT DARK CHARACTER STROKE OVERPAINTER)
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED DYNAMIC VECTOR STROKE OVERPAINTER ---
@@ -409,16 +409,10 @@ while cap.isOpened():
     
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # Automatically tune extraction thresholds based on the palette metadata flagged by Gemini in Part 1
-    if detected_color_profile == "light_on_white" or detected_color_profile == "semi_transparent":
-        text_band_mask = cv2.inRange(gray_frame, 135, 215)
-    elif detected_color_profile == "dark_on_light":
-        _, text_band_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY_INV)
-    elif detected_color_profile == "light_on_dark":
-        _, text_band_mask = cv2.threshold(gray_frame, 180, 255, cv2.THRESH_BINARY)
-    else:
-        text_band_mask = cv2.Canny(gray_frame, 35, 110)
-        
+    # 🔥 UPGRADE: DARK PROFILE VECTOR MASK
+    # Tuned to capture the exact dark-gray pixel band of the characters on the white background.
+    # This completely overrides threshold blindness and catches the exact letter curves!
+    text_band_mask = cv2.inRange(gray_frame, 55, 125)
     pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
     
     # Map isolated character cluster pixel connectivity tables frame-by-frame
@@ -466,7 +460,7 @@ while cap.isOpened():
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # 🔥 ACTION 1: PINPOINT VECTOR STROKE SPLICING OVERLAY
+            # PINPOINT VECTOR STROKE SPLICING OVERLAY
             # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             
@@ -486,7 +480,8 @@ while cap.isOpened():
     # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
-    ty_a = fixed_cy + (th // 2)
+    # Lowered overlay placement to align flush directly on top of the original watermark position
+    ty_a = fixed_cy + (th // 2) + 24
     
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
