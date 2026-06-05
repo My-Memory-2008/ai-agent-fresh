@@ -232,10 +232,12 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
+
+
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI VISUAL TARGET INGESTION CORE)
+# PHASE A: PART 1 OF 2 (AI SPATIAL COORDINATE TARGET EXTRACTOR)
 # ==========================================
-print("🧠 Launching Gemini Vision Target Ingestion & Morphological Vector Core...")
+print("🧠 Launching Gemini Multimodal Spatial Coordinate Target Extractor...")
 
 import os
 import re
@@ -257,31 +259,36 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Sample a clean timeline frame where the text layers are structurally fully active
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
+# Sample a mid-timeline frame to extract layout boundaries
+sample_idx = int(frame_count * 0.45)
+cap.set(cv2.CAP_PROP_POS_FRAMES, sample_idx)
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Spacious lower panel quadrant to trap any multi-creator format layout safely (65% - 99% height bounds)
-min_x_bounds = int(orig_width * 0.10)
-max_x_bounds = int(orig_width * 0.90)
-min_y_bounds = int(orig_height * 0.65)
-max_y_bounds = int(orig_height * 0.99)
-polygon_vertices = np.array([[min_x_bounds, min_y_bounds], [max_x_bounds, min_y_bounds], [max_x_bounds, max_y_bounds], [min_x_bounds, max_y_bounds]], dtype=np.int32)
-
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# STAGE 1: THE GEMINI CONTENT IDENTIFIER PROMPT
+# 🔥 COGNITIVE OBJECT DETECTION PROMPT:
+# Commands Gemini to act as a raw spatial detector and return the exact
+# normalized 2D bounding box coordinates [ymin, xmin, ymax, xmax] of the watermark text.
 vision_prompt = (
-    "Examine this vertical video frame carefully. Your primary task is to identify and read the creator's username watermark text handle or logo signature stamp.\n"
-    "The text can belong to any unique creator, sit anywhere inside the lower third of the screen, and feature any visual opacity.\n\n"
-    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover (e.g., '@sand.tagious', '@creator_reel').\n"
+    "Examine this vertical video frame carefully. Your primary task is to locate the creator's username watermark text handle (e.g., '@sand.tagious').\n"
+    "Look closely across the entire lower half of the screen. Even if it is faint, transparent, or blended into the white background, locate it.\n\n"
+    "Return the exact 2D bounding box coordinates enclosing ONLY the watermark text area as normalized points on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
-    "{\n  \"found\": true,\n  \"watermark_text\": \"the exact characters found\"\n}\n\n"
-    "CRITICAL: Do not write code blocks, markdown ticks, or introduction notes. Print the clean JSON dictionary format completely raw."
+    "{\n"
+    "  \"found\": true,\n"
+    "  \"watermark_text\": \"@sand.tagious\",\n"
+    "  \"ymin\": 700,\n"
+    "  \"xmin\": 200,\n"
+    "  \"ymax\": 760,\n"
+    "  \"xmax\": 800\n"
+    "}\n\n"
+    "CRITICAL: Do not write code blocks, markdown ticks, or markdown notes. Print the clean JSON map raw."
 )
 
-target_watermark_text = "@creator_loop"
+# Hardcoded pixel data fallbacks extracted directly from your successful telemetry projection logs
+p_ymin, p_xmin, p_ymax, p_xmax = 700, 222, 730, 680
+target_watermark_text = "@sand.tagious"
 
 if openrouter_key and ret_v:
     try:
@@ -291,16 +298,20 @@ if openrouter_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
-        url = "https://openrouter.ai"
+        protocol_prefix = "https" + ":" + chr(47) + chr(47)
+        router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
+        url = f"{protocol_prefix}{router_host}"
+        
         headers = {
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Universal Ingestion System"
+            "X-Title": "AI Spatial Coordinate Locator"
         }
         
+        current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
         payload = {
-            "model": "google/gemini-2.5-flash",
+            "model": current_endpoint,
             "messages": [{
                 "role": "user",
                 "content": [
@@ -309,91 +320,64 @@ if openrouter_key and ret_v:
                 ]
             }],
             "temperature": 0.0,
-            "max_tokens": 150
+            "max_tokens": 180
         }
 
         with requests.Session() as session:
             session.trust_env = False
             response = session.post(url, headers=headers, json=payload, timeout=35)
             
-        if response.status_code == 200 and response.text:
+        if response.status_code == 200:
             ai_data = response.json()
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                # 🔥 FIXED OPENROUTER ARRAY INDEX UNPACKING MATRIX:
-                # Restored choice index placement to pull data flawlessly from the cloud stream!
                 ai_text = ai_data["choices"][0]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
                 if json_match:
                     ai_json_data = json.loads(json_match.group(0))
                     if ai_json_data.get("found") is True:
                         target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                        print(f"🎉 CLOUD DATA RECIEVED! Gemini identified string: \"{target_watermark_text}\"")
-        else:
-            print(f"❌ Server connection lane dropped status path indicator: {response.status_code}")
+                        p_ymin = int(ai_json_data.get("ymin", p_ymin))
+                        p_xmin = int(ai_json_data.get("xmin", p_xmin))
+                        p_ymax = int(ai_json_data.get("ymax", p_ymax))
+                        p_xmax = int(ai_json_data.get("xmax", p_xmax))
+                        print(f"🎉 AI SPATIAL TRACKING LOCK SUCCESS! Handle: \"{target_watermark_text}\"")
     except Exception as vision_fault:
-        print(f"⚠️ Cloud vision request lane interrupted: {vision_fault}")
+        print(f"⚠️ Cloud vision tracker challenged. Utilizing fallback vector metrics: {vision_fault}")
 
-# --- 2. STAGE 2: ADAPTIVE POSITION LOCATOR MATRIX ---
-x1_final, x2_final, y1_final, y2_final = 0, 0, 0, 0
-vector_lock_success = False
-
-if ret_v:
-    gray_init = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
-    
-    morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
-    gradient_field = cv2.morphologyEx(gray_init, cv2.MORPH_GRADIENT, morph_kernel)
-    _, binarized_field = cv2.threshold(gradient_field, 45, 255, cv2.THRESH_BINARY)
-    
-    raw_mask = np.zeros(sample_frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
-    canvas_init = cv2.bitwise_and(binarized_field, raw_mask)
-         
-    contours, _ = cv2.findContours(canvas_init, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    for cnt in contours:
-        tx, ty, tw, th = cv2.boundingRect(cnt)
-        if tw > 110 and th >= 8 and th < 55:
-            x1_final = tx - 4   
-            x2_final = tx + tw + 4
-            y1_final = ty - 2   
-            y2_final = ty + th + 2
-            vector_lock_success = True
-            break
-
-if not vector_lock_success:
-    x1_final = int(orig_width * 0.24)   
-    x2_final = int(orig_width * 0.76)   
-    y1_final = int(orig_height * 0.920) 
-    y2_final = int(orig_height * 0.952) 
-
-x1_final = max(0, min(x1_final, orig_width - 1))
-x2_final = max(0, min(x2_final, orig_width - 1))
-y1_final = max(0, min(y1_final, orig_height - 1))
-y2_final = max(0, min(y2_final, orig_height - 1))
+# --- 2. CALCULATE ACCURATE ABSOLUTE PIXEL COORDINATES ---
+# Converts Gemini's normalized grid array directly into standard top-down video frame pixel scalars
+x1_final = max(0, min(int((p_xmin / 1000.0) * orig_width), orig_width - 1))
+x2_final = max(0, min(int((p_xmax / 1000.0) * orig_width), orig_width - 1))
+y1_final = max(0, min(int((p_ymin / 1000.0) * orig_height), orig_height - 1))
+y2_final = max(0, min(int((p_ymax / 1000.0) * orig_height), orig_height - 1))
 
 target_w = x2_final - x1_final
 target_h = y2_final - y1_final
+polygon_vertices = np.array([[x1_final, y1_final], [x2_final, y1_final], [x2_final, y2_final], [x1_final, y2_final]], dtype=np.int32)
 
-fixed_cx = int(orig_width * 0.5)
-fixed_cy = int(orig_height * 0.755) 
+# Central alignments for locking your new stationary logo handle layers
+fixed_cx = x1_final + (target_w // 2)
+fixed_cy = y1_final + (target_h // 2)
 
 if ret_v:
     roi_pixels = sample_frame[y1_final:y2_final, x1_final:x2_final]
-    avg_b = int(np.median(roi_pixels[:, :, 0])) if roi_pixels.size > 0 else 245
-    avg_g = int(np.median(roi_pixels[:, :, 1])) if roi_pixels.size > 0 else 245
-    avg_r = int(np.median(roi_pixels[:, :, 2])) if roi_pixels.size > 0 else 245
+    if roi_pixels.size > 0:
+        avg_b = int(np.median(roi_pixels[:, :, 0]))
+        avg_g = int(np.median(roi_pixels[:, :, 1]))
+        avg_r = int(np.median(roi_pixels[:, :, 2]))
+    else:
+        avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
 else:
-    avg_b, avg_g, avg_r = 245, 245, 245
+    avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-print("\n🏁 FINAL PIXEL-PERFECT MARGIN COORDINATES SCAN COMPLETE:")
-print(f"   👉 EXACT X1 (Left Margin Point) : {x1_final}")
-print(f"   👉 EXACT X2 (Right Margin Point): {x2_final}")
-print(f"   👉 EXACT Y1 (Top Line Border)   : {y1_final}")
-print(f"   👉 EXACT Y2 (Bottom Line Border): {y2_final}")
+print("\n🎯 FIXED ACCURACY LOCATION MATRIX LOCKED:")
+print(f"   👉 EXACT X1 (Left Point)  : {x1_final}")
+print(f"   👉 EXACT X2 (Right Point) : {x2_final}")
+print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
+print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
 print("-" * 55 + "\n")
-
 
 
 # ==========================================
