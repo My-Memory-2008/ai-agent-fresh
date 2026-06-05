@@ -230,10 +230,11 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
+
 # ==========================================
-# PHASE A: PART 1 OF 2 (PATH-CORRECTED DYNAMIC PROFILE SCANNER - FIXED)
+# PHASE A: PART 1 OF 2 (AI DYNAMIC HANDLE EXTRACTOR & ANCHOR CORE)
 # ==========================================
-print("🧠 Launching explicit path-corrected dynamic palette scanner...")
+print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
 
 import os
 import re
@@ -245,12 +246,10 @@ import numpy as np
 import subprocess
 import requests
 
-# 🔥 FIXED PATH ROUTING: Defines separate input and output file paths 
-# to completely break the Kaggle file system cache lock!
+# --- 1. INITIALIZATION & FILE PATH ROUTING ---
 INPUT_REEL = output_path
 FINAL_MONETIZED_OUTPUT = "/kaggle/working/final_monetized_output.mp4"
 
-# 1. Capture absolute frame parameters from your target clip to compile structural lanes
 cap = cv2.VideoCapture(INPUT_REEL)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -262,8 +261,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# 🔥 FIXED EXPANDED BOUNDING GRID Matrix:
-# Opens height search windows up from 0.70 to 0.98 to flawlessly encompass the true Y:1433 watermark lane!
+# Spacious lower panel quadrant to trap any multi-creator format layout safely (70% - 98% height)
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
 min_y = int(orig_height * 0.70)
@@ -274,6 +272,7 @@ polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [mi
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
+# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text handle or logo stamp.\n"
     "The watermark can belong to any unique creator, sit anywhere on screen, and feature any visual color shade.\n\n"
@@ -292,6 +291,7 @@ vision_prompt = (
 target_watermark_text = "@creator_loop"
 detected_color_profile = "semi_transparent"
 
+# --- STEP 1: GEMINI TEXT SCANNER ---
 if openrouter_key and ret_v:
     try:
         TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
@@ -341,7 +341,7 @@ if openrouter_key and ret_v:
                         detected_color_profile = ai_json_data.get("color_profile", detected_color_profile)
                         print(f"🎉 LOCK ACHIEVED! Handle: \"{target_watermark_text}\" | Profile: \"{detected_color_profile}\"")
     except Exception as vision_fault:
-        print(f"⚠️ Cloud vision request lane interrupted: {vision_fault}. Utilizing stable fallback core.")
+        print(f"⚠️ Intelligence lane bypassed. Defaulting to local variance fallback core: {vision_fault}")
 
 # --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & STABLE ANCHOR CORE ---
 if ret_v:
@@ -351,15 +351,13 @@ if ret_v:
     avg_r = int(np.median(roi_pixels[:, :, 2]))
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
     
-    # Run a full-grid local Canny contrast pass within the newly expanded text search region
     gray_sample = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
     local_edges_sample = cv2.Canny(gray_sample, 25, 100)
     pinpoint_sample = np.zeros_like(local_edges_sample)
     pinpoint_sample[min_y:max_y, min_x:max_x] = local_edges_sample[min_y:max_y, min_x:max_x]
     
     contours_s, _ = cv2.findContours(pinpoint_sample, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    sample_x_points = []
-    sample_y_points = []
+    sample_x_points, sample_y_points = [], []
     for cnt in contours_s:
         sx, sy, sw, sh = cv2.boundingRect(cnt)
         if sw >= 2 and sh >= 2 and sw < 100 and sh < 40:
@@ -376,10 +374,9 @@ else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
     fixed_cx = min_x + (target_w // 2)
-    fixed_cy = min_y + (target_h // 2)
+    fixed_cy = min_y + (target_h // 2) - 4
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
-
 
 # ==========================================
 # PHASE A: PART 2 OF 2 (PINPOINT SPLIT-CHARACTER BITWISE SPLICING ENGINE)
@@ -454,6 +451,8 @@ while cap.isOpened():
             
             # Extract the live moving background sand shade surrounding *only* this specific character
             local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
+            
+            # Tuple index unpacking resolved to avoid data type crashes
             local_b = int(local_avg_channels[0])
             local_g = int(local_avg_channels[1])
             local_r = int(local_avg_channels[2])
@@ -466,7 +465,7 @@ while cap.isOpened():
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # 🔥 IMPLEMENTING YOUR STRATEGY: BITWISE CHARACTER OVERPAINT MASK SPLICING
+            # 🔥 ACTION 1: BITWISE SPLIT-CHARACTER OVERPAINT MASK SPLICING
             # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             
@@ -511,9 +510,6 @@ OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
 print(f"🔗 File bridge securely mapped! Linked output straight to: {OLD_ROUTING_TARGET}")
-
-
-
 
 
 # --------------------------------------------------
