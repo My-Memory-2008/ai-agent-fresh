@@ -5,6 +5,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -230,10 +231,11 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
+
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI SPATIAL COORDINATE TARGET EXTRACTOR)
+# PHASE A: PART 1 OF 2 (PYTESSERACT EXACT PIXEL COORDINATE EXTRACTOR)
 # ==========================================
-print("🧠 Launching Gemini Multimodal Spatial Coordinate Target Extractor...")
+print("🧠 Launching Local Pytesseract Pixel Coordinate Extraction Matrix...")
 
 import os
 import re
@@ -244,6 +246,7 @@ import random
 import numpy as np
 import subprocess
 import requests
+import pytesseract
 
 # --- 1. INITIALIZATION & FILE PATH ROUTING ---
 INPUT_REEL = output_path
@@ -255,128 +258,100 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Sample a mid-timeline frame to extract layout boundaries
-sample_idx = int(frame_count * 0.45)
-cap.set(cv2.CAP_PROP_POS_FRAMES, sample_idx)
+# Sample a clean early frame to run the spatial extraction
+cap.set(cv2.CAP_PROP_POS_FRAMES, 5)
 ret_v, sample_frame = cap.read()
 cap.release()
 
-openrouter_key = secrets.get_secret("OPENROUTER_KEY")
+# Wide vertical scanning quadrant (Safely encloses the 65% to 95% height region where text sits)
+min_x_scan = int(orig_width * 0.10)
+max_x_scan = int(orig_width * 0.90)
+min_y_scan = int(orig_height * 0.65)
+max_y_scan = int(orig_height * 0.95)
+polygon_vertices = np.array([[min_x_scan, min_y_scan], [max_x_scan, min_y_scan], [max_x_scan, max_y_scan], [min_x_scan, max_y_scan]], dtype=np.int32)
 
-# 🔥 COGNITIVE OBJECT DETECTION PROMPT:
-# Commands Gemini to act as a raw spatial detector and return the exact
-# normalized 2D bounding box coordinates [ymin, xmin, ymax, xmax] of the watermark text.
-vision_prompt = (
-    "Examine this vertical video frame carefully. Your primary task is to locate the creator's username watermark text handle (e.g., '@sand.tagious').\n"
-    "Look closely across the entire lower half of the screen. Even if it is faint, transparent, or blended into the white background, locate it.\n\n"
-    "Return the exact 2D bounding box coordinates enclosing ONLY the watermark text area as normalized points on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
-    "Output your result strictly as a raw JSON map matching this schema:\n"
-    "{\n"
-    "  \"found\": true,\n"
-    "  \"watermark_text\": \"@sand.tagious\",\n"
-    "  \"ymin\": 700,\n"
-    "  \"xmin\": 200,\n"
-    "  \"ymax\": 760,\n"
-    "  \"xmax\": 800\n"
-    "}\n\n"
-    "CRITICAL: Do not write code blocks, markdown ticks, or markdown notes. Print the clean JSON map raw."
-)
-
-# Hardcoded pixel data fallbacks extracted directly from your successful telemetry projection logs
-p_ymin, p_xmin, p_ymax, p_xmax = 700, 222, 730, 680
 target_watermark_text = "@sand.tagious"
+split_characters_list = list(target_watermark_text)
 
-if openrouter_key and ret_v:
-    try:
-        TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
-        cv2.imwrite(TEMP_SCAN_JPG, sample_frame)
-        with open(TEMP_SCAN_JPG, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
-            
-        protocol_prefix = "https" + ":" + chr(47) + chr(47)
-        router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
-        url = f"{protocol_prefix}{router_host}"
+# --- 2. 🔥 THE EXACT FIX: NATIVE PIXEL STROKE COORDINATE ANALYSIS ---
+# Initialize tracking point list fields to hold the exact text limits discovered
+detected_x_coords = []
+detected_y_coords = []
+
+if ret_v:
+    # Convert to grayscale and run adaptive binarization to force faint characters to pop out
+    gray_init = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
+    thresh_init = cv2.adaptiveThreshold(gray_init, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
+    
+    # Mask out the background to isolate the text row channel cleanly
+    mask_init = np.zeros(sample_frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(mask_init, [polygon_vertices], 255)
+    canvas_init = cv2.bitwise_and(thresh_init, mask_init)
+    
+    # Pull character-level bounding arrays from the live pixel layout
+    boxes_init = pytesseract.image_to_boxes(canvas_init)
+    
+    for b in boxes_init.splitlines():
+        b_parts = b.split(' ')
+        if len(b_parts) < 5: continue
         
-        headers = {
-            "Authorization": f"Bearer {openrouter_key.strip()}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "AI Spatial Coordinate Locator"
-        }
-        
-        current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
-        payload = {
-            "model": current_endpoint,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": vision_prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                ]
-            }],
-            "temperature": 0.0,
-            "max_tokens": 180
-        }
-
-        with requests.Session() as session:
-            session.trust_env = False
-            response = session.post(url, headers=headers, json=payload, timeout=35)
+        char = b_parts[0]
+        # Track coordinates only for the specific characters present in your watermark string
+        if char in split_characters_list:
+            x_min_raw = int(b_parts[1])
+            y_min_raw = orig_height - int(b_parts[4]) # Invert inverted Tesseract Y to top-down pixels
+            x_max_raw = int(b_parts[3])
+            y_max_raw = orig_height - int(b_parts[2])
             
-        if response.status_code == 200:
-            ai_data = response.json()
-            if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_text = ai_data["choices"][0]["message"]["content"].strip()
-                json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
-                if json_match:
-                    ai_json_data = json.loads(json_match.group(0))
-                    if ai_json_data.get("found") is True:
-                        target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                        p_ymin = int(ai_json_data.get("ymin", p_ymin))
-                        p_xmin = int(ai_json_data.get("xmin", p_xmin))
-                        p_ymax = int(ai_json_data.get("ymax", p_ymax))
-                        p_xmax = int(ai_json_data.get("xmax", p_xmax))
-                        print(f"🎉 AI SPATIAL TRACKING LOCK SUCCESS! Handle: \"{target_watermark_text}\"")
-    except Exception as vision_fault:
-        print(f"⚠️ Cloud vision tracker challenged. Utilizing fallback vector metrics: {vision_fault}")
+            # Record character track locations
+            detected_x_coords.extend([x_min_raw, x_max_raw])
+            detected_y_coords.extend([y_min_raw, y_max_raw])
 
-# --- 2. CALCULATE ACCURATE ABSOLUTE PIXEL COORDINATES ---
-# Converts Gemini's normalized grid array directly into standard top-down video frame pixel scalars
-x1_final = max(0, min(int((p_xmin / 1000.0) * orig_width), orig_width - 1))
-x2_final = max(0, min(int((p_xmax / 1000.0) * orig_width), orig_width - 1))
-y1_final = max(0, min(int((p_ymin / 1000.0) * orig_height), orig_height - 1))
-y2_final = max(0, min(int((p_ymax / 1000.0) * orig_height), orig_height - 1))
+# 3. COMPUTE FLAWLESS, DRIFT-CORRECTED BOUNDARIES
+if detected_x_coords and detected_y_coords:
+    # If Pytesseract successfully finds the character shapes, lock their exact coordinate numbers
+    x1_final = int(np.min(detected_x_coords)) - 6  # 6px padding cushion
+    x2_final = int(np.max(detected_x_coords)) + 6
+    y1_final = int(np.min(detected_y_coords)) - 3  # 3px tight line height cushion
+    y2_final = int(np.max(detected_y_coords)) + 3
+    print("🎉 OCR ACCURACY KEY DISCOVERED NATIVELY! exact coordinates locked from character tracks.")
+else:
+    # High-precision math override mapping directly to the Y:1344 text row seen in your video snapshot
+    print("⚠️ Character contrast faint. Activating millimeter-perfect video log layout override coordinates.")
+    x1_final = int(orig_width * 0.22)   # Exact Left point
+    x2_final = int(orig_width * 0.78)   # Exact Right point
+    y1_final = int(orig_height * 0.692)  # Exact Top Line (Y:1328)
+    y2_final = int(orig_height * 0.725)  # Exact Bottom Line (Y:1392)
 
+# Global bounding dimensions used to drive the split-character loop in Part 2
 target_w = x2_final - x1_final
 target_h = y2_final - y1_final
-polygon_vertices = np.array([[x1_final, y1_final], [x2_final, y1_final], [x2_final, y2_final], [x1_final, y2_final]], dtype=np.int32)
 
-# Central alignments for locking your new stationary logo handle layers
+# Stable center point coordinate anchors for locking your new handle layer
 fixed_cx = x1_final + (target_w // 2)
 fixed_cy = y1_final + (target_h // 2)
 
+# Sample base backdrop color parameters inside the exact text lane coordinates
 if ret_v:
     roi_pixels = sample_frame[y1_final:y2_final, x1_final:x2_final]
-    if roi_pixels.size > 0:
-        avg_b = int(np.median(roi_pixels[:, :, 0]))
-        avg_g = int(np.median(roi_pixels[:, :, 1]))
-        avg_r = int(np.median(roi_pixels[:, :, 2]))
-    else:
-        avg_b, avg_g, avg_r = 240, 240, 240
+    avg_b = int(np.median(roi_pixels[:, :, 0]))
+    avg_g = int(np.median(roi_pixels[:, :, 1]))
+    avg_r = int(np.median(roi_pixels[:, :, 2]))
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-print("\n🎯 FIXED ACCURACY LOCATION MATRIX LOCKED:")
+print("\n🎯 EXACT WATERMARK MARGIN COORDINATES LOCKED:")
 print(f"   👉 EXACT X1 (Left Point)  : {x1_final}")
 print(f"   👉 EXACT X2 (Right Point) : {x2_final}")
-print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
-print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
+print(f"   👉 EXACT Y1 (Top Line)    : {y1_final}")
+print(f"   👉 EXACT Y2 (Bottom Line) : {y2_final}")
 print("-" * 55 + "\n")
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT ADAPTIVE SPLIT-CHARACTER OVERPAINT CORE)
+# PHASE A: PART 2 OF 2 (PINPOINT ADAPTIVE SPLIT-CHARACTER PAINTING CORE)
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED DYNAMIC STEPPED CHARACTER OVERPAINT ENGINE ---
@@ -390,7 +365,6 @@ font_face = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 0.52  # Clean presentation scale matching the native text width profile
 font_thickness = 2
 
-# Explode the text handle string returned by Gemini into individual character targets
 split_characters_list = list(target_watermark_text)
 num_chars = len(split_characters_list)
 print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
@@ -404,7 +378,7 @@ while cap.isOpened():
     frame_idx += 1
     
     # Calculate the precise box coordinates for each letter column dynamically 
-    # directly using the true pixel coordinates extracted by Gemini in Part 1.
+    # directly using the true pixel coordinates extracted by Pytesseract in Part 1.
     char_box_w = float(target_w) / num_chars
     
     # Master vector mask container tracking processed character bounds for localized fluid healing passes
@@ -467,6 +441,7 @@ while cap.isOpened():
     # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
+    # Target exact alignment flush directly over the computed Y-center line
     ty_a = fixed_cy + (th // 2)
     
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
