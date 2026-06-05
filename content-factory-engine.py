@@ -230,8 +230,6 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
-
-
 # ==========================================
 # PHASE A: PART 1 OF 2 (AI DYNAMIC CHARACTER PALETTE MATRIX BUILDER)
 # ==========================================
@@ -247,20 +245,36 @@ import numpy as np
 import subprocess
 import requests
 
+# --- Kaggle Environment Notebook Variables Fallback Protection ---
+if 'output_path' not in locals() and 'output_path' not in globals():
+    output_path = "/kaggle/working/input_reel.mp4" 
+
+try:
+    from kaggle_secrets import UserSecretsClient
+    secrets = UserSecretsClient()
+except Exception:
+    class MockSecrets:
+        def get_secret(self, key): return os.environ.get(key, None)
+    secrets = MockSecrets()
+
 # --- 1. INITIALIZATION & PATH ROUTING ---
 INPUT_REEL = output_path
 FINAL_MONETIZED_OUTPUT = "/kaggle/working/final_monetized_output.mp4"
 
-cap = cv2.VideoCapture(INPUT_REEL)
-orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-fps = cap.get(cv2.CAP_PROP_FPS)
+if not os.path.exists(INPUT_REEL):
+    print(f"⚠️ Warning: Video target path '{INPUT_REEL}' not found physically yet. Initializing dummy canvas arrays.")
+    orig_width, orig_height, frame_count, fps = 1080, 1920, 300, 30.0
+    ret_v, sample_frame = False, None
+else:
+    cap = cv2.VideoCapture(INPUT_REEL)
+    orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
-sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
-ret_v, sample_frame = cap.read()
-cap.release()
+    cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
+    ret_v, sample_frame = cap.read()
+    cap.release()
 
 # Spatial Bounding Quadrant: Broadly encloses the text region safely (70% - 98% height)
 min_x = int(orig_width * 0.15)
@@ -332,26 +346,27 @@ if openrouter_key and ret_v:
             ai_data = response.json()
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
                 ai_text = ai_data["choices"]["message"]["content"].strip()
+                
+                # Look for a clean JSON map inside the AI's string response text payload
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
                 if json_match:
                     ai_json_data = json.loads(json_match.group(0))
-                    if ai_json_data.get("found") is True:
-                        target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                        detected_color_profile = ai_json_data.get("color_profile", detected_color_profile)
+                    
+                    # FIX: Explicit type casting and string dictionary extraction
+                    if ai_json_data.get("found") is True or str(ai_json_data.get("found")).lower() == 'true':
+                        target_watermark_text = str(ai_json_data["watermark_text"]).strip()
+                        detected_color_profile = str(ai_json_data["color_profile"]).strip()
                         print(f"🎉 LOCK ACHIEVED! Handle: \"{target_watermark_text}\" | Profile: \"{detected_color_profile}\"")
     except Exception as vision_fault:
         print(f"⚠️ Intelligence lane bypassed. Defaulting to local variance fallback core: {vision_fault}")
 
 # --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & FIXED ANCHOR SETUP ---
-if ret_v:
+if ret_v and sample_frame is not None:
     roi_pixels = sample_frame[min_y:max_y, min_x:max_x]
     avg_b = int(np.median(roi_pixels[:, :, 0]))
     avg_g = int(np.median(roi_pixels[:, :, 1]))
     avg_r = int(np.median(roi_pixels[:, :, 2]))
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
-    
-    # Absolute alignment base coordinates lock the font mask directly over the characters,
-    # completely bypassing the wide side-bars layout blind spot!
     fixed_cx = 458
     fixed_cy = 1632
 else:
@@ -369,6 +384,7 @@ print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fi
 
 # --- 3. HARDWARE-ACCELERATED DYNAMIC VECTOR TEXT ROTOSCOPE OVERPAINTER ---
 print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
+
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -381,70 +397,85 @@ font_thickness = 2
 split_characters_list = list(target_watermark_text)
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
+# --- ADVANCED PRE-COMPUTATION MATRIX STAGE ---
+# Pre-calculating character positions once outside the loop to dramatically speed up execution
+(total_w, total_h), _ = cv2.getTextSize(target_watermark_text, font_face, font_scale, font_thickness)
+start_text_x = fixed_cx - (total_w // 2)
+start_text_y = fixed_cy + (total_h // 2)
+
+char_metrics = []
+temp_canvas = np.zeros((orig_height, orig_width), dtype=np.uint8)
+
+# Calculate exact geometric placement metrics for every individual character string element
+for idx, char in enumerate(split_characters_list):
+    # Determine the precise starting X coordinate based on font kerning up to this point
+    sub_str = "".join(split_characters_list[:idx])
+    (sub_w, _), _ = cv2.getTextSize(sub_str, font_face, font_scale, font_thickness)
+    char_start_x = start_text_x + sub_w
+    
+    # Trace character profile path onto a temporary layout template layer
+    single_char_canvas = np.zeros((orig_height, orig_width), dtype=np.uint8)
+    cv2.putText(single_char_canvas, char, (char_start_x, start_text_y), font_face, font_scale, 255, font_thickness, cv2.LINE_AA)
+    
+    # Locate exact non-zero coordinate indexes
+    char_pixels_y, char_pixels_x = np.where(single_char_canvas == 255)
+    
+    if char_pixels_y.size > 0 and char_pixels_x.size > 0:
+        cx_min, cx_max = np.min(char_pixels_x), np.max(char_pixels_x)
+        cy_min, cy_max = np.min(char_pixels_y), np.max(char_pixels_y)
+        
+        # Safe bounding limits context mapping 3px out
+        sample_y1 = max(0, cy_min - 3)
+        sample_y2 = min(orig_height - 1, cy_max + 3)
+        sample_x1 = max(0, cx_min - 3)
+        sample_x2 = min(orig_width - 1, cx_max + 3)
+        
+        char_metrics.append({
+            "canvas": single_char_canvas,
+            "bounds": (sample_y1, sample_y2, sample_x1, sample_x2)
+        })
+
+# Initialize standard dilation structures
+char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+
+# --- FRAME-BY-FRAME LOOP PROCESSING ENGINE ---
 while cap.isOpened():
     ret, frame = cap.read()
-    if not ret: break
-    
-    # Measure string dimensions to compute the exact horizontal alignment coordinates
-    (total_w, total_h), _ = cv2.getTextSize(target_watermark_text, font_face, font_scale, font_thickness)
-    
-    # Calculate perfect central alignments over the locked stationary anchor paths
-    start_text_x = fixed_cx - (total_w // 2)
-    start_text_y = fixed_cy + (total_h // 2)
-    
-    current_char_x = start_text_x
+    if not ret: 
+        break
     
     # Master vector mask container tracking processed character bounds for localized fluid healing passes
     pristine_vector_text_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     
     # 🔥 THE AI ROTOSCOPE OVERRIDE PASS:
-    # Loops through and renders every single character string element individually onto a local stencil mask layer
-    for char in split_characters_list:
-        (cw, ch), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
+    for metric in char_metrics:
+        single_char_canvas = metric["canvas"]
+        sample_y1, sample_y2, sample_x1, sample_x2 = metric["bounds"]
         
-        # 1. Create a tiny isolated single-character canvas trace channel
-        single_char_canvas = np.zeros(frame.shape[:2], dtype=np.uint8)
-        cv2.putText(single_char_canvas, char, (current_char_x, start_text_y), font_face, font_scale, 255, font_thickness, cv2.LINE_AA)
+        # Extract neighborhood ROI pixels safely
+        neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
         
-        # 2. Extract bounding coordinates of this single character natively to pull local sand color values
-        char_pixels_y, char_pixels_x = np.where(single_char_canvas == 255)
-        
-        if char_pixels_y.size > 0 and char_pixels_x.size > 0:
-            cx_min, cx_max = np.min(char_pixels_x), np.max(char_pixels_x)
-            cy_min, cy_max = np.min(char_pixels_y), np.max(char_pixels_y)
-            
-            # Sample background sand values 3px outside this exact character footprint box bounds
-            sample_y1 = max(0, cy_min - 3)
-            sample_y2 = min(orig_height - 1, cy_max + 3)
-            sample_x1 = max(0, cx_min - 3)
-            sample_x2 = min(orig_width - 1, cx_max + 3)
-            
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
+        if neighborhood_roi.size > 0:
             local_avg_channels = cv2.mean(neighborhood_roi)
-            
-            # Extract individual color channels cleanly to prevent type crashes
             local_b = int(local_avg_channels[0])
             local_g = int(local_avg_channels[1])
             local_r = int(local_avg_channels[2])
+        else:
+            local_b, local_g, local_r = avg_b, avg_g, avg_r
             
-            if local_b == 0 and local_g == 0 and local_r == 0:
-                local_b, local_g, local_r = avg_b, avg_g, avg_r
-                
-            # 3. Swell ONLY the exact vector letter path lines out by a tight 2px safety margin
-            # to securely consume font drop-shadows and anti-aliasing outlines without blurring sand textures
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_single_char = cv2.dilate(single_char_canvas, char_kernel, iterations=1)
-            dilated_char_bool = dilated_single_char > 0
+        if local_b == 0 and local_g == 0 and local_r == 0:
+            local_b, local_g, local_r = avg_b, avg_g, avg_r
             
-            # 4. 🔥 PINPOINT ROTOSCOPE SPLICING OVERLAY:
-            # Overpaints ONLY the specific letter paths with its dynamically matched surrounding color on this frame
-            # This completely targets only the specific characters, leaving adjacent sand 100% untouched!
-            frame[dilated_char_bool] = [local_b, local_g, local_r]
-            
-            # Merge this character path onto our master template eraser canvas layer
-            pristine_vector_text_mask = cv2.bitwise_or(pristine_vector_text_mask, dilated_single_char)
-            
-        current_char_x += cw + 1  # Spacing increments to align the next adjacent character perfectly
+        # Swell ONLY the exact vector letter path lines out by a tight 2px safety margin
+        dilated_single_char = cv2.dilate(single_char_canvas, char_kernel, iterations=1)
+        dilated_char_bool = dilated_single_char > 0
+        
+        # 🔥 PINPOINT ROTOSCOPE SPLICING OVERLAY:
+        # Overpaints ONLY the specific letter paths with its dynamically matched surrounding color on this frame
+        frame[dilated_char_bool] = [local_b, local_g, local_r]
+        
+        # Merge this character path onto our master template eraser canvas layer
+        pristine_vector_text_mask = cv2.bitwise_or(pristine_vector_text_mask, dilated_single_char)
         
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(pristine_vector_text_mask) > 0:
@@ -471,14 +502,17 @@ subprocess.run([
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
+if os.path.exists(TEMP_HEALED_MP4): 
+    os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete: Watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
 # THE AUTOMATED SYMLINK BRIDGE:
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
-if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
+if os.path.exists(OLD_ROUTING_TARGET): 
+    os.remove(OLD_ROUTING_TARGET)
 os.symlink(FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET)
 print(f"🔗 File bridge securely mapped! Linked output straight to: {OLD_ROUTING_TARGET}")
+
 
 
 # --------------------------------------------------
