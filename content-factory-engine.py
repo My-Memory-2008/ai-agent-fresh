@@ -230,9 +230,8 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
         except Exception:
             pass
 
-
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI MULTI-CREATOR SPATIAL OBJECT TRACKER & CORE SETUP)
+# PHASE A: PART 1 OF 2 (AI SPATIAL COORDINATE TARGET EXTRACTOR)
 # ==========================================
 print("🧠 Launching Gemini Multimodal Spatial Coordinate Target Extractor...")
 
@@ -256,19 +255,21 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-sample_frames_list = [int(frame_count * 0.15), int(frame_count * 0.45), int(frame_count * 0.75)]
-cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
+# Sample a mid-timeline frame to extract layout boundaries
+sample_idx = int(frame_count * 0.45)
+cap.set(cv2.CAP_PROP_POS_FRAMES, sample_idx)
 ret_v, sample_frame = cap.read()
 cap.release()
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# 🔥 THE AI SPATIAL TRACKER PROMPT:
-# Commands Gemini 2.5 Flash to act as a 2D Object Detector and output normalized spatial bounding box coordinates.
+# 🔥 COGNITIVE OBJECT DETECTION PROMPT:
+# Commands Gemini to act as a raw spatial detector and return the exact
+# normalized 2D bounding box coordinates [ymin, xmin, ymax, xmax] of the watermark text.
 vision_prompt = (
-    "Examine this vertical video frame carefully. Your task is to identify and locate the creator's username watermark text handle (e.g., '@sand.tagious').\n"
-    "Look closely across the entire screen. Even if it is faint, transparent, or blended into a busy background, find it.\n\n"
-    "Return the exact 2D bounding box location of the watermark text as normalized coordinates on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
+    "Examine this vertical video frame carefully. Your primary task is to locate the creator's username watermark text handle (e.g., '@sand.tagious').\n"
+    "Look closely across the entire lower half of the screen. Even if it is faint, transparent, or blended into the white background, locate it.\n\n"
+    "Return the exact 2D bounding box coordinates enclosing ONLY the watermark text area as normalized points on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
     "{\n"
     "  \"found\": true,\n"
@@ -278,11 +279,11 @@ vision_prompt = (
     "  \"ymax\": 760,\n"
     "  \"xmax\": 800\n"
     "}\n\n"
-    "CRITICAL: Do not write code blocks or markdown ticks. Output the clean JSON map raw."
+    "CRITICAL: Do not write code blocks, markdown ticks, or markdown notes. Print the clean JSON map raw."
 )
 
-# Universal fallback coordinates if the network connection slips
-p_ymin, p_xmin, p_ymax, p_xmax = 700, 200, 760, 800
+# Hardcoded pixel data fallbacks extracted directly from your successful telemetry projection logs
+p_ymin, p_xmin, p_ymax, p_xmax = 700, 222, 730, 680
 target_watermark_text = "@sand.tagious"
 
 if openrouter_key and ret_v:
@@ -301,7 +302,7 @@ if openrouter_key and ret_v:
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "AI Spatial Coordinate System"
+            "X-Title": "AI Spatial Coordinate Locator"
         }
         
         current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
@@ -335,27 +336,27 @@ if openrouter_key and ret_v:
                         p_xmin = int(ai_json_data.get("xmin", p_xmin))
                         p_ymax = int(ai_json_data.get("ymax", p_ymax))
                         p_xmax = int(ai_json_data.get("xmax", p_xmax))
-                        print(f"🎉 AI SPATIAL TRACKING LOCK SUCCESS! Handle: \"{target_watermark_text}\" | Grid Coordinates -> Ymin:{p_ymin}, Xmin:{p_xmin}, Ymax:{p_ymax}, Xmax:{p_xmax}")
+                        print(f"🎉 AI SPATIAL TRACKING LOCK SUCCESS! Handle: \"{target_watermark_text}\"")
     except Exception as vision_fault:
-        print(f"⚠️ Flagship vision tracker challenged. Utilizing fallback vector anchors: {vision_fault}")
+        print(f"⚠️ Cloud vision tracker challenged. Utilizing fallback vector metrics: {vision_fault}")
 
-# --- 2. CONVERT AI NORMALIZED COORDINATES TO ACTUAL VIDEO FRAME PIXELS ---
-# Dynamically converts Gemini's 0-1000 grid layout straight onto your actual video dimensions!
-target_min_x = max(0, min(int((p_xmin / 1000.0) * orig_width), orig_width - 1))
-target_max_x = max(0, min(int((p_xmax / 1000.0) * orig_width), orig_width - 1))
-target_min_y = max(0, min(int((p_ymin / 1000.0) * orig_height), orig_height - 1))
-target_max_y = max(0, min(int((p_ymax / 1000.0) * orig_height), orig_height - 1))
+# --- 2. CALCULATE ACCURATE ABSOLUTE PIXEL COORDINATES ---
+# Converts Gemini's normalized grid array directly into standard top-down video frame pixel scalars
+x1_final = max(0, min(int((p_xmin / 1000.0) * orig_width), orig_width - 1))
+x2_final = max(0, min(int((p_xmax / 1000.0) * orig_width), orig_width - 1))
+y1_final = max(0, min(int((p_ymin / 1000.0) * orig_height), orig_height - 1))
+y2_final = max(0, min(int((p_ymax / 1000.0) * orig_height), orig_height - 1))
 
-box_w = target_max_x - target_min_x
-box_h = target_max_y - target_min_y
-polygon_vertices = np.array([[target_min_x, target_min_y], [target_max_x, target_min_y], [target_max_x, target_max_y], [target_min_x, target_max_y]], dtype=np.int32)
+target_w = x2_final - x1_final
+target_h = y2_final - y1_final
+polygon_vertices = np.array([[x1_final, y1_final], [x2_final, y1_final], [x2_final, y2_final], [x1_final, y2_final]], dtype=np.int32)
 
-# Central alignment anchors for locking your new custom handle
-fixed_cx = target_min_x + (box_w // 2)
-fixed_cy = target_min_y + (box_h // 2)
+# Central alignments for locking your new stationary logo handle layers
+fixed_cx = x1_final + (target_w // 2)
+fixed_cy = y1_final + (target_h // 2)
 
 if ret_v:
-    roi_pixels = sample_frame[target_min_y:target_max_y, target_min_x:target_max_x]
+    roi_pixels = sample_frame[y1_final:y2_final, x1_final:x2_final]
     if roi_pixels.size > 0:
         avg_b = int(np.median(roi_pixels[:, :, 0]))
         avg_g = int(np.median(roi_pixels[:, :, 1]))
@@ -367,15 +368,18 @@ else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-print(f"🔒 AI Coordinate Mapping Complete -> Target Pixel Box: X=[{target_min_x}:{target_max_x}], Y=[{target_min_y}:{target_max_y}]")
-print(f"🔒 Stationary anchor locked -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
-
+print("\n🎯 FIXED ACCURACY LOCATION MATRIX LOCKED:")
+print(f"   👉 EXACT X1 (Left Point)  : {x1_final}")
+print(f"   👉 EXACT X2 (Right Point) : {x2_final}")
+print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
+print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
+print("-" * 55 + "\n")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (AI-GUIDED CHARACTER-SPLIT OVERPAINT CORE)
+# PHASE A: PART 2 OF 2 (PINPOINT ADAPTIVE SPLIT-CHARACTER OVERPAINT CORE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL TEXT OVERPAINTER ---
+# --- 3. HARDWARE-ACCELERATED DYNAMIC STEPPED CHARACTER OVERPAINT ENGINE ---
 print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -383,10 +387,10 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Precise presentation scaling matching the native text width profile
+font_scale = 0.52  # Clean presentation scale matching the native text width profile
 font_thickness = 2
 
-# Explode the dynamic text handle string returned by Gemini into individual character targets
+# Explode the text handle string returned by Gemini into individual character targets
 split_characters_list = list(target_watermark_text)
 num_chars = len(split_characters_list)
 print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
@@ -399,17 +403,20 @@ while cap.isOpened():
     if not ret: break
     frame_idx += 1
     
-    # Calculate the precise box coordinates for each letter column dynamically
-    char_box_w = float(box_w) / num_chars
+    # Calculate the precise box coordinates for each letter column dynamically 
+    # directly using the true pixel coordinates extracted by Gemini in Part 1.
+    char_box_w = float(target_w) / num_chars
     
+    # Master vector mask container tracking processed character bounds for localized fluid healing passes
+    character_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     frame_coordinates_log = []
     
     for idx in range(num_chars):
         # Calculate the exact geometric pixel boundaries enclosing this individual letter channel
-        start_x = int(target_min_x + (idx * char_box_w))
-        end_x = int(target_min_x + ((idx + 1) * char_box_w))
-        start_y = int(target_min_y)
-        end_y = int(target_max_y)
+        start_x = int(x1_final + (idx * char_box_w))
+        end_x = int(x1_final + ((idx + 1) * char_box_w))
+        start_y = int(y1_final)
+        end_y = int(y2_final)
         
         # Pull a local neighborhood color sample 4px wide directly to the left and right of the character bounds
         sample_left_x = max(0, start_x - 4)
@@ -424,7 +431,11 @@ while cap.isOpened():
             local_g = int((np.median(bg_sample_left[:, :, 1]) + np.median(bg_sample_right[:, :, 1])) / 2)
             local_r = int((np.median(bg_sample_left[:, :, 2]) + np.median(bg_sample_right[:, :, 2])) / 2)
         else:
-            local_b, local_g, local_r = avg_b, avg_g, avg_r
+            # Regional fallback parameters if sampling window borders compress
+            roi_pixels = frame[start_y:end_y, max(0, start_x-5):min(orig_width, end_x+5)]
+            local_b = int(np.median(roi_pixels[:, :, 0]))
+            local_g = int(np.median(roi_pixels[:, :, 1]))
+            local_r = int(np.median(roi_pixels[:, :, 2]))
             
         # Add a tight 1px internal safety inset to avoid touching edge artifacts
         inset_start_x = start_x + 1
@@ -432,16 +443,16 @@ while cap.isOpened():
         inset_start_y = start_y + 1
         inset_end_y = end_y - 1
         
-        # Drops a clean pixel color patch sticker over ONLY the precise character tracks.
-        # This completely stops the vertical streaks and keeps the video frame 100% crisp!
+        # PINPOINT TARGETED OVERPAINT:
+        # Overpaints *only* the specific coordinates of the exact size of the characters frame-by-frame
+        # with its matched local shifting backdrop color. This completely leaves adjacent sand untouched!
         frame[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = [local_b, local_g, local_r]
+        
+        # Track the individual character region inside the erasure canvas layer
+        character_erasure_map[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = 255
         frame_coordinates_log.append(f"'{split_characters_list[idx]}'@[X1:{start_x},X2:{end_x}]")
         
     # Run a fast fluid marching patch pass to smooth out any residual letter boundaries
-    # Build a tight temporary mask representing only the painted characters region for localized edge blending
-    character_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    character_erasure_map[target_min_y:target_max_y, target_min_x:target_max_x] = 255
-    
     if cv2.countNonZero(character_erasure_map) > 0:
         dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         inflated_erasure_mask = cv2.dilate(character_erasure_map, dilation_kernel, iterations=1)
@@ -449,7 +460,7 @@ while cap.isOpened():
         
     # Live Telemetry Coordinate Reporting
     if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> Pinpoint Sticker Painting Individual Character Columns:")
+        print(f"🎬 Frame {frame_idx:04d} -> Pinpoint Painting Individual Character Columns:")
         print(f"   📍 Active Grid: {frame_coordinates_log} ... {frame_coordinates_log[-1]}")
 
     # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
@@ -476,12 +487,11 @@ subprocess.run([
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
-# THE AUTOMATED SYMLINK BRIDGE:
+# THE AUTOMATED FILE SWAP BRIDGE:
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
 print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
-
 
 
 # --------------------------------------------------
