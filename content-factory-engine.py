@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI DYNAMIC HANDLE EXTRACTOR & ANCHOR CORE)
+# PHASE A: PART 1 OF 2 (AI PALETTE SCANNER & UNIQUE OUTPUT TARGET BUILDER)
 # ==========================================
-print("🧠 Launching Gemini Dynamic Pattern Scanner for Multi-Creator Video Ingestion...")
+print("🧠 Launching Gemini Intelligence Multi-Creator Palette Scanner...")
 
 import os
 import re
@@ -246,9 +246,14 @@ import numpy as np
 import subprocess
 import requests
 
-# --- 1. INITIALIZATION & FILE PATH ROUTING ---
+# --- 1. INITIALIZATION & CACHE-BUSTING FILE PATH ROUTING ---
 INPUT_REEL = output_path
-FINAL_MONETIZED_OUTPUT = "/kaggle/working/final_monetized_output.mp4"
+
+# 🔥 THE CACHE LOCK FIX: Generates a unique timestamp suffix on every single run
+# This forces Kaggle's browser player to load the fresh, newly painted video asset instantly!
+unique_run_id = random.randint(100, 999)
+FINAL_MONETIZED_OUTPUT = f"/kaggle/working/final_monetized_output_{unique_run_id}.mp4"
+print(f"📦 Unique Output Target Path Set: {FINAL_MONETIZED_OUTPUT}")
 
 cap = cv2.VideoCapture(INPUT_REEL)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -261,7 +266,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Spacious lower panel quadrant to trap any multi-creator format layout safely (70% - 98% height)
+# Expanded vertical search quadrant to flawlessly trap the text curves safely (70% - 98% height)
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
 min_y = int(orig_height * 0.70)
@@ -272,7 +277,6 @@ polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [mi
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
 vision_prompt = (
     "Examine this vertical video frame carefully. Identify the creator's username watermark text handle or logo stamp.\n"
     "The watermark can belong to any unique creator, sit anywhere on screen, and feature any visual color shade.\n\n"
@@ -291,7 +295,6 @@ vision_prompt = (
 target_watermark_text = "@creator_loop"
 detected_color_profile = "semi_transparent"
 
-# --- STEP 1: GEMINI TEXT SCANNER ---
 if openrouter_key and ret_v:
     try:
         TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
@@ -378,8 +381,9 @@ else:
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT SPLIT-CHARACTER BITWISE SPLICING ENGINE)
+# PHASE A: PART 2 OF 2 (PINPOINT CHARACTER SPLICING ENGINE & LIVE CONSOLE TELEmetry)
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER SPLICING & OVERPAINT MATRIX ---
@@ -396,9 +400,12 @@ font_thickness = 2
 split_characters_list = list(target_watermark_text)
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
+frame_idx = 0
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
+    frame_idx += 1
     
     # Isolate general expanded lower third section bounds exclusively
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
@@ -424,6 +431,7 @@ while cap.isOpened():
     # Master vector mask container targeting ONLY the character paths
     pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     char_counter = 0
+    painted_this_frame = 0
     
     for i in range(1, num_labels):
         if char_counter >= len(split_characters_list): break
@@ -436,23 +444,20 @@ while cap.isOpened():
         
         # Sizing thresholds opened to 1px to capture compressed or fractured letter shards perfectly
         if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
-            # Isolate the exact individual letter component mask natively
             single_char_mask = np.uint8(labels_im == i) * 255
             
             # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact letter bounds
             sample_y1 = max(0, comp_y - 2)
             sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
             sample_x1 = max(0, comp_x - 2)
-            sample_x2 = min(orig_width - 1, comp_x + comp_w + 2)
+            sample_width_limit = min(orig_width - 1, comp_x + comp_w + 2)
             
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
-            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_x2]
+            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_width_limit]
+            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
             local_bg_mask = cv2.bitwise_not(local_text_roi)
             
             # Extract the live moving background sand shade surrounding *only* this specific character
             local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            
-            # Tuple index unpacking resolved to avoid data type crashes
             local_b = int(local_avg_channels[0])
             local_g = int(local_avg_channels[1])
             local_r = int(local_avg_channels[2])
@@ -465,8 +470,7 @@ while cap.isOpened():
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # 🔥 ACTION 1: BITWISE SPLIT-CHARACTER OVERPAINT MASK SPLICING
-            # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
+            # BITWISE CHARACTER OVERPAINT MASK SPLICING
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             
             # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
@@ -476,6 +480,11 @@ while cap.isOpened():
             # Merge this processed character tracking footprint onto our unified erasure canvas layer
             pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
             char_counter += 1
+            painted_this_frame += 1
+            
+    # 🔥 LIVE CONSOLE METRICS: Reports the exact processing status of the paint engine
+    if frame_idx % 30 == 0:
+         print(f"🎬 Frame {frame_idx:04d} -> Isolated and overpainted {painted_this_frame:02d} separate character tokens successfully.")
             
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(pinpoint_erasure_map) > 0:
