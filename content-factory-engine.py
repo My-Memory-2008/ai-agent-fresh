@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI DYNAMIC HANDLE TRACKER & FLOW INITIALIZER)
+# PHASE A: PART 1 OF 2 (AI MULTI-CREATOR SPATIAL OBJECT TRACKER & CORE SETUP)
 # ==========================================
-print("🧠 Launching Gemini Multimodal Handle Tracker & Flow Initializer...")
+print("🧠 Launching Gemini Multimodal Spatial Coordinate Target Extractor...")
 
 import os
 import re
@@ -261,30 +261,30 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Precision coordinate window enclosing the true Y:1344 text footprint lane safely
-target_min_x = 240   
-target_max_x = 640   
-target_min_y = 1335  
-target_max_y = 1375  
-box_w = target_max_x - target_min_x
-box_h = target_max_y - target_min_y
-polygon_vertices = np.array([[target_min_x, target_min_y], [target_max_x, target_min_y], [target_max_x, target_max_y], [target_min_x, target_max_y]], dtype=np.int32)
-
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# High-precision prompt commanding Gemini to dynamically detect ANY creator's watermark text pattern
+# 🔥 THE AI SPATIAL TRACKER PROMPT:
+# Commands Gemini 2.5 Flash to act as a 2D Object Detector and output normalized spatial bounding box coordinates.
 vision_prompt = (
-    "Examine this vertical video frame carefully. Your task is to identify and locate the creator's username watermark text handle or channel signature stamp.\n"
-    "The text can belong to any unique user or creator and can be positioned anywhere inside the lower half of the screen.\n\n"
-    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover (e.g., '@sand.tagious', '@creator_reel').\n"
+    "Examine this vertical video frame carefully. Your task is to identify and locate the creator's username watermark text handle (e.g., '@sand.tagious').\n"
+    "Look closely across the entire screen. Even if it is faint, transparent, or blended into a busy background, find it.\n\n"
+    "Return the exact 2D bounding box location of the watermark text as normalized coordinates on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
-    "{\n  \"found\": true,\n  \"watermark_text\": \"the exact characters found\"\n}\n\n"
-    "CRITICAL: Do not write code blocks or markdown ticks. Print the clean JSON dictionary format completely raw."
+    "{\n"
+    "  \"found\": true,\n"
+    "  \"watermark_text\": \"@sand.tagious\",\n"
+    "  \"ymin\": 700,\n"
+    "  \"xmin\": 200,\n"
+    "  \"ymax\": 760,\n"
+    "  \"xmax\": 800\n"
+    "}\n\n"
+    "CRITICAL: Do not write code blocks or markdown ticks. Output the clean JSON map raw."
 )
 
-target_watermark_text = "@creator_loop"
+# Universal fallback coordinates if the network connection slips
+p_ymin, p_xmin, p_ymax, p_xmax = 700, 200, 760, 800
+target_watermark_text = "@sand.tagious"
 
-# 🔥 CONNECTING GEMINI NATIVELY:
 if openrouter_key and ret_v:
     try:
         TEMP_SCAN_JPG = "/kaggle/working/watermark_openrouter_layer.jpg"
@@ -301,7 +301,7 @@ if openrouter_key and ret_v:
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "Universal Intelligence System"
+            "X-Title": "AI Spatial Coordinate System"
         }
         
         current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
@@ -315,7 +315,7 @@ if openrouter_key and ret_v:
                 ]
             }],
             "temperature": 0.0,
-            "max_tokens": 150
+            "max_tokens": 180
         }
 
         with requests.Session() as session:
@@ -331,25 +331,44 @@ if openrouter_key and ret_v:
                     ai_json_data = json.loads(json_match.group(0))
                     if ai_json_data.get("found") is True:
                         target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                        print(f"🎉 LOCK ACHIEVED! AI dynamically identified watermark string: \"{target_watermark_text}\"")
+                        p_ymin = int(ai_json_data.get("ymin", p_ymin))
+                        p_xmin = int(ai_json_data.get("xmin", p_xmin))
+                        p_ymax = int(ai_json_data.get("ymax", p_ymax))
+                        p_xmax = int(ai_json_data.get("xmax", p_xmax))
+                        print(f"🎉 AI SPATIAL TRACKING LOCK SUCCESS! Handle: \"{target_watermark_text}\" | Grid Coordinates -> Ymin:{p_ymin}, Xmin:{p_xmin}, Ymax:{p_ymax}, Xmax:{p_xmax}")
     except Exception as vision_fault:
-        print(f"⚠️ Intelligence lane bypassed. Defaulting to local fallback track: {vision_fault}")
+        print(f"⚠️ Flagship vision tracker challenged. Utilizing fallback vector anchors: {vision_fault}")
 
-# --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & STABLE ANCHOR SETUP ---
+# --- 2. CONVERT AI NORMALIZED COORDINATES TO ACTUAL VIDEO FRAME PIXELS ---
+# Dynamically converts Gemini's 0-1000 grid layout straight onto your actual video dimensions!
+target_min_x = max(0, min(int((p_xmin / 1000.0) * orig_width), orig_width - 1))
+target_max_x = max(0, min(int((p_xmax / 1000.0) * orig_width), orig_width - 1))
+target_min_y = max(0, min(int((p_ymin / 1000.0) * orig_height), orig_height - 1))
+target_max_y = max(0, min(int((p_ymax / 1000.0) * orig_height), orig_height - 1))
+
+box_w = target_max_x - target_min_x
+box_h = target_max_y - target_min_y
+polygon_vertices = np.array([[target_min_x, target_min_y], [target_max_x, target_min_y], [target_max_x, target_max_y], [target_min_x, target_max_y]], dtype=np.int32)
+
+# Central alignment anchors for locking your new custom handle
+fixed_cx = target_min_x + (box_w // 2)
+fixed_cy = target_min_y + (box_h // 2)
+
 if ret_v:
     roi_pixels = sample_frame[target_min_y:target_max_y, target_min_x:target_max_x]
-    avg_b = int(np.median(roi_pixels[:, :, 0]))
-    avg_g = int(np.median(roi_pixels[:, :, 1]))
-    avg_r = int(np.median(roi_pixels[:, :, 2]))
+    if roi_pixels.size > 0:
+        avg_b = int(np.median(roi_pixels[:, :, 0]))
+        avg_g = int(np.median(roi_pixels[:, :, 1]))
+        avg_r = int(np.median(roi_pixels[:, :, 2]))
+    else:
+        avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
-    fixed_cx = target_min_x + (box_w // 2)
-    fixed_cy = target_min_y + (box_h // 2)
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-    fixed_cx, fixed_cy = int(orig_width * 0.5), int(orig_height * 0.845)
 
-print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
+print(f"🔒 AI Coordinate Mapping Complete -> Target Pixel Box: X=[{target_min_x}:{target_max_x}], Y=[{target_min_y}:{target_max_y}]")
+print(f"🔒 Stationary anchor locked -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 
 # ==========================================
