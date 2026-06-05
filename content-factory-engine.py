@@ -382,10 +382,10 @@ else:
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT DARK CHARACTER STROKE OVERPAINTER)
+# PHASE A: PART 2 OF 2 (PINPOINT STRUCTURAL FONT CHARACTER SPLICING CORE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC VECTOR STROKE OVERPAINTER ---
+# --- 3. HARDWARE-ACCELERATED DYNAMIC VECTOR TEXT STENCIL OVERPAINTER ---
 print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -393,8 +393,8 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  # Clean presentation scale matching native text footprint profiles
-font_thickness = 2
+font_scale = 0.50  # Precise presentation scale matching native text footprint profiles
+font_thickness = 1
 
 split_characters_list = list(target_watermark_text)
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
@@ -403,88 +403,81 @@ while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     
-    # Isolate general lower third target quadrant bounds exclusively
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
+    # 🔥 IMPLEMENTING YOUR LOGIC: ABSOLUTE VECTOR CHARACTER STENCIL SPLICING
+    # Generates a millimeter-perfect, sharp text path template on an empty memory canvas layer
+    # instead of trying to guess fuzzy shapes on the blurry video background.
+    pristine_vector_text_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Measure string dimensions to compute the exact horizontal alignment coordinates
+    (total_w, total_h), _ = cv2.getTextSize(target_watermark_text, font_face, font_scale, font_thickness)
     
-    # 🔥 UPGRADE: DARK PROFILE VECTOR MASK
-    # Tuned to capture the exact dark-gray pixel band of the characters on the white background.
-    # This completely overrides threshold blindness and catches the exact letter curves!
-    text_band_mask = cv2.inRange(gray_frame, 55, 125)
-    pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
+    # Calculate perfect central alignments over the locked stationary anchor paths
+    start_text_x = fixed_cx - (total_w // 2)
+    start_text_y = fixed_cy + (total_h // 2)
     
-    # Map isolated character cluster pixel connectivity tables frame-by-frame
-    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
+    current_char_x = start_text_x
     
-    # Master vector mask container targeting ONLY the character paths
-    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    char_counter = 0
-    
-    for i in range(1, num_labels):
-        if char_counter >= len(split_characters_list): break
+    # Loop through and render every single character string element individually
+    for char in split_characters_list:
+        (cw, ch), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
         
-        comp_w = stats[i, cv2.CC_STAT_WIDTH]
-        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-        comp_area = stats[i, cv2.CC_STAT_AREA]
-        comp_x = stats[i, cv2.CC_STAT_LEFT]
-        comp_y = stats[i, cv2.CC_STAT_TOP]
+        # 1. Create a tiny isolated single-character canvas trace channel
+        single_char_canvas = np.zeros(frame.shape[:2], dtype=np.uint8)
+        cv2.putText(single_char_canvas, char, (current_char_x, start_text_y), font_face, font_scale, 255, font_thickness, cv2.LINE_AA)
         
-        # Sizing thresholds filter out wide background objects to trap literal letter paths exclusively
-        if comp_w >= 1 and comp_h >= 1 and comp_w < 50 and comp_h < 50 and comp_area >= 1:
-            # Isolate the exact individual letter component mask natively
-            single_char_mask = np.uint8(labels_im == i) * 255
+        # 2. Extract bounding coordinates of this single character natively to pull local sand color values
+        char_pixels_y, char_pixels_x = np.where(single_char_canvas == 255)
+        
+        if char_pixels_y.size > 0 and char_pixels_x.size > 0:
+            cx_min, cx_max = np.min(char_pixels_x), np.max(char_pixels_x)
+            cy_min, cy_max = np.min(char_pixels_y), np.max(char_pixels_y)
             
-            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact letter bounds
-            sample_y1 = max(0, comp_y - 2)
-            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
-            sample_x1 = max(0, comp_x - 2)
-            sample_width_limit = min(orig_width - 1, comp_x + comp_w + 2)
+            # Sample background sand values 3px outside this exact character footprint box
+            sample_y1 = max(0, cy_min - 3)
+            sample_y2 = min(orig_height - 1, cy_max + 3)
+            sample_x1 = max(0, cx_min - 3)
+            sample_x2 = min(orig_width - 1, cx_max + 3)
             
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_bg_mask = cv2.bitwise_not(local_text_roi)
+            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
+            local_avg_channels = cv2.mean(neighborhood_roi)
             
-            # Extract the live moving background sand shade surrounding *only* this specific character
-            local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            local_b = int(local_avg_channels[0])
-            local_g = int(local_avg_channels[1])
-            local_r = int(local_avg_channels[2])
+            local_b = int(local_avg_channels)
+            local_g = int(local_avg_channels)
+            local_r = int(local_avg_channels)
             
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
-            
-            # Expand the character stroke mask outward by an ultra-tight 2px using an elliptical matrix kernel 
-            # to fully swallow font dropshadow profiles and fuzzy compression halos completely
+                
+            # 3. Swell ONLY the exact vector letter path lines out by a tight 3px margin
+            # to securely trap dropshadow halos and fuzzy compression glow outlines perfectly
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
+            dilated_single_char = cv2.dilate(single_char_canvas, char_kernel, iterations=1)
             
-            # PINPOINT VECTOR STROKE SPLICING OVERLAY
-            # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
+            # 4. 🔥 PINPOINT VECTOR STENCIL OVERPAINT SPLICING:
+            # Generates a dedicated on-the-fly local background color patch matching the sand tone perfectly
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             
-            # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
+            # Copy *only* the precise vector letter stencil paths straight onto the video frame canvas,
             # overpainting the watermark characters frame-by-frame with 0% background box smudges or stripes!
-            cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
+            cv2.copyTo(solid_bg_patch, dilated_single_char, frame)
             
-            # Merge this processed character tracking footprint onto our unified erasure canvas layer
-            pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
-            char_counter += 1
+            # Merge this character path onto our master template eraser canvas layer
+            pristine_vector_text_mask = cv2.bitwise_or(pristine_vector_text_mask, dilated_single_char)
             
+        current_char_x += cw + 1  # Spacing increments to align the next adjacent character perfectly
+        
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
-    if cv2.countNonZero(pinpoint_erasure_map) > 0:
-        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
+    if cv2.countNonZero(pristine_vector_text_mask) > 0:
+        frame = cv2.inpaint(frame, pristine_vector_text_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
     # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
     # Centered over the frozen coordinate paths with 0% bouncing jitter
-    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
+    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
     tx_a = fixed_cx - (tw // 2)
-    # Lowered overlay placement to align flush directly on top of the original watermark position
-    ty_a = fixed_cy + (th // 2) + 24
+    ty_a = fixed_cy + (th // 2) + 24  # Aligned flush straight over the erased text track section
     
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, shadow_color, font_thickness + 2, cv2.LINE_AA)
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
+    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
     
     video_writer.write(frame)
 
