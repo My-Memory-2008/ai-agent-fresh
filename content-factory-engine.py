@@ -382,113 +382,93 @@ else:
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (COORDINATE TRACKING & PIXEL-PERFECT SPLICING ENGINE)
+# PHASE A: PART 2 OF 2 (PINPOINT DYNAMIC SPLIT-CHARACTER PAINTER CORE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER SPLICING & OVERPAINT MATRIX ---
-print("🎨 Processing frame-by-frame individual character bitwise overpainting...")
+# --- 3. HARDWARE-ACCELERATED DYNAMIC STEPPED CHARACTER OVERPAINT ENGINE ---
+print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.52  
+font_scale = 0.52  # Presentation scale matching native typography footprint dimensions
 font_thickness = 2
 
+# 🔥 STRATEGY EXECUTION: Explode the dynamic text handle into separate letter array targets
 split_characters_list = list(target_watermark_text)
-text_color, shadow_color = (255, 255, 255), (15, 15, 15)
+num_chars = len(split_characters_list)
+print(f"✂️ Text exploded into individual tracking components: {split_characters_list}")
 
+text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 frame_idx = 0
-first_lock_printed = False
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     frame_idx += 1
     
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [polygon_vertices], 255)
+    # 🔥 THE STEPPED SPATIAL SWEEP:
+    # Instead of filtering loose pixels, calculate the precise box coordinates for each letter
+    # by splitting the true horizontal target window into evenly spaced character sub-sections.
+    char_box_w = float(target_w) / num_chars
+    char_box_h = float(target_h)
     
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    if detected_color_profile == "light_on_white" or detected_color_profile == "semi_transparent":
-        text_band_mask = cv2.inRange(gray_frame, 135, 215)
-    elif detected_color_profile == "dark_on_light":
-        _, text_band_mask = cv2.threshold(gray_frame, 95, 255, cv2.THRESH_BINARY_INV)
-    elif detected_color_profile == "light_on_dark":
-        _, text_band_mask = cv2.threshold(gray_frame, 180, 255, cv2.THRESH_BINARY)
-    else:
-        text_band_mask = cv2.Canny(gray_frame, 35, 110)
-        
-    pinpoint_character_strokes = cv2.bitwise_and(text_band_mask, raw_mask)
-    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
-    
-    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    char_counter = 0
-    painted_this_frame = 0
+    # Master erasure mask container tracking processed character bounds
+    character_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     frame_coordinates_log = []
     
-    for i in range(1, num_labels):
-        if char_counter >= len(split_characters_list): break
+    for idx in range(num_chars):
+        # Calculate the exact geometric pixel boundaries enclosing this individual letter channel
+        start_x = int(min_x + (idx * char_box_w))
+        end_x = int(min_x + ((idx + 1) * char_box_w))
+        start_y = int(min_y)
+        end_y = int(max_y)
         
-        comp_w = stats[i, cv2.CC_STAT_WIDTH]
-        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-        comp_area = stats[i, cv2.CC_STAT_AREA]
-        comp_x = stats[i, cv2.CC_STAT_LEFT]
-        comp_y = stats[i, cv2.CC_STAT_TOP]
+        # Pull a local neighborhood color sample 4px wide directly to the left and right of the character bounds
+        sample_left_x = max(0, start_x - 4)
+        sample_right_x = min(orig_width - 1, end_x + 4)
         
-        if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55 and comp_area >= 1:
-            single_char_mask = np.uint8(labels_im == i) * 255
-            
-            sample_y1 = max(0, comp_y - 2)
-            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
-            sample_x1 = max(0, comp_x - 2)
-            sample_width_limit = min(orig_width - 1, comp_x + comp_w + 2)
-            
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_bg_mask = cv2.bitwise_not(local_text_roi)
-            
-            local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            local_b = int(local_avg_channels[0])
-            local_g = int(local_avg_channels[1])
-            local_r = int(local_avg_channels[2])
-            
-            if local_b == 0 and local_g == 0 and local_r == 0:
-                local_b, local_g, local_r = avg_b, avg_g, avg_r
-            
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
-            
-            solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
-            
-            pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
-            
-            # Save literal processing coordinates coordinates map for live telemetry trace logs
-            frame_coordinates_log.append(f"Char '{split_characters_list[char_counter]}' @ [X:{comp_x}, Y:{comp_y}, W:{comp_w}, H:{comp_h}]")
-            char_counter += 1
-            painted_this_frame += 1
-
-    # 🔥 Live Coordinate Telemetry Reporting Lanes
-    if painted_this_frame > 0 and not first_lock_printed:
-        print("\n🔍 INITIAL WATERMARK GEOMETRY LOCK CAPTURED (First frame hit):")
-        for coord_line in frame_coordinates_log:
-            print(f"   👉 {coord_line}")
-        print("-" * 65 + "\n")
-        first_lock_printed = True
-
-    if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> Splicing ink over character paths:")
-        if frame_coordinates_log:
-             print(f"   📍 Current Stroke Vector: {frame_coordinates_log[0]} ... {frame_coordinates_log[-1]}")
+        bg_sample_left = frame[start_y:end_y, sample_left_x:start_x]
+        bg_sample_right = frame[start_y:end_y, end_x:sample_right_x]
+        
+        # Calculate the exact background color of the sand surrounding *only* this specific character
+        if bg_sample_left.size > 0 and bg_sample_right.size > 0:
+            local_b = int((np.median(bg_sample_left[:, :, 0]) + np.median(bg_sample_right[:, :, 0])) / 2)
+            local_g = int((np.median(bg_sample_left[:, :, 1]) + np.median(bg_sample_right[:, :, 1])) / 2)
+            local_r = int((np.median(bg_sample_left[:, :, 2]) + np.median(bg_sample_right[:, :, 2])) / 2)
         else:
-             print("   📍 Current Stroke Vector: Searching tracking lanes...")
-
-    if cv2.countNonZero(pinpoint_erasure_map) > 0:
-        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
+            local_b, local_g, local_r = avg_b, avg_g, avg_r
+            
+        # Add a tight 1px internal safety inset to avoid touching edge artifacts
+        inset_start_x = start_x + 1
+        inset_end_x = end_x - 1
+        inset_start_y = start_y + 1
+        inset_end_y = end_y - 1
         
+        # 🔥 PINPOINT TARGETED OVERPAINT:
+        # Overpaints *only* the specific letter block path frame-by-frame
+        # with its matched local background color, rendering the old text completely invisible.
+        frame[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = [local_b, local_g, local_r]
+        
+        # Track the individual character region inside the erasure canvas layer
+        character_erasure_map[inset_start_y:inset_end_y, inset_start_x:inset_end_x] = 255
+        frame_coordinates_log.append(f"'{split_characters_list[idx]}'@[X1:{start_x},X2:{end_x}]")
+        
+    # Run a fast fluid marching patch pass to smooth out any residual letter boundaries
+    if cv2.countNonZero(character_erasure_map) > 0:
+        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        inflated_erasure_mask = cv2.dilate(character_erasure_map, dilation_kernel, iterations=1)
+        frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
+        
+    # Live Telemetry Coordinate Reporting
+    if frame_idx % 45 == 0:
+        print(f"🎬 Frame {frame_idx:04d} -> Pinpoint Painting Individual Character Columns:")
+        print(f"   📍 Active Grid: {frame_coordinates_log[0]} ... {frame_coordinates_log[-1]}")
+
+    # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
+    # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, font_scale, font_thickness)
     tx_a = fixed_cx - (tw // 2)
     ty_a = fixed_cy + (th // 2)
@@ -509,18 +489,12 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print(f"✅ Phase A Complete: Watermark removalpass finalized to: {FINAL_MONETIZED_OUTPUT}")
+print(f"✅ Phase A Complete: Watermark removal pass finalized to: {FINAL_MONETIZED_OUTPUT}")
 
-# 🔥 THE PERMANENT FILE SWAP FORCE: Wipes out the old file name path completely 
-# and explicitly re-saves the finished file as ocr_cleaned_source.mp4.
-# This cuts right through browser preview caches and forces the next cell to read the painted frames!
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
-
-# Direct copy action avoids symlink mapping drops completely
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
 print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
-
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
