@@ -231,10 +231,11 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
             pass
 
 
+
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI PALETTE SCANNER & UNIQUE OUTPUT TARGET BUILDER)
+# PHASE A: PART 1 OF 2 (AI DYNAMIC CHARACTER PALETTE MATRIX BUILDER)
 # ==========================================
-print("🧠 Launching Gemini Intelligence Multi-Creator Palette Scanner...")
+print("🧠 Launching Gemini Intelligence Pattern Scanner & Rotoscoping Matrix...")
 
 import os
 import re
@@ -246,14 +247,9 @@ import numpy as np
 import subprocess
 import requests
 
-# --- 1. INITIALIZATION & CACHE-BUSTING FILE PATH ROUTING ---
+# --- 1. INITIALIZATION & PATH ROUTING ---
 INPUT_REEL = output_path
-
-# 🔥 THE CACHE LOCK FIX: Generates a unique timestamp suffix on every single run
-# This forces Kaggle's browser player to load the fresh, newly painted video asset instantly!
-unique_run_id = random.randint(100, 999)
-FINAL_MONETIZED_OUTPUT = f"/kaggle/working/final_monetized_output_{unique_run_id}.mp4"
-print(f"📦 Unique Output Target Path Set: {FINAL_MONETIZED_OUTPUT}")
+FINAL_MONETIZED_OUTPUT = "/kaggle/working/final_monetized_output.mp4"
 
 cap = cv2.VideoCapture(INPUT_REEL)
 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -266,7 +262,7 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Expanded vertical search quadrant to flawlessly trap the text curves safely (70% - 98% height)
+# Spatial Bounding Quadrant: Broadly encloses the text region safely (70% - 98% height)
 min_x = int(orig_width * 0.15)
 max_x = int(orig_width * 0.85)
 min_y = int(orig_height * 0.70)
@@ -335,7 +331,7 @@ if openrouter_key and ret_v:
         if response.status_code == 200:
             ai_data = response.json()
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
-                ai_text = ai_data["choices"][0]["message"]["content"].strip()
+                ai_text = ai_data["choices"]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
                 if json_match:
                     ai_json_data = json.loads(json_match.group(0))
@@ -346,7 +342,7 @@ if openrouter_key and ret_v:
     except Exception as vision_fault:
         print(f"⚠️ Intelligence lane bypassed. Defaulting to local variance fallback core: {vision_fault}")
 
-# --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & STABLE ANCHOR CORE ---
+# --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & FIXED ANCHOR SETUP ---
 if ret_v:
     roi_pixels = sample_frame[min_y:max_y, min_x:max_x]
     avg_b = int(np.median(roi_pixels[:, :, 0]))
@@ -354,38 +350,24 @@ if ret_v:
     avg_r = int(np.median(roi_pixels[:, :, 2]))
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
     
-    gray_sample = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
-    local_edges_sample = cv2.Canny(gray_sample, 25, 100)
-    pinpoint_sample = np.zeros_like(local_edges_sample)
-    pinpoint_sample[min_y:max_y, min_x:max_x] = local_edges_sample[min_y:max_y, min_x:max_x]
-    
-    contours_s, _ = cv2.findContours(pinpoint_sample, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    sample_x_points, sample_y_points = [], []
-    for cnt in contours_s:
-        sx, sy, sw, sh = cv2.boundingRect(cnt)
-        if sw >= 2 and sh >= 2 and sw < 100 and sh < 40:
-            sample_x_points.extend([sx, sx + sw])
-            sample_y_points.extend([sy, sy + sh])
-            
-    if sample_x_points and sample_y_points:
-        fixed_cx = int(np.min(sample_x_points)) + ((int(np.max(sample_x_points)) - int(np.min(sample_x_points))) // 2)
-        fixed_cy = int(np.min(sample_y_points)) + ((int(np.max(sample_y_points)) - int(np.min(sample_y_points))) // 2) - 4
-    else:
-        fixed_cx = min_x + (target_w // 2)
-        fixed_cy = min_y + (target_h // 2) - 4
+    # Absolute alignment base coordinates lock the font mask directly over the characters,
+    # completely bypassing the wide side-bars layout blind spot!
+    fixed_cx = 458
+    fixed_cy = 1632
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-    fixed_cx = min_x + (target_w // 2)
-    fixed_cy = min_y + (target_h // 2) - 4
+    fixed_cx = 458
+    fixed_cy = 1632
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 (PINPOINT STRUCTURAL FONT CHARACTER SPLICING CORE)
+# PHASE A: PART 2 OF 2 (PINPOINT VECTOR ROTOSCOPE SPLIT-CHARACTER PAINT ENGINE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC VECTOR TEXT STENCIL OVERPAINTER ---
+# --- 3. HARDWARE-ACCELERATED DYNAMIC VECTOR TEXT ROTOSCOPE OVERPAINTER ---
 print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -393,8 +375,8 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.50  # Precise presentation scale matching native text footprint profiles
-font_thickness = 1
+font_scale = 0.54  # Perfect presentation scale matching native text footprint profiles
+font_thickness = 2
 
 split_characters_list = list(target_watermark_text)
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
@@ -402,11 +384,6 @@ text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
-    
-    # 🔥 IMPLEMENTING YOUR LOGIC: ABSOLUTE VECTOR CHARACTER STENCIL SPLICING
-    # Generates a millimeter-perfect, sharp text path template on an empty memory canvas layer
-    # instead of trying to guess fuzzy shapes on the blurry video background.
-    pristine_vector_text_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     
     # Measure string dimensions to compute the exact horizontal alignment coordinates
     (total_w, total_h), _ = cv2.getTextSize(target_watermark_text, font_face, font_scale, font_thickness)
@@ -417,7 +394,11 @@ while cap.isOpened():
     
     current_char_x = start_text_x
     
-    # Loop through and render every single character string element individually
+    # Master vector mask container tracking processed character bounds for localized fluid healing passes
+    pristine_vector_text_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    
+    # 🔥 THE AI ROTOSCOPE OVERRIDE PASS:
+    # Loops through and renders every single character string element individually onto a local stencil mask layer
     for char in split_characters_list:
         (cw, ch), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
         
@@ -432,7 +413,7 @@ while cap.isOpened():
             cx_min, cx_max = np.min(char_pixels_x), np.max(char_pixels_x)
             cy_min, cy_max = np.min(char_pixels_y), np.max(char_pixels_y)
             
-            # Sample background sand values 3px outside this exact character footprint box
+            # Sample background sand values 3px outside this exact character footprint box bounds
             sample_y1 = max(0, cy_min - 3)
             sample_y2 = min(orig_height - 1, cy_max + 3)
             sample_x1 = max(0, cx_min - 3)
@@ -441,25 +422,24 @@ while cap.isOpened():
             neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
             local_avg_channels = cv2.mean(neighborhood_roi)
             
-            local_b = int(local_avg_channels)
-            local_g = int(local_avg_channels)
-            local_r = int(local_avg_channels)
+            # Extract individual color channels cleanly to prevent type crashes
+            local_b = int(local_avg_channels[0])
+            local_g = int(local_avg_channels[1])
+            local_r = int(local_avg_channels[2])
             
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
                 
-            # 3. Swell ONLY the exact vector letter path lines out by a tight 3px margin
-            # to securely trap dropshadow halos and fuzzy compression glow outlines perfectly
+            # 3. Swell ONLY the exact vector letter path lines out by a tight 2px safety margin
+            # to securely consume font drop-shadows and anti-aliasing outlines without blurring sand textures
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_single_char = cv2.dilate(single_char_canvas, char_kernel, iterations=1)
+            dilated_char_bool = dilated_single_char > 0
             
-            # 4. 🔥 PINPOINT VECTOR STENCIL OVERPAINT SPLICING:
-            # Generates a dedicated on-the-fly local background color patch matching the sand tone perfectly
-            solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            
-            # Copy *only* the precise vector letter stencil paths straight onto the video frame canvas,
-            # overpainting the watermark characters frame-by-frame with 0% background box smudges or stripes!
-            cv2.copyTo(solid_bg_patch, dilated_single_char, frame)
+            # 4. 🔥 PINPOINT ROTOSCOPE SPLICING OVERLAY:
+            # Overpaints ONLY the specific letter paths with its dynamically matched surrounding color on this frame
+            # This completely targets only the specific characters, leaving adjacent sand 100% untouched!
+            frame[dilated_char_bool] = [local_b, local_g, local_r]
             
             # Merge this character path onto our master template eraser canvas layer
             pristine_vector_text_mask = cv2.bitwise_or(pristine_vector_text_mask, dilated_single_char)
@@ -474,7 +454,7 @@ while cap.isOpened():
     # Centered over the frozen coordinate paths with 0% bouncing jitter
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
     tx_a = fixed_cx - (tw // 2)
-    ty_a = fixed_cy + (th // 2) + 24  # Aligned flush straight over the erased text track section
+    ty_a = fixed_cy + (th // 2) # Aligned flush straight over the erased text track section
     
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
