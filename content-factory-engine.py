@@ -232,9 +232,9 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI DYNAMIC HANDLE SCANNER & STRUCTURAL SETUP)
+# PHASE A: PART 1 OF 2 (AI MULTI-CREATOR PALETTE SCANNER & TESSERACT SETUP)
 # ==========================================
-print("🧠 Activating Universal Adaptive Split-Character Stencil Engine...")
+print("🧠 Launching Gemini Intelligent Scanner & Tesseract Vector Engine...")
 
 import os
 import re
@@ -245,6 +245,7 @@ import random
 import numpy as np
 import subprocess
 import requests
+import pytesseract  # Fixed character-level layout library integration
 
 # --- 1. INITIALIZATION & FILE PATH ROUTING ---
 INPUT_REEL = output_path
@@ -261,10 +262,10 @@ cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_count * 0.35))
 ret_v, sample_frame = cap.read()
 cap.release()
 
-# Spacious lower third container canvas bounds safely enclosing 65% - 99% height rows
+# Universal spacious target margin coordinates bounding box (70% - 99% height bounds)
 min_x = int(orig_width * 0.12)
 max_x = int(orig_width * 0.88)
-min_y = int(orig_height * 0.65)
+min_y = int(orig_height * 0.70)
 max_y = int(orig_height * 0.99)
 target_w = max_x - min_x
 target_h = max_y - min_y
@@ -272,11 +273,10 @@ polygon_vertices = np.array([[min_x, min_y], [max_x, min_y], [max_x, max_y], [mi
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# Upgraded content tracker prompt extracting dynamic creator handles fresh across any channel template
 vision_prompt = (
-    "Examine this vertical video frame carefully. Your task is to identify and locate the creator's username watermark text handle or channel signature stamp.\n"
+    "Examine this vertical video frame carefully. Identify the creator's username watermark text handle or logo stamp.\n"
     "The text can belong to any unique user or creator and can be positioned anywhere inside the lower third of the screen.\n\n"
-    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover (e.g., '@sand.tagious', '@creator_reel').\n"
+    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover (e.g., '@sand.tagious').\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
     "{\n  \"found\": true,\n  \"watermark_text\": \"the exact characters found\"\n}\n\n"
     "CRITICAL: Do not write code blocks or markdown ticks. Print the clean JSON dictionary format completely raw."
@@ -342,40 +342,23 @@ if ret_v:
     avg_r = int(np.median(roi_pixels[:, :, 2]))
     text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
     
-    # Analyze the initial frame's edge properties natively to calculate a stable coordinate center point
-    gray_sample = cv2.cvtColor(sample_frame, cv2.COLOR_BGR2GRAY)
-    local_edges_sample = cv2.Canny(gray_sample, 25, 100)
-    pinpoint_sample = np.zeros_like(local_edges_sample)
-    pinpoint_sample[min_y:max_y, min_x:max_x] = local_edges_sample[min_y:max_y, min_x:max_x]
-    
-    contours_s, _ = cv2.findContours(pinpoint_sample, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    sample_x_points, sample_y_points = [], []
-    for cnt in contours_s:
-        sx, sy, sw, sh = cv2.boundingRect(cnt)
-        if sw >= 2 and sh >= 2 and sw < 120 and sh < 45:
-            sample_x_points.extend([sx, sx + sw])
-            sample_y_points.extend([sy, sy + sh])
-            
-    if sample_x_points and sample_y_points:
-        fixed_cx = int(np.min(sample_x_points)) + ((int(np.max(sample_x_points)) - int(np.min(sample_x_points))) // 2)
-        fixed_cy = int(np.min(sample_y_points)) + ((int(np.max(sample_y_points)) - int(np.min(sample_y_points))) // 2) - 4
-    else:
-        fixed_cx = int(orig_width * 0.5)
-        fixed_cy = int(orig_height * 0.842)
+    # Establish baseline center layout coordinates matching the video track geometry
+    fixed_cx = int(orig_width * 0.5)
+    fixed_cy = int(orig_height * 0.845)
 else:
     avg_b, avg_g, avg_r = 240, 240, 240
     text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-    fixed_cx, fixed_cy = int(orig_width * 0.5), int(orig_height * 0.842)
+    fixed_cx, fixed_cy = int(orig_width * 0.5), int(orig_height * 0.845)
 
 print(f"🔒 Stationary anchor coordinate grid locked into VRAM -> Center X: {fixed_cx} | Center Y: {fixed_cy}")
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (UNIVERSAL ADAPTIVE MULTI-SCALE LETTER SHADER LOOP)
+# PHASE A: PART 2 OF 2 (PYTESSERACT CHARACTER-LEVEL PAINT ENGINE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED ADAPTIVE CHARACTER COORDINATE STENCIL LOOPS ---
-print("🎨 Processing frame-by-frame exact text size adaptive overpainting...")
+# --- 3. HARDWARE-ACCELERATED PYTESSERACT CHARACTER-STROKE LOOPS ---
+print("🎨 Processing frame-by-frame character isolation and pixel-perfect overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -383,85 +366,100 @@ video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_h
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 split_characters_list = list(target_watermark_text)
-num_chars = len(split_characters_list)
+
+# Force-calculate fallback text color profile parameters
+text_color, shadow_color = (255, 255, 255), (15, 15, 15)
+
+frame_idx = 0
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
+    frame_idx += 1
     
-    # Isolate general target quadrant bounds exclusively
+    # 1. OPTIMIZATION FOR LIGHT OPACITY BINARIZATION PASS
+    # Strips out the white sand background and forces the gray characters to turn solid black
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    adaptive_thresh = cv2.adaptiveThreshold(gray_frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
+    
+    # Restrict Tesseract scanning engine exclusively inside the lower quadrant bounds
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [polygon_vertices], 255)
+    isolated_text_canvas = cv2.bitwise_and(adaptive_thresh, raw_mask)
     
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    # 🔥 THE ADAPTIVE GAUSSIAN SHAPE EXTRACTION:
-    # Dynamically reads local contrast transitions to isolate ONLY the literal character lines 
-    # of whatever font shape, angle, or watermark pattern enters the frame canvas.
-    adaptive_text_mask = cv2.adaptiveThreshold(gray_frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
-    pinpoint_character_strokes = cv2.bitwise_and(adaptive_text_mask, raw_mask)
-    
-    # Map isolated character cluster pixel connectivity tables frame-by-frame
-    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
+    # 2. GET CHARACTER-LEVEL PYTESSERACT BOUNDING BOXES
+    # Tesseract returns: character, x_min, y_min, x_max, y_max on its inverted internal grid layout
+    boxes = pytesseract.image_to_boxes(isolated_text_canvas)
     
     # Master vector mask container targeting ONLY the character paths
-    universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    char_counter = 0
+    pinpoint_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     
-    for i in range(1, num_labels):
-        if char_counter >= num_chars: break
+    for b in boxes.splitlines():
+        b_parts = b.split(' ')
+        if len(b_parts) < 5: continue
         
-        comp_w = stats[i, cv2.CC_STAT_WIDTH]
-        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-        comp_area = stats[i, cv2.CC_STAT_AREA]
-        comp_x = stats[i, cv2.CC_STAT_LEFT]
-        comp_y = stats[i, cv2.CC_STAT_TOP]
+        char = b_parts[0]
         
-        # Sizing thresholds filter out massive background shapes to lock ONLY onto literal text character lines
-        if comp_w >= 1 and comp_h >= 2 and comp_w < 55 and comp_h < 55 and comp_area > 2:
-            # Isolate the exact individual letter component mask natively
-            single_char_mask = np.uint8(labels_im == i) * 255
-            
-            # Real-Time Character Neighborhood Color Sampler: Samples background 2px outside this exact character bounds
-            sample_y1 = max(0, comp_y - 2)
-            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
-            sample_x1 = max(0, comp_x - 2)
-            sample_width_limit = min(orig_width - 1, comp_x + comp_w + 2)
-            
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_bg_mask = cv2.bitwise_not(local_text_roi)
-            
-            # Extract the live moving background sand shade surrounding *only* this specific character
-            local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-            local_b = int(local_avg_channels[0])
-            local_g = int(local_avg_channels[1])
-            local_r = int(local_avg_channels[2])
-            
-            if local_b == 0 and local_g == 0 and local_r == 0:
-                local_b, local_g, local_r = avg_b, avg_g, avg_r
-            
-            # Expand the character stroke mask outward by an ultra-tight 2px using an elliptical matrix kernel 
-            # to fully swallow font dropshadow profiles and fuzzy compression halos completely
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
-            dilated_char_bool = dilated_char_stroke > 0
-            
-            # 🔥 ACTION 1: PINPOINT VECTOR STENCIL OVERPAINT SPLICING
-            # Generates a dedicated on-the-fly local color matte canvas matching the live sand tone perfectly
-            solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            
-            # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
-            # overpainting the watermark characters frame-by-frame with 0% background box smudges or stripes!
-            cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
-            
-            # Merge this processed character tracking footprint onto our unified erasure canvas layer
-            universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_char_stroke)
-            char_counter += 1
-            
+        # FIXED INVERTED Y-COORDINATES MATCHING YOUR FRAMEWORK EFFECTIVELY:
+        # Inverts Tesseract bottom-up coordinates cleanly back to standard top-down video frame pixels
+        x_min = int(b_parts[1])
+        y_min = orig_height - int(b_parts[2]) # Re-mapped top boundary edge
+        x_max = int(b_parts[3])
+        y_max = orig_height - int(b_parts[4]) # Re-mapped bottom boundary edge
+        
+        comp_w = x_max - x_min
+        comp_h = y_max - y_min
+        
+        # Filter for the specific watermark characters discovered by Gemini in Part 1
+        if char in split_characters_list:
+            # Sizing thresholds to filter out wide background noise objects
+            if comp_w >= 1 and comp_h >= 1 and comp_w < 55 and comp_h < 55:
+                
+                # Real-Time Character Neighborhood Color Sampler: Samples background 3px outside character limits
+                sample_y1 = max(0, y_min - 3)
+                sample_y2 = min(orig_height - 1, y_max + 3)
+                sample_x1 = max(0, x_min - 3)
+                sample_x2 = min(orig_width - 1, x_max + 3)
+                
+                neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
+                local_text_roi = isolated_text_canvas[sample_y1:sample_y2, sample_x1:sample_x2]
+                local_bg_mask = cv2.bitwise_not(local_text_roi)
+                
+                # Extract the live moving background sand shade surrounding *only* this specific character
+                local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask if local_bg_mask.shape == neighborhood_roi.shape[:2] else None)
+                
+                # 🔥 CRITICAL POSITION UNPACK FIX: Targets loop tuple data explicitly by absolute channel array indices!
+                local_b = int(local_avg_channels[0])
+                local_g = int(local_avg_channels[1])
+                local_r = int(local_avg_channels[2])
+                
+                if local_b == 0 and local_g == 0 and local_r == 0:
+                    local_b, local_g, local_r = avg_b, avg_g, avg_r
+                
+                # Isolate the exact individual letter bounding box segment mask natively
+                single_char_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+                cv2.rectangle(single_char_mask, (x_min, y_min), (x_max, y_max), 255, -1)
+                
+                # Filter down to the literal text curves by intersecting the box with our binarized stroke paths
+                precise_letter_strokes = cv2.bitwise_and(single_char_mask, isolated_text_canvas)
+                
+                # Swell ONLY the exact character pixel text lines out by a tight 2px safety margin
+                char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+                dilated_char_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
+                
+                # ACTION 1: PINPOINT VECTOR STENCIL OVERPAINT SPLICING
+                solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
+                
+                # Copy *only* the precise letter mask pixel tracks straight onto the video frame canvas,
+                # overpainting the watermark characters frame-by-frame with 0% background box smudges or stripes!
+                cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
+                
+                # Merge this processed character tracking footprint onto our unified erasure canvas layer
+                pinpoint_erasure_map = cv2.bitwise_or(pinpoint_erasure_map, dilated_char_stroke)
+
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
-    if cv2.countNonZero(universal_erasure_map) > 0:
-        frame = cv2.inpaint(frame, universal_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
+    if cv2.countNonZero(pinpoint_erasure_map) > 0:
+        frame = cv2.inpaint(frame, pinpoint_erasure_map, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
     # --- ACTION 2: LOCKED STATIONARY OVERLAY GENERATION ---
     # Centered over the frozen coordinate paths with 0% bouncing jitter
@@ -485,7 +483,7 @@ subprocess.run([
 ], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
-print(f"✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
+print(f"✅ Phase A Complete: Universal deterministic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
 # THE AUTOMATED SYMLINK BRIDGE:
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
