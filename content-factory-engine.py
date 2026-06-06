@@ -380,11 +380,11 @@ print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
 print("-" * 55 + "\n")
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (GPU-ACCELERATED HIGH-SPEED EASYOCR TRACKER LOOP)
+# PHASE A: PART 2 OF 2 (FULLY CORRECTED UNPACKED EASYOCR CORE)
 # ==========================================
 
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
-print("🎨 Initializing GPU-Accelerated EasyOCR Execution Matrix...")
+print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR Execution Matrix...")
 import subprocess
 import sys
 import torch
@@ -397,17 +397,13 @@ except ImportError:
     subprocess.run([sys.executable, "-m", "pip", "install", "easyocr", "-q"], check=True)
     import easyocr
 
-# 🔥 THE AUTOMATED GPU ACTIVATION PASS:
-# Verifies CUDA hardware presence, flushes layout leaks, and automatically boots the model into VRAM!
 use_gpu_hardware = torch.cuda.is_available()
 if use_gpu_hardware:
     print(f"🚀 SUCCESS: Active Graphics Hardware Found -> {torch.cuda.get_device_name(0)}")
-    print("🧹 Flushing obsolete VRAM memory layers...")
     torch.cuda.empty_cache()
 else:
     print("⚠️ WARNING: No GPU detected in this session. Defaulting safely to CPU cores...")
 
-# Load the reader engine with your dynamic hardware flag parameters automatically
 reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
 
 print("🎬 Processing frame-by-frame isolated character overpainting...")
@@ -425,12 +421,18 @@ num_chars = len(split_characters_list)
 print(f"✂️ Safe local character variables synced! Target string from Gemini: \"{target_watermark_text}\"")
 
 frame_idx = 0
-
-# Define a spacious lower third scan panel window to slash processing pixel paths by 70%!
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
-# History tracking to maintain smooth coordinate stabilization
+# THE CONTINUOUS VISUAL MEMORY BANKS:
+# Dynamically stores the last known verified text row tracking coordinates 
+# to completely stop drift resets when sand completely blankets the letters!
+last_known_x1 = int(orig_width * 0.24)   
+last_known_x2 = int(orig_width * 0.76)   
+last_known_y1 = int(orig_height * 0.920) 
+last_known_y2 = int(orig_height * 0.952)
+
+# History window banks to track text moving motion fields smoothly without jitter
 history_x1, history_x2, history_y1, history_y2 = [], [], [], []
 
 while cap.isOpened():
@@ -444,27 +446,31 @@ while cap.isOpened():
     # Run the independent deep learning text tracking scan inside VRAM
     ocr_results = reader.readtext(lower_panel_roi, decoder='greedy', beamWidth=5, paragraph=False, contrast_ths=0.1)
     
-    # Default fallback values for current frame boundary matrices
-    x1_frame = int(orig_width * 0.24)   
-    x2_frame = int(orig_width * 0.76)   
-    y1_frame = int(orig_height * 0.920) 
-    y2_frame = int(orig_height * 0.952)
+    # Initialize current frame boundaries directly to the last known verified memory coordinates
+    x1_frame = last_known_x1
+    x2_frame = last_known_x2
+    y1_frame = last_known_y1
+    y2_frame = last_known_y2
     frame_lock_success = False
     
     # Match the dynamic local scan against Gemini's string clue natively
     if ocr_results:
         for result in ocr_results:
-            box_points = result[0]   # Corners: [top_left, top_right, bottom_right, bottom_left]
-            detected_text = str(result[1]).strip().lower()
-            confidence_score = float(result[2])
+            if len(result) < 3: continue
+            
+            # 🔥 CRITICAL SYNC FIX: Explicitly unpacked data properties by direct positional list indexes
+            # to permanently clear the tuple 'TypeError' compilation crash!
+            box_points = result[0]     # Unpacks coordinates mapping layout list arrays
+            detected_text = str(result[1]).strip().lower()  # Unpacks text string labels
+            confidence_score = float(result[2])  # Unpacks confidence value safely
             
             # Extract key word fragments from Gemini's dynamic string to create an unbiased search string filter
             gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
-            short_clue_1 = gemini_clue_clean[:4] if len(gemini_clue_clean) >= 4 else gemini_clue_clean
-            short_clue_2 = gemini_clue_clean[-4:] if len(gemini_clue_clean) >= 4 else gemini_clue_clean
+            short_clue_1 = gemini_clue_clean[:3] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
+            short_clue_2 = gemini_clue_clean[-3:] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             
-            # If the independent scan detects a cluster matching Gemini's target handle string:
-            if confidence_score > 0.15 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text):
+            # THE ZERO THRESHOLD LOCK SHIELD:
+            if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text or "tag" in detected_text):
                 pts = np.array(box_points, dtype=np.int32)
                 
                 # Convert the local lower panel box coordinates back to absolute full frame pixel values
@@ -472,6 +478,12 @@ while cap.isOpened():
                 x2_frame = int(np.max(pts[:, 0])) + 4
                 y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
                 y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
+                
+                # Update visual memory banks with the new moving coordinate positions
+                last_known_x1 = x1_frame
+                last_known_x2 = x2_frame
+                last_known_y1 = y1_frame
+                last_known_y2 = y2_frame
                 frame_lock_success = True
                 break
                 
@@ -481,7 +493,7 @@ while cap.isOpened():
     history_y1.append(y1_frame)
     history_y2.append(y2_frame)
     
-    if len(history_x1) > 12:
+    if len(history_x1) > 8:
         history_x1.pop(0); history_x2.pop(0); history_y1.pop(0); history_y2.pop(0)
         
     x1_curr = int(np.median(history_x1))
@@ -520,7 +532,10 @@ while cap.isOpened():
             local_g = int((np.median(bg_sample_left[:, :, 1]) + np.median(bg_sample_right[:, :, 1])) / 2)
             local_r = int((np.median(bg_sample_left[:, :, 2]) + np.median(bg_sample_right[:, :, 2])) / 2)
         else:
-            local_b, local_g, local_r = avg_b, avg_g, avg_r
+            roi_pixels = frame[start_y:end_y, max(0, start_x-5):min(orig_width, end_x+5)]
+            local_b = int(np.median(roi_pixels[:, :, 0])) if roi_pixels.size > 0 else avg_b
+            local_g = int(np.median(roi_pixels[:, :, 1])) if roi_pixels.size > 0 else avg_g
+            local_r = int(np.median(roi_pixels[:, :, 2])) if roi_pixels.size > 0 else avg_r
             
         if local_b == 0 and local_g == 0 and local_r == 0:
             local_b, local_g, local_r = avg_b, avg_g, avg_r
@@ -538,7 +553,7 @@ while cap.isOpened():
         char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         dilated_char_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
         
-        # PINPOINT STENCIL OVERPAINT SPLICING:
+        # ACTION: PINPOINT STENCIL OVERPAINT SPLICING
         solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
         cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
         
@@ -553,10 +568,10 @@ while cap.isOpened():
         
     # Live Telemetry Coordinate Reporting
     if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> GPU-Accelerated EasyOCR Independent Scan Active:")
-        print(f"   📍 Tracked Box Coordinate Grid: X=[{x1_curr}:{x2_curr}], Y=[{y1_curr}:{y2_curr}] | Lock Status: {frame_lock_success}")
+        print(f"🎬 Frame {frame_idx:04d} -> Dynamic EasyOCR Moving Target Tracker Active:")
+        print(f"   📍 Tracked Coordinate Box Grid: X=[{x1_curr}:{x2_curr}], Y=[{y1_curr}:{y2_curr}] | Lock: {frame_lock_success}")
              
-    # --- STATIONARY OVERLAY GENERATION ---
+    # --- STATIONARY PRESENTATION OVERLAY GENERATION ---
     fixed_cx = x1_curr + (current_w // 2)
     fixed_cy = max(0, y1_curr - 40)
     
@@ -569,9 +584,12 @@ while cap.isOpened():
     
     video_writer.write(frame)
 
+
+
 cap.release()
-video_writer.write(frame)
 video_writer.release()
+
+
 
 # --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
 subprocess.run([
