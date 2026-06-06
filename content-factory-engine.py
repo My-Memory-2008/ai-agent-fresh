@@ -379,19 +379,15 @@ print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
 print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
 print("-" * 55 + "\n")
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 (FULLY CORRECTED UNPACKED EASYOCR COMPONENT CORE)
-# ==========================================
-
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
 print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR Execution Matrix...")
+import os
 import subprocess
 import sys
 import torch
 import cv2
 import numpy as np
-import os
 
 # Dynamic installation guard ensuring easyocr is loaded into memory cleanly
 try:
@@ -409,8 +405,8 @@ else:
     print("⚠️ WARNING: No GPU detected in this session. Defaulting safely to CPU cores...")
 
 reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
-
 print("🎬 Processing frame-by-frame isolated character overpainting...")
+
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -428,17 +424,24 @@ frame_idx = 0
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
+# Global fallback background color averages if sampling fails completely
+avg_b, avg_g, avg_r = 128, 128, 128 
+
 # THE CONTINUOUS VISUAL MEMORY BANKS:
-last_known_x1 = int(orig_width * 0.24)   
-last_known_x2 = int(orig_width * 0.76)   
+# Dynamically stores the last known verified text row tracking coordinates 
+# to completely stop drift resets when sand completely blankets the letters!
+last_known_x1 = int(orig_width * 0.24) 
+last_known_x2 = int(orig_width * 0.76) 
 last_known_y1 = int(orig_height * 0.920) 
 last_known_y2 = int(orig_height * 0.952)
 
+# History window banks to track text moving motion fields smoothly without jitter
 history_x1, history_x2, history_y1, history_y2 = [], [], [], []
 
 while cap.isOpened():
     ret, frame = cap.read()
-    if not ret: break
+    if not ret:
+        break
     frame_idx += 1
     
     # Crop the frame strictly to the lower panel where text lives to maximize processing speeds
@@ -457,24 +460,30 @@ while cap.isOpened():
     # Match the dynamic local scan against Gemini's string clue natively
     if ocr_results:
         for result in ocr_results:
-            if len(result) < 3: continue
+            if len(result) < 3:
+                continue
             
-            box_points = result[0]     
-            detected_text = str(result[1]).strip().lower()  
-            confidence_score = float(result[2])  
+            # 🔥 CRITICAL SYNC FIX: Explicitly unpacked data properties by direct positional list indexes
+            box_points = result[0]                # Unpacks coordinates mapping layout list arrays
+            detected_text = str(result[1]).strip().lower() # Unpacks text string labels
+            confidence_score = float(result[2])   # Unpacks confidence value safely
             
+            # Extract key word fragments from Gemini's dynamic string to create an unbiased search string filter
             gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
             short_clue_1 = gemini_clue_clean[:3] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             short_clue_2 = gemini_clue_clean[-3:] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             
+            # THE ZERO THRESHOLD LOCK SHIELD:
             if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text or "tag" in detected_text):
                 pts = np.array(box_points, dtype=np.int32)
                 
-                x1_frame = int(np.min(pts[:, 0])) - 6
-                x2_frame = int(np.max(pts[:, 0])) + 6
-                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 4
-                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 4
+                # Convert the local lower panel box coordinates back to absolute full frame pixel values
+                x1_frame = int(np.min(pts[:, 0])) - 4
+                x2_frame = int(np.max(pts[:, 0])) + 4
+                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
+                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
                 
+                # Update visual memory banks with the new moving coordinate positions
                 last_known_x1 = x1_frame
                 last_known_x2 = x2_frame
                 last_known_y1 = y1_frame
@@ -482,6 +491,7 @@ while cap.isOpened():
                 frame_lock_success = True
                 break
                 
+    # KALMAN FILTER SMOOTHING MATRIX
     history_x1.append(x1_frame)
     history_x2.append(x2_frame)
     history_y1.append(y1_frame)
@@ -495,99 +505,87 @@ while cap.isOpened():
     y1_curr = int(np.median(history_y1))
     y2_curr = int(np.median(history_y2))
     
+    # Slicing safety boundary constraints check
     x1_curr = max(0, min(x1_curr, orig_width - 1))
     x2_curr = max(0, min(x2_curr, orig_width - 1))
     y1_curr = max(0, min(y1_curr, orig_height - 1))
     y2_curr = max(0, min(y2_curr, orig_height - 1))
     
-    # 1. 🔥 HIGH-CONTRAST BINARIZATION STEP FOR SHAPE TRACING
-    gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    adaptive_text_mask = cv2.adaptiveThreshold(gray_full, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
+    # PINPOINT INDEPENDENT CHARACTER-LEVEL SPLITTING LOOP
+    current_w = x2_curr - x1_curr
+    char_box_w = float(current_w) / num_chars if num_chars > 0 else 1.0
     
-    # Restrict shape parsing exclusively within EasyOCR's active coordinates envelope box
-    quadrant_vertices = np.array([[x1_curr, y1_curr], [x2_curr, y1_curr], [x2_curr, y2_curr], [x1_curr, y2_curr]], dtype=np.int32)
-    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(raw_mask, [quadrant_vertices], 255)
-    pinpoint_character_strokes = cv2.bitwise_and(adaptive_text_mask, raw_mask)
-    
-    # 2. 🔥 PARSE EVERY SINGLE SEPARATE CHARACTER INDEPENDENTLY ON THIS FRAME
-    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
-    
+    # Master vector mask container tracking processed character coordinates mask arrays
     universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    char_counter = 0
     frame_coordinates_log = []
     
-    for i in range(1, num_labels):
-        if char_counter >= num_chars: break
+    for idx in range(num_chars):
+        start_x = int(x1_curr + (idx * char_box_w))
+        end_x = int(x1_curr + ((idx + 1) * char_box_w))
+        start_y = int(y1_curr)
+        end_y = int(y2_curr)
         
-        comp_w = stats[i, cv2.CC_STAT_WIDTH]
-        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
-        comp_area = stats[i, cv2.CC_STAT_AREA]
-        comp_x = stats[i, cv2.CC_STAT_LEFT]
-        comp_y = stats[i, cv2.CC_STAT_TOP]
+        sample_left_x = max(0, start_x - 4)
+        sample_right_x = min(orig_width, end_x + 4)
         
-        # Filtering thresholds ignore loose background sand grains to lock onto real font strokes
-        if comp_w >= 1 and comp_h >= 2 and comp_w < 55 and comp_h < 55 and comp_area > 2:
-            # Isolate the precise coordinates and size of this standalone individual character shape natively
-            single_char_mask = np.uint8(labels_im == i) * 255
+        bg_sample_left = frame[start_y:end_y, sample_left_x:start_x]
+        bg_sample_right = frame[start_y:end_y, end_x:sample_right_x]
+        
+        if bg_sample_left.size > 0 and bg_sample_right.size > 0:
+            local_b = int((np.median(bg_sample_left[:, :, 0]) + np.median(bg_sample_right[:, :, 0])) / 2)
+            local_g = int((np.median(bg_sample_left[:, :, 1]) + np.median(bg_sample_right[:, :, 1])) / 2)
+            local_r = int((np.median(bg_sample_left[:, :, 2]) + np.median(bg_sample_right[:, :, 2])) / 2)
+        else:
+            roi_pixels = frame[start_y:end_y, max(0, start_x-5):min(orig_width, end_x+5)]
+            local_b = int(np.median(roi_pixels[:, :, 0])) if roi_pixels.size > 0 else avg_b
+            local_g = int(np.median(roi_pixels[:, :, 1])) if roi_pixels.size > 0 else avg_g
+            local_r = int(np.median(roi_pixels[:, :, 2])) if roi_pixels.size > 0 else avg_r
             
-            # Local Character Backdrop Neighborhood Sampler: Samples background 2px directly outside letter outlines
-            sample_y1 = max(0, comp_y - 2)
-            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
-            sample_x1 = max(0, comp_x - 2)
-            sample_width_limit = min(orig_width - 1, comp_x + comp_w + 2)
-            
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
-            local_bg_mask = cv2.bitwise_not(local_text_roi)
-            
-            if neighborhood_roi.size > 0 and local_bg_mask.shape == neighborhood_roi.shape[:2]:
-                local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-                local_b = int(local_avg_channels[0])
-                local_g = int(local_avg_channels[1])
-                local_r = int(local_avg_channels[2])
-            else:
-                local_b, local_g, local_r = avg_b, avg_g, avg_r
-                
-            if local_b == 0 and local_g == 0 and local_r == 0:
-                local_b, local_g, local_r = avg_b, avg_g, avg_r
-                
-            # Expand the character stroke mask outward by an ultra-tight 2px to fully swallow drop shadows
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
-            
-            # 3. 🔥 BITWISE STENCIL OVERPAINT SPLICING
-            solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
-            
-            universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_char_stroke)
-            frame_coordinates_log.append(f"'{split_characters_list[char_counter]}'@[X:{comp_x},Y:{comp_y}]")
-            char_counter += 1
+        if local_b == 0 and local_g == 0 and local_r == 0:
+            local_b, local_g, local_r = avg_b, avg_g, avg_r
+
+        # Generate an isolated single-character bounding segment canvas natively
+        single_char_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+        cv2.rectangle(single_char_mask, (start_x, start_y), (end_x, end_y), 255, -1)
+
+        # High-contrast binarization pass isolates fine font tracks cleanly from the sand background
+        gray_roi_block = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        adaptive_thresh = cv2.adaptiveThreshold(gray_roi_block, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
+        
+        precise_letter_strokes = cv2.bitwise_and(single_char_mask, adaptive_thresh)
+        
+        char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        dilated_char_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
+        
+        # ACTION: PINPOINT STENCIL OVERPAINT SPLICING
+        solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
+        cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
+        
+        universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_char_stroke)
+        frame_coordinates_log.append(f"{split_characters_list[idx]}@[X1:{start_x},X2:{end_x}]")
 
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(universal_erasure_map) > 0:
         dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
         frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
-        
+
     # Live Telemetry Coordinate Reporting
     if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> True Independent Character-Level Isolation Active:")
-        if frame_coordinates_log:
-             print(f"   📍 Active Character Grid Matrix: {frame_coordinates_log[-1]}")
-             
+        print(f"🎬 Frame {frame_idx:04d} -> Dynamic EasyOCR Moving Target Tracker Active:")
+        print(f"   📍 Tracked Coordinate Box Grid: X=[{x1_curr}:{x2_curr}], Y=[{y1_curr}:{y2_curr}] | Lock: {frame_lock_success}")
+
     # --- STATIONARY PRESENTATION OVERLAY GENERATION ---
-    current_w = x2_curr - x1_curr
     fixed_cx = x1_curr + (current_w // 2)
     fixed_cy = max(0, y1_curr - 40)
-    
+
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
     tx_a = fixed_cx - (tw // 2)
     ty_a = fixed_cy + (th // 2)
-    
+
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
-    
+
     video_writer.write(frame)
 
 cap.release()
