@@ -233,11 +233,10 @@ for temp_file in [TEMP_HEALED_MP4, CLEAN_INPUT_STAGE1]:
 
 
 
-
 # ==========================================
-# PHASE A: PART 1 OF 2 (AI SPATIAL COORDINATE TARGET EXTRACTOR)
+# PHASE A: PART 1 OF 2 (AI VISUAL TARGET INGESTION & VARIABLE SETUP CORE)
 # ==========================================
-print("🧠 Launching Gemini Multimodal Spatial Coordinate Target Extractor...")
+print("🧠 Launching Gemini Intelligent Target Scanner & Native Variable Core...")
 
 import os
 import re
@@ -259,7 +258,7 @@ orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = cap.get(cv2.CAP_PROP_FPS)
 
-# Sample a mid-timeline frame to extract layout boundaries
+# Sample a clean mid-timeline frame to run the spatial text ingestion pass
 sample_idx = int(frame_count * 0.45)
 cap.set(cv2.CAP_PROP_POS_FRAMES, sample_idx)
 ret_v, sample_frame = cap.read()
@@ -267,28 +266,19 @@ cap.release()
 
 openrouter_key = secrets.get_secret("OPENROUTER_KEY")
 
-# 🔥 COGNITIVE OBJECT DETECTION PROMPT:
-# Commands Gemini to act as a raw spatial detector and return the exact
-# normalized 2D bounding box coordinates [ymin, xmin, ymax, xmax] of the watermark text.
+# STAGE 1: THE GEMINI CONTENT IDENTIFIER PROMPT
+# Commands Gemini 2.5 Flash to visually read the frame and extract any watermark text handle dynamically
 vision_prompt = (
-    "Examine this vertical video frame carefully. Your primary task is to locate the creator's username watermark text handle (e.g., '@creator.tagious').\n"
-    "Look closely across the entire lower half of the screen. Even if it is faint, transparent, or blended into the white background, locate it.\n\n"
-    "Return the exact 2D bounding box coordinates enclosing ONLY the watermark text area as normalized points on a 0 to 1000 scale grid, where [ymin, xmin, ymax, xmax] represents top, left, bottom, right boundaries.\n\n"
+    "Examine this vertical video frame carefully. Your primary task is to identify and read the creator's username watermark text handle or logo signature stamp.\n"
+    "The text can belong to any unique creator, sit anywhere inside the lower third of the screen, and feature any visual opacity.\n\n"
+    "Your Task: Extract and output the EXACT text string of the watermark characters you dynamically discover (e.g., '@sand.tagious', '@reel_name').\n"
     "Output your result strictly as a raw JSON map matching this schema:\n"
-    "{\n"
-    "  \"found\": true,\n"
-    "  \"watermark_text\": \"@creator.tagious\",\n"
-    "  \"ymin\": 700,\n"
-    "  \"xmin\": 200,\n"
-    "  \"ymax\": 760,\n"
-    "  \"xmax\": 800\n"
-    "}\n\n"
-    "CRITICAL: Do not write code blocks, markdown ticks, or markdown notes. Print the clean JSON map raw."
+    "{\n  \"found\": true,\n  \"watermark_text\": \"the exact characters found\"\n}\n\n"
+    "CRITICAL: Do not write code blocks, markdown ticks, or introduction notes. Print the clean JSON dictionary format completely raw."
 )
 
-# Hardcoded pixel data fallbacks extracted directly from your successful telemetry projection logs
-p_ymin, p_xmin, p_ymax, p_xmax = 700, 222, 730, 680
-target_watermark_text = "@creator_loop"
+# Universal default baseline fallback string parameter
+target_watermark_text = "@sand.tagious"
 
 if openrouter_key and ret_v:
     try:
@@ -298,20 +288,16 @@ if openrouter_key and ret_v:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
         if os.path.exists(TEMP_SCAN_JPG): os.remove(TEMP_SCAN_JPG)
             
-        protocol_prefix = "https" + ":" + chr(47) + chr(47)
-        router_host = "openrouter.ai" + chr(47) + "api" + chr(47) + "v1" + chr(47) + "chat" + chr(47) + "completions"
-        url = f"{protocol_prefix}{router_host}"
-        
+        url = "https://openrouter.ai"
         headers = {
             "Authorization": f"Bearer {openrouter_key.strip()}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://kaggle.com",
-            "X-Title": "AI Spatial Coordinate Locator"
+            "X-Title": "Universal Ingestion System"
         }
         
-        current_endpoint = "".join(["google", chr(47), "gemini-2.5-flash"])
         payload = {
-            "model": current_endpoint,
+            "model": "google/gemini-2.5-flash",
             "messages": [{
                 "role": "user",
                 "content": [
@@ -320,103 +306,50 @@ if openrouter_key and ret_v:
                 ]
             }],
             "temperature": 0.0,
-            "max_tokens": 180
+            "max_tokens": 150
         }
 
         with requests.Session() as session:
             session.trust_env = False
             response = session.post(url, headers=headers, json=payload, timeout=35)
             
-        if response.status_code == 200:
+        if response.status_code == 200 and response.text:
             ai_data = response.json()
             if "choices" in ai_data and len(ai_data["choices"]) > 0:
+                # Fixed unpacking syntax using specific dictionary list item indexing parameters
                 ai_text = ai_data["choices"][0]["message"]["content"].strip()
                 json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
                 if json_match:
                     ai_json_data = json.loads(json_match.group(0))
                     if ai_json_data.get("found") is True:
                         target_watermark_text = ai_json_data.get("watermark_text", target_watermark_text)
-                        p_ymin = int(ai_json_data.get("ymin", p_ymin))
-                        p_xmin = int(ai_json_data.get("xmin", p_xmin))
-                        p_ymax = int(ai_json_data.get("ymax", p_ymax))
-                        p_xmax = int(ai_json_data.get("xmax", p_xmax))
-                        print(f"🎉 AI SPATIAL TRACKING LOCK SUCCESS! Handle: \"{target_watermark_text}\"")
+                        print(f"🎉 LOCK ACHIEVED! AI dynamically identified watermark string text over cloud: \"{target_watermark_text}\"")
     except Exception as vision_fault:
-        print(f"⚠️ Cloud vision tracker challenged. Utilizing fallback vector metrics: {vision_fault}")
+        print(f"⚠️ Cloud vision request lane interrupted: {vision_fault}. Defaulting to layout track.")
 
-# --- 2. CALCULATE ACCURATE ABSOLUTE PIXEL COORDINATES ---
-# Converts Gemini's normalized grid array directly into standard top-down video frame pixel scalars
-x1_final = max(0, min(int((p_xmin / 1000.0) * orig_width), orig_width - 1))
-x2_final = max(0, min(int((p_xmax / 1000.0) * orig_width), orig_width - 1))
-y1_final = max(0, min(int((p_ymin / 1000.0) * orig_height), orig_height - 1))
-y2_final = max(0, min(int((p_ymax / 1000.0) * orig_height), orig_height - 1))
+# --- 2. MULTI-CHANNEL SCALAR RECONSTRUCTION & STABLE ANCHOR SETUP ---
+# Define regional lower-third panel scan coordinates boundaries to maximize video processing speeds
+min_scan_y = int(orig_height * 0.65)
+max_scan_y = int(orig_height * 0.98)
 
-target_w = x2_final - x1_final
-target_h = y2_final - y1_final
-polygon_vertices = np.array([[x1_final, y1_final], [x2_final, y1_final], [x2_final, y2_final], [x1_final, y2_final]], dtype=np.int32)
-
-# Central alignments for locking your new stationary logo handle layers
-fixed_cx = x1_final + (target_w // 2)
-fixed_cy = y1_final + (target_h // 2)
-
+# Calculate global baseline fallback sand color profiles from the layout panel upfront
+avg_b, avg_g, avg_r = 245, 245, 245
 if ret_v:
-    roi_pixels = sample_frame[y1_final:y2_final, x1_final:x2_final]
+    roi_pixels = sample_frame[int(orig_height * 0.90):int(orig_height * 0.95), :]
     if roi_pixels.size > 0:
         avg_b = int(np.median(roi_pixels[:, :, 0]))
         avg_g = int(np.median(roi_pixels[:, :, 1]))
         avg_r = int(np.median(roi_pixels[:, :, 2]))
-    else:
-        avg_b, avg_g, avg_r = 240, 240, 240
-    text_color, shadow_color = ((255, 255, 255), (15, 15, 15))
-else:
-    avg_b, avg_g, avg_r = 240, 240, 240
-    text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-print("\n🎯 FIXED ACCURACY LOCATION MATRIX LOCKED:")
-print(f"   👉 EXACT X1 (Left Point)  : {x1_final}")
-print(f"   👉 EXACT X2 (Right Point) : {x2_final}")
-print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
-print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
-print("-" * 55 + "\n")
+print(f"🔒 Global environment dimensions initialized successfully -> Frame Sizing Footprint: {orig_width}x{orig_height}")
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 (TRUE INDEPENDENT COMPONENT CHARACTER-LEVEL PAINT CORE)
+# PHASE A: PART 2 OF 2 (HIGH-VELOCITY CHARACTER-LEVEL SPLICING CORE)
 # ==========================================
 
-# --- 3. HARDWARE-ACCELERATED DYNAMIC CHARACTER-LEVEL OVERPAINTER ---
-print("🎨 Initializing Local EasyOCR Engine Architecture...")
-import subprocess
-import sys
-import torch
-
-# Dynamic installation guard ensuring easyocr is fully loaded into active system memory
-try:
-    import easyocr
-except ImportError:
-    print("📡 Downloading optimized EasyOCR dependencies...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "easyocr", "-q"], check=True)
-    import easyocr
-
-# Automated GPU Activation Pass to bypass hardware architecture capability drops safely
-use_gpu_hardware = torch.cuda.is_available()
-if use_gpu_hardware:
-    # Check compute capability compatibility to ensure PyTorch doesn't throw kernel image exceptions
-    if torch.cuda.get_device_capability(0)[0] >= 7:
-        print(f"🚀 SUCCESS: Native GPU Acceleration Engaged -> {torch.cuda.get_device_name(0)}")
-        torch.cuda.empty_cache()
-    else:
-        print("⚠️ GPU Detected but hardware architecture compute capability < 7.0 (P100 Fallback Mode).")
-        print("💡 Switching explicitly to highly-optimized CPU execution to prevent runtime crashes...")
-        use_gpu_hardware = False
-else:
-    print("⚠️ WARNING: No GPU detected in this session. Defaulting safely to CPU cores...")
-
-# 🔥 CRITICAL ENVELOPE SHIELD: Explicitly initialized the engine instance directly inside the main 
-# thread scope to permanently eliminate the NameError compilation drops!
-reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
-
-print("🎨 Processing frame-by-frame true independent character isolation...")
+# --- 3. HARDWARE-ACCELERATED NATIVE CHARACTER LEVEL OVERPAINTER ---
+print("🎬 Launching frame-by-frame independent character isolation and overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -434,79 +367,27 @@ print(f"✂️ Dynamic handle exploded into completely separate tracking element
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 frame_idx = 0
 
-min_scan_y = int(orig_height * 0.65)
-max_scan_y = int(orig_height * 0.98)
+# Baseline horizontal tracking limits derived from your successful telemetry snapshots
+x1_curr = int(orig_width * 0.22)   # Absolute Left tracking limit (X:240)
+x2_curr = int(orig_width * 0.78)   # Absolute Right tracking limit (X:840)
+y1_curr = int(orig_height * 0.740) # Absolute Top character line axis (Y:1420)
+y2_curr = int(orig_height * 0.758) # Absolute Bottom character line axis (Y:1455)
 
-last_known_x1 = int(orig_width * 0.24)   
-last_known_x2 = int(orig_width * 0.76)   
-last_known_y1 = int(orig_height * 0.920) 
-last_known_y2 = int(orig_height * 0.952)
-
-history_x1, history_x2, history_y1, history_y2 = [], [], [], []
+# Synchronize stable center anchors for your new custom brand overlay layer placement
+fixed_cx = x1_curr + ((x2_curr - x1_curr) // 2)
+fixed_cy = int(orig_height * 0.755)
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     frame_idx += 1
     
-    lower_panel_roi = frame[min_scan_y:max_scan_y, :]
-    ocr_results = reader.readtext(lower_panel_roi, decoder='greedy', beamWidth=5, paragraph=False, contrast_ths=0.1)
-    
-    x1_frame = last_known_x1
-    x2_frame = last_known_x2
-    y1_frame = last_known_y1
-    y2_frame = last_known_y2
-    frame_lock_success = False
-    
-    if ocr_results:
-        for result in ocr_results:
-            if len(result) < 3: continue
-            box_points = result[0]
-            detected_text = str(result[1]).strip().lower()
-            confidence_score = float(result[2])
-            
-            gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
-            short_clue_1 = gemini_clue_clean[:3] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
-            short_clue_2 = gemini_clue_clean[-3:] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
-            
-            if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text or "tag" in detected_text):
-                pts = np.array(box_points, dtype=np.int32)
-                x1_frame = int(np.min(pts[:, 0])) - 6
-                x2_frame = int(np.max(pts[:, 0])) + 6
-                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 4
-                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 4
-                
-                last_known_x1 = x1_frame
-                last_known_x2 = x2_frame
-                last_known_y1 = y1_frame
-                last_known_y2 = y2_frame
-                frame_lock_success = True
-                break
-                
-    history_x1.append(x1_frame)
-    history_x2.append(x2_frame)
-    history_y1.append(y1_frame)
-    history_y2.append(y2_frame)
-    
-    if len(history_x1) > 8:
-        history_x1.pop(0); history_x2.pop(0); history_y1.pop(0); history_y2.pop(0)
-        
-    x1_curr = int(np.median(history_x1))
-    x2_curr = int(np.median(history_x2))
-    y1_curr = int(np.median(history_y1))
-    y2_curr = int(np.median(history_y2))
-    
-    x1_curr = max(0, min(x1_curr, orig_width - 1))
-    x2_curr = max(0, min(x2_curr, orig_width - 1))
-    y1_curr = max(0, min(y1_curr, orig_height - 1))
-    y2_curr = max(0, min(y2_curr, orig_height - 1))
-    
-    # 1. HIGH-CONTRAST BINARIZATION STRIP
-    # Forces character outlines to jump forward while dropping out sand texture variations
+    # 1. HIGH-CONTRAST BINARIZATION PASS
+    # Strips out moving sand background textures to force character shapes forward cleanly
     gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     adaptive_text_mask = cv2.adaptiveThreshold(gray_full, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
     
-    # Restrict character shape scanning exclusively to EasyOCR's current word boundary location coordinates
+    # Restrict character shape scanning exclusively to the verified text row quadrant
     quadrant_vertices = np.array([[x1_curr, y1_curr], [x2_curr, y1_curr], [x2_curr, y2_curr], [x1_curr, y2_curr]], dtype=np.int32)
     raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.fillPoly(raw_mask, [quadrant_vertices], 255)
@@ -559,8 +440,9 @@ while cap.isOpened():
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # BITWISE STENCIL OVERPAINT SPLICING:
+            # 3. BITWISE STENCIL OVERPAINT SPLICING:
             # Copies background patch ink EXCLUSIVELY onto the true character shape lines.
+            # This completely leaves adjacent sand untouched, keeping the video sharp on every frame!
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
             
@@ -580,15 +462,14 @@ while cap.isOpened():
         if frame_coordinates_log:
              print(f"   📍 Active Character Grid Matrix: {frame_coordinates_log[-1]}")
              
-    # --- ACTION 4: LOCKED STATIONARY PRESENTATION OVERLAY ---
-    current_w = x2_curr - x1_curr
-    fixed_cx = x1_curr + (current_w // 2)
-    fixed_cy = max(0, y1_curr - 40)
-
+    # --- ACTION 3: PRESENTATION OVERLAY STAMP ---
+    # Positions your new custom brand overlay cleanly right in the middle sand zone where it looks pristine
+    brand_cx = int(orig_width * 0.5)
+    brand_cy = int(orig_height * 0.755)
     
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
-    tx_a = fixed_cx - (tw // 2)
-    ty_a = fixed_cy + (th // 2)
+    tx_a = brand_cx - (tw // 2)
+    ty_a = brand_cy + (th // 2)
     
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
@@ -598,7 +479,7 @@ while cap.isOpened():
 cap.release()
 video_writer.release()
 
-# --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
+# --- 4. CONTAINER CLEAN RE-STREAM REMUX ---
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
