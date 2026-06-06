@@ -379,6 +379,7 @@ print(f"   👉 EXACT Y1 (Top Border)   : {y1_final}")
 print(f"   👉 EXACT Y2 (Bottom Border): {y2_final}")
 print("-" * 55 + "\n")
 
+
 # ==========================================
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
 print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR Execution Matrix...")
@@ -428,8 +429,6 @@ max_scan_y = int(orig_height * 0.98)
 avg_b, avg_g, avg_r = 128, 128, 128 
 
 # THE CONTINUOUS VISUAL MEMORY BANKS:
-# Dynamically stores the last known verified text row tracking coordinates 
-# to completely stop drift resets when sand completely blankets the letters!
 last_known_x1 = int(orig_width * 0.24) 
 last_known_x2 = int(orig_width * 0.76) 
 last_known_y1 = int(orig_height * 0.920) 
@@ -463,34 +462,34 @@ while cap.isOpened():
             if len(result) < 3:
                 continue
             
-            # 🔥 CRITICAL SYNC FIX: Explicitly unpacked data properties by direct positional list indexes
-            box_points = result[0]                # Unpacks coordinates mapping layout list arrays
-            detected_text = str(result[1]).strip().lower() # Unpacks text string labels
-            confidence_score = float(result[2])   # Unpacks confidence value safely
+            box_points = result[0]
+            detected_text = str(result[1]).strip().lower()
+            confidence_score = float(result[2])
             
-            # Extract key word fragments from Gemini's dynamic string to create an unbiased search string filter
+            # Unbiased search filters
             gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
             short_clue_1 = gemini_clue_clean[:3] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             short_clue_2 = gemini_clue_clean[-3:] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             
-            # THE ZERO THRESHOLD LOCK SHIELD:
-            if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text or "tag" in detected_text):
+            # --- UPGRADED LOCK SHIELD ---
+            # If confidence is strong, or ANY 2 letters overlap, accept coordinates to stop skipping frames
+            char_overlap_count = sum(1 for c in short_clue_1 if c in detected_text)
+            
+            if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or char_overlap_count >= 2 or "sand" in detected_text or "tag" in detected_text):
                 pts = np.array(box_points, dtype=np.int32)
                 
-                # Convert the local lower panel box coordinates back to absolute full frame pixel values
                 x1_frame = int(np.min(pts[:, 0])) - 4
                 x2_frame = int(np.max(pts[:, 0])) + 4
                 y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
                 y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
                 
-                # Update visual memory banks with the new moving coordinate positions
                 last_known_x1 = x1_frame
                 last_known_x2 = x2_frame
                 last_known_y1 = y1_frame
                 last_known_y2 = y2_frame
                 frame_lock_success = True
                 break
-                
+
     # KALMAN FILTER SMOOTHING MATRIX
     history_x1.append(x1_frame)
     history_x2.append(x2_frame)
@@ -511,13 +510,19 @@ while cap.isOpened():
     y1_curr = max(0, min(y1_curr, orig_height - 1))
     y2_curr = max(0, min(y2_curr, orig_height - 1))
     
-    # PINPOINT INDEPENDENT CHARACTER-LEVEL SPLITTING LOOP
     current_w = x2_curr - x1_curr
     char_box_w = float(current_w) / num_chars if num_chars > 0 else 1.0
     
-    # Master vector mask container tracking processed character coordinates mask arrays
     universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
     frame_coordinates_log = []
+    
+    # --- PRE-COMPUTE MULTI-LEVEL THRESHOLD MAPS TO PREVENT BLANK MASKS ---
+    gray_roi_block = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    
+    # Standard high contrast threshold
+    adaptive_thresh_normal = cv2.adaptiveThreshold(gray_roi_block, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
+    # Fallback low-contrast threshold (smaller constant subtactor grabs faint edges)
+    adaptive_thresh_sensitive = cv2.adaptiveThreshold(gray_roi_block, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 4)
     
     for idx in range(num_chars):
         start_x = int(x1_curr + (idx * char_box_w))
@@ -544,20 +549,20 @@ while cap.isOpened():
         if local_b == 0 and local_g == 0 and local_r == 0:
             local_b, local_g, local_r = avg_b, avg_g, avg_r
 
-        # Generate an isolated single-character bounding segment canvas natively
         single_char_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.rectangle(single_char_mask, (start_x, start_y), (end_x, end_y), 255, -1)
 
-        # High-contrast binarization pass isolates fine font tracks cleanly from the sand background
-        gray_roi_block = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        adaptive_thresh = cv2.adaptiveThreshold(gray_roi_block, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
+        # Apply normal extraction
+        precise_letter_strokes = cv2.bitwise_and(single_char_mask, adaptive_thresh_normal)
         
-        precise_letter_strokes = cv2.bitwise_and(single_char_mask, adaptive_thresh)
-        
+        # --- FALLBACK PROTECTION ---
+        # If normal binarization failed to capture pixels inside this character block, use the sensitive map
+        if cv2.countNonZero(cv2.bitwise_and(single_char_mask, precise_letter_strokes)) == 0:
+            precise_letter_strokes = cv2.bitwise_and(single_char_mask, adaptive_thresh_sensitive)
+            
         char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         dilated_char_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
         
-        # ACTION: PINPOINT STENCIL OVERPAINT SPLICING
         solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
         cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
         
@@ -566,9 +571,9 @@ while cap.isOpened():
 
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(universal_erasure_map) > 0:
-        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4)) # Expanded kernel for absolute edge coverage
         inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
-        frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
+        frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
 
     # Live Telemetry Coordinate Reporting
     if frame_idx % 45 == 0:
@@ -579,18 +584,17 @@ while cap.isOpened():
     fixed_cx = x1_curr + (current_w // 2)
     fixed_cy = max(0, y1_curr - 40)
 
-    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
+    (tw, th), _ = cv2.getTextSize("OAMRAM", font_face, 0.52, 2)
     tx_a = fixed_cx - (tw // 2)
     ty_a = fixed_cy + (th // 2)
 
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
+    cv2.putText(frame, "OAMRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
+    cv2.putText(frame, "OAMRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
 
     video_writer.write(frame)
 
 cap.release()
 video_writer.release()
-
 # --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
 
 subprocess.run([
