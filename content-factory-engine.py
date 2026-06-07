@@ -386,31 +386,66 @@ print("-" * 55 + "\n")
 # ==========================================
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
 print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR Execution Matrix...")
-import subprocess
-import sys
-import torch
-import cv2
-import numpy as np
-import os
+import subprocess, sys, os
+import torch, cv2, numpy as np
 
-# Dynamic installation guard ensuring easyocr is loaded into memory cleanly
 try:
     import easyocr
 except ImportError:
-    print("📡 Downloading optimized EasyOCR dependencies...")
     subprocess.run([sys.executable, "-m", "pip", "install", "easyocr", "-q"], check=True)
     import easyocr
 
 use_gpu_hardware = torch.cuda.is_available()
 if use_gpu_hardware:
-    print(f"🚀 SUCCESS: Active Graphics Hardware Found -> {torch.cuda.get_device_name(0)}")
+    print(f"🚀 GPU: {torch.cuda.get_device_name(0)}")
     torch.cuda.empty_cache()
 else:
-    print("⚠️ WARNING: No GPU detected in this session. Defaulting safely to CPU cores...")
+    print("⚠️ No GPU — using CPU")
 
 reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
 
-print("🎬 Processing frame-by-frame isolated character overpainting...")
+# ── helpers ───────────────────────────────────────────────────────────────────
+def _substrings(text, n=3):
+    """All n-char substrings of text."""
+    return {text[i:i+n] for i in range(len(text) - n + 1)} if len(text) >= n else {text}
+
+def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
+    """
+    True if ANY min_len-char chunk of target appears anywhere in detected.
+    Also accepts if detected contains ≥60 % of target's characters (handles
+    OCR garbling like '4WRAM' for '@AWRAM').
+    """
+    detected = detected.lower().strip()
+    target_clean = target.lower().replace("@", "").replace(".", "").replace("_", "")
+
+    # Substring hit
+    for chunk in _substrings(target_clean, min_len):
+        if chunk in detected:
+            return True
+
+    # Character-overlap ratio hit
+    common = sum(1 for c in target_clean if c in detected)
+    if len(target_clean) > 0 and common / len(target_clean) >= 0.55:
+        return True
+
+    return False
+
+def safe_median_color(frame, y1, y2, x1, x2):
+    """Median BGR of a clipped ROI; never returns all-zeros."""
+    h, w = frame.shape[:2]
+    y1, y2 = max(0, y1), min(h, y2)
+    x1, x2 = max(0, x1), min(w, x2)
+    roi = frame[y1:y2, x1:x2]
+    if roi.size == 0:
+        return None
+    b = int(np.median(roi[:, :, 0]))
+    g = int(np.median(roi[:, :, 1]))
+    r = int(np.median(roi[:, :, 2]))
+    if b == 0 and g == 0 and r == 0:
+        return None
+    return b, g, r
+
+# ── video I/O ─────────────────────────────────────────────────────────────────
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -419,192 +454,208 @@ video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_h
 font_face = cv2.FONT_HERSHEY_SIMPLEX
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
 
-# Explode the true dynamic text handle string returned by Gemini into individual targeted characters
 split_characters_list = list(target_watermark_text)
 num_chars = len(split_characters_list)
-print(f"✂️ Safe local character variables synced! Target string from Gemini: \"{target_watermark_text}\"")
+print(f"✂️ Target string from Gemini: \"{target_watermark_text}\" ({num_chars} chars)")
 
-frame_idx = 0
+# ── scan band ─────────────────────────────────────────────────────────────────
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
-# THE CONTINUOUS VISUAL MEMORY BANKS:
-# Dynamically stores the last known verified text row tracking coordinates 
-# to completely stop drift resets when sand completely blankets the letters!
-last_known_x1 = int(orig_width * 0.24)   
-last_known_x2 = int(orig_width * 0.76)   
-last_known_y1 = int(orig_height * 0.920) 
+# ── persistent memory ─────────────────────────────────────────────────────────
+last_known_x1 = int(orig_width  * 0.24)
+last_known_x2 = int(orig_width  * 0.76)
+last_known_y1 = int(orig_height * 0.920)
 last_known_y2 = int(orig_height * 0.952)
 
-# History window banks to track text moving motion fields smoothly without jitter
+HISTORY_LEN = 15  # FIX 3: was 8
 history_x1, history_x2, history_y1, history_y2 = [], [], [], []
+
+frame_idx = 0
 
 while cap.isOpened():
     ret, frame = cap.read()
-    if not ret: 
+    if not ret:
         break
     frame_idx += 1
-    
-    # Crop the frame strictly to the lower panel where text lives to maximize processing speeds
-    lower_panel_roi = frame[min_scan_y:max_scan_y, :]
-    
-    # Run the independent deep learning text tracking scan inside VRAM
-    ocr_results = reader.readtext(lower_panel_roi, decoder='greedy', beamWidth=5, paragraph=False, contrast_ths=0.1)
-    
-    # Initialize current frame boundaries directly to the last known verified memory coordinates
+
+    # ── OCR on lower panel only ──────────────────────────────────────────────
+    lower_panel = frame[min_scan_y:max_scan_y, :]
+    ocr_results = reader.readtext(
+        lower_panel,
+        decoder='greedy',
+        beamWidth=5,
+        paragraph=False,
+        contrast_ths=0.05,   # slightly lower → catches faint/sand-covered text
+        adjust_contrast=0.6,
+    )
+
     x1_frame = last_known_x1
     x2_frame = last_known_x2
     y1_frame = last_known_y1
     y2_frame = last_known_y2
     frame_lock_success = False
-    
-    # Match the dynamic local scan against Gemini's string clue natively
-    if ocr_results:
-        for result in ocr_results:
-            if len(result) < 3: continue
-            
-            # 🔥 CRITICAL SYNC FIX: Explicitly unpacked data properties by direct positional list indexes
-            # to permanently clear the tuple 'TypeError' compilation crash!
-            box_points = result[0]     # Unpacks coordinates mapping layout list arrays
-            detected_text = str(result[1]).strip().lower()  # Unpacks text string labels
-            confidence_score = float(result[2])  # Unpacks confidence value safely
-            
-            # Extract key word fragments from Gemini's dynamic string to create an unbiased search string filter
-            gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
-            short_clue_1 = gemini_clue_clean[:3] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
-            short_clue_2 = gemini_clue_clean[-3:] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
-            
-            # THE ZERO THRESHOLD LOCK SHIELD:
-            if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text or "tag" in detected_text):
-                pts = np.array(box_points, dtype=np.int32)
-                
-                # Convert the local lower panel box coordinates back to absolute full frame pixel values
-                x1_frame = int(np.min(pts[:, 0])) - 4
-                x2_frame = int(np.max(pts[:, 0])) + 4
-                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
-                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
-                
-                # Update visual memory banks with the new moving coordinate positions
-                last_known_x1 = x1_frame
-                last_known_x2 = x2_frame
-                last_known_y1 = y1_frame
-                last_known_y2 = y2_frame
-                frame_lock_success = True
-                break
 
-    # KALMAN FILTER SMOOTHING MATRIX (Guaranteed to execute perfectly every frame)
+    # FIX 1 + FIX 4: fuzzy match; always push something into history
+    if ocr_results:
+        best_conf = -1.0
+        best_box  = None
+
+        for result in ocr_results:
+            if len(result) < 3:
+                continue
+            box_points     = result[0]
+            detected_text  = str(result[1]).strip()
+            confidence     = float(result[2])
+
+            if confidence > 0.0 and fuzzy_match(detected_text, target_watermark_text):
+                if confidence > best_conf:          # pick highest-confidence match
+                    best_conf = confidence
+                    best_box  = box_points
+
+        if best_box is not None:
+            pts = np.array(best_box, dtype=np.int32)
+            x1_frame = int(np.min(pts[:, 0])) - 4
+            x2_frame = int(np.max(pts[:, 0])) + 4
+            y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
+            y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
+
+            last_known_x1 = x1_frame
+            last_known_x2 = x2_frame
+            last_known_y1 = y1_frame
+            last_known_y2 = y2_frame
+            frame_lock_success = True
+
+    # FIX 4: whether or not OCR fired, push current best coords into history
     history_x1.append(x1_frame)
     history_x2.append(x2_frame)
     history_y1.append(y1_frame)
     history_y2.append(y2_frame)
-    
-    if len(history_x1) > 8:
-        history_x1.pop(0); history_x2.pop(0); history_y1.pop(0); history_y2.pop(0)
-        
+
+    if len(history_x1) > HISTORY_LEN:
+        history_x1.pop(0); history_x2.pop(0)
+        history_y1.pop(0); history_y2.pop(0)
+
     x1_curr = int(np.median(history_x1))
     x2_curr = int(np.median(history_x2))
     y1_curr = int(np.median(history_y1))
     y2_curr = int(np.median(history_y2))
-    
-    # Slicing safety boundary constraints check
-    x1_curr = max(0, min(x1_curr, orig_width - 1))
-    x2_curr = max(0, min(x2_curr, orig_width - 1))
+
+    x1_curr = max(0, min(x1_curr, orig_width  - 1))
+    x2_curr = max(0, min(x2_curr, orig_width  - 1))
     y1_curr = max(0, min(y1_curr, orig_height - 1))
     y2_curr = max(0, min(y2_curr, orig_height - 1))
-    
-    # PINPOINT INDEPENDENT CHARACTER-LEVEL SPLITTING LOOP
-    current_w = x2_curr - x1_curr
-    char_box_w = float(current_w) / num_chars if num_chars > 0 else 1.0
-    
-    # Master vector mask container tracking processed character coordinates mask arrays
+
+    # ── FIX 2: adaptive threshold on the CROPPED ROI only ───────────────────
+    roi_crop    = frame[y1_curr:y2_curr, x1_curr:x2_curr]
+    roi_h, roi_w = roi_crop.shape[:2] if roi_crop.size > 0 else (0, 0)
+
+    if roi_h > 0 and roi_w > 0:
+        gray_roi = cv2.cvtColor(roi_crop, cv2.COLOR_BGR2GRAY)
+        block_size = max(3, (roi_h | 1))          # must be odd and ≥ 3
+        if block_size % 2 == 0:
+            block_size += 1
+        adaptive_thresh_roi = cv2.adaptiveThreshold(
+            gray_roi, 255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV,
+            block_size, 9
+        )
+    else:
+        adaptive_thresh_roi = None
+
+    # ── per-character erase ──────────────────────────────────────────────────
+    current_w   = max(1, x2_curr - x1_curr)
+    char_box_w  = float(current_w) / num_chars if num_chars > 0 else 1.0
+
     universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
-    frame_coordinates_log = []
-    
+
     for idx in range(num_chars):
-        start_x = int(x1_curr + (idx * char_box_w))
-        end_x = int(x1_curr + ((idx + 1) * char_box_w))
-        start_y = int(y1_curr)
-        end_y = int(y2_curr)
-        
-        # --- FIXED: AGGRESSIVE BLOCKED OVERPAINT TO ENSURE EVERY FRAME IS CLEAN ---
-        # 1. Add solid 6-pixel padding around each individual letter to swallow anti-aliasing text halos
-        char_padding = 6
-        pad_start_x = max(0, start_x - char_padding)
-        pad_end_x = min(orig_width, end_x + char_padding)
-        pad_start_y = max(0, start_y - char_padding)
-        pad_end_y = min(orig_height, end_y + char_padding)
-        
-        pad_w = pad_end_x - pad_start_x
-        pad_h = pad_end_y - pad_start_y
+        start_x = int(x1_curr + idx       * char_box_w)
+        end_x   = int(x1_curr + (idx + 1) * char_box_w)
+        start_y = y1_curr
+        end_y   = y2_curr
 
-        # 2. Slice a live texture segment from directly above the padded character bounding box
-        sample_ymin = max(0, pad_start_y - 15)
-        sample_ymax = pad_start_y
-        
-        # Top-edge exception handler: switch slice direction to bottom if text approaches frame ceiling
-        if sample_ymin == 0:
-            sample_ymin = pad_end_y
-            sample_ymax = min(orig_height, pad_end_y + 15)
-            
-        # 3. Scale and dynamically overlay the background sample straight onto the frame array
-        if (sample_ymax - sample_ymin) > 0 and pad_w > 0 and pad_h > 0:
-            background_sample = frame[sample_ymin:sample_ymax, pad_start_x:pad_end_x]
-            paint_patch = cv2.resize(background_sample, (pad_w, pad_h), interpolation=cv2.INTER_LINEAR)
-            
-            # This completely replaces the watermark block on the frame with zero residues left behind
-            frame[pad_start_y:pad_end_y, pad_start_x:pad_end_x] = paint_patch
+        # ── FIX 5: safe background sampling ─────────────────────────────────
+        pad = 5
+        bg_color = (
+            safe_median_color(frame, start_y, end_y, start_x - pad, start_x) or
+            safe_median_color(frame, start_y, end_y, end_x,         end_x + pad) or
+            safe_median_color(frame, start_y, end_y, start_x,       end_x) or
+            (avg_b, avg_g, avg_r)
+        )
+        local_b, local_g, local_r = bg_color
 
-        # 4. Record coordinates onto the erasure map for post-processing edge healing
-        cv2.rectangle(universal_erasure_map, (pad_start_x, pad_start_y), (pad_end_x, pad_end_y), 255, -1)
-        frame_coordinates_log.append(f"'{split_characters_list[idx]}'@[X1:{start_x},X2:{end_x}]")
+        # ── character-level stroke mask ──────────────────────────────────────
+        single_char_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+        cv2.rectangle(single_char_mask, (start_x, start_y), (end_x, end_y), 255, -1)
 
-    # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
+        if adaptive_thresh_roi is not None:
+            # Map char position into cropped-ROI coordinates
+            cx1 = max(0, start_x - x1_curr)
+            cx2 = min(roi_w, end_x - x1_curr)
+            char_thresh_patch = np.zeros_like(adaptive_thresh_roi)
+            if cx2 > cx1:
+                char_thresh_patch[:, cx1:cx2] = adaptive_thresh_roi[:, cx1:cx2]
+
+            # Paste back into full-frame canvas at correct position
+            full_thresh = np.zeros(frame.shape[:2], dtype=np.uint8)
+            full_thresh[y1_curr:y2_curr, x1_curr:x2_curr] = char_thresh_patch
+
+            precise_letter_strokes = cv2.bitwise_and(single_char_mask, full_thresh)
+        else:
+            precise_letter_strokes = single_char_mask.copy()
+
+        char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        dilated_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
+
+        solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
+        cv2.copyTo(solid_bg_patch, dilated_stroke, frame)
+
+        universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_stroke)
+
+    # ── FIX 6: inpaint with larger radius to kill edge halos ────────────────
     if cv2.countNonZero(universal_erasure_map) > 0:
-        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
-        frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
-        
-    # Live Telemetry Coordinate Reporting
+        dilation_kernel   = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        inflated_mask     = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
+        frame = cv2.inpaint(frame, inflated_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+
+    # ── telemetry ────────────────────────────────────────────────────────────
     if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> Dynamic EasyOCR Moving Target Tracker Active:")
-        print(f"   📍 Tracked Coordinate Box Grid: X=[{x1_curr}:{x2_curr}], Y=[{y1_curr}:{y2_curr}] | Lock: {frame_lock_success}")
-             
-    # --- STATIONARY PRESENTATION OVERLAY GENERATION ---
+        lock_str = "✅ LOCK" if frame_lock_success else "🔁 MEMORY"
+        print(f"🎬 Frame {frame_idx:04d} | X=[{x1_curr}:{x2_curr}] Y=[{y1_curr}:{y2_curr}] | {lock_str}")
+
+    # ── overlay ──────────────────────────────────────────────────────────────
     fixed_cx = x1_curr + (current_w // 2)
     fixed_cy = max(0, y1_curr - 40)
-    
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
-    tx_a = fixed_cx - (tw // 2)
-    ty_a = fixed_cy + (th // 2)
-    
+    tx_a = fixed_cx - tw // 2
+    ty_a = fixed_cy + th // 2
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
-    
+    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color,   2, cv2.LINE_AA)
+
     video_writer.write(frame)
 
 cap.release()
 video_writer.release()
 
-# --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
+# ── remux audio ──────────────────────────────────────────────────────────────
 subprocess.run([
-    "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
-    "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
+    "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL,
+    "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy",
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
+if os.path.exists(TEMP_HEALED_MP4):
+    os.remove(TEMP_HEALED_MP4)
+print(f"✅ Phase A Complete → {FINAL_MONETIZED_OUTPUT}")
 
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
-
-if os.path.exists(TEMP_HEALED_MP4): 
-    os.remove(TEMP_HEALED_MP4)
-print(f"✅ Phase A Complete: Universal GPU deep-learning watermark removal finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
-
-# THE AUTOMATED FILE SWAP BRIDGE:
-
+if os.path.exists(OLD_ROUTING_TARGET):
+    os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
+print(f"🔗 File bridge mapped → {OLD_ROUTING_TARGET}")
 
-        
-print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
