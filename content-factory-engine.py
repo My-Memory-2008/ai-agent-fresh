@@ -411,9 +411,8 @@ reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
 print("🎬 Core EasyOCR pipeline setup locked and ready for frame loops.")
 
 
-
 # ==========================================
-# PHASE A: PART 2 OF 2 — SUB-PART B (TRUE PER-FRAME CHARACTER SPLIT PAINTER LOOP)
+# PHASE A: PART 2 OF 2 — SUB-PART B (THE DEFINITE PER-CHARACTER ERASER CORE)
 # ==========================================
 print("🎬 Processing frame-by-frame isolated character overpainting...")
 
@@ -520,7 +519,7 @@ while cap.isOpened():
     cv2.fillPoly(raw_mask, [quadrant_vertices], 255)
     pinpoint_character_strokes = cv2.bitwise_and(adaptive_text_mask, raw_mask)
     
-    # 2. 🔥 TRUE CHARACTER-LEVEL COMPONENT ISOLATION MATRICES (Bypasses all math divisions)
+    # 2. TRUE CHARACTER-LEVEL COMPONENT ISOLATION MATRICES (Bypasses all math divisions)
     num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
     
     universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
@@ -540,7 +539,7 @@ while cap.isOpened():
         if comp_w >= 1 and comp_h >= 2 and comp_w < 55 and comp_h < 55 and comp_area > 2:
             single_char_mask = np.uint8(labels_im == i) * 255
             
-            # Character Backdrop Neighborhood Sampler: Samples background 2px outside letter boundaries
+            # Character Neighborhood Background Sampler: Samples background 2px directly outside letter boundaries
             sample_y1 = max(0, comp_y - 2)
             sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
             sample_x1 = max(0, comp_x - 2)
@@ -552,18 +551,21 @@ while cap.isOpened():
             
             if neighborhood_roi.size > 0 and local_bg_mask.shape == neighborhood_roi.shape[:2]:
                 local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
-                local_b, local_g, local_r = int(local_avg_channels[0]), int(local_avg_channels[1]), int(local_avg_channels[2])
+                # 🔥 THE TUPLE INDEXING FIX: Explicitly extraction values by array locations to unbreak painting passes!
+                local_b = int(local_avg_channels[0])
+                local_g = int(local_avg_channels[1])
+                local_r = int(local_avg_channels[2])
             else:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
                 
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
                 
-            # Expand the character stroke mask outward by an ultra-tight 2px to fully swallow drop shadows
-            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            # Expand the character stroke mask outward by an ultra-tight 4px safety buffer to fully swallow drop shadows
+            char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4))
             dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # 3. 🔥 BITWISE STENCIL OVERPAINT SPLICING: Erases ONLY the precise text stroke paths
+            # 3. BITWISE STENCIL OVERPAINT SPLICING: Erases ONLY the precise text stroke paths
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
             cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
             
@@ -571,7 +573,7 @@ while cap.isOpened():
             frame_coordinates_log.append(f"'{split_characters_list[char_counter]}'@[X:{comp_x},Y:{comp_y}]")
             char_counter += 1
 
-    # Clean out any remaining character edge outlines via localized inpainting
+    # Clean out any remaining character edge outlines smoothly via localized inpainting
     if cv2.countNonZero(universal_erasure_map) > 0:
         dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
@@ -601,6 +603,7 @@ cap.release()
 video_writer.release()
 
 # --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
+import subprocess
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
