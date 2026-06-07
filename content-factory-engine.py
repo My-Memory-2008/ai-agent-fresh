@@ -39,6 +39,7 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 
+
 # ==========================================
 # 1. CONFIG & SECRETS
 # ==========================================
@@ -381,7 +382,7 @@ print("-" * 55 + "\n")
 
 
 # ==========================================
-# PHASE A: PART 2 OF 2 — SUB-PART A (ENGINE INITIALIZATION CORE)
+# PHASE A: PART 2 OF 2 — SUB-PART A (EASYOCR INITIALIZER CORE)
 # ==========================================
 print("🎨 Initializing GPU-Agnostic Dynamic EasyOCR Execution Matrix...")
 import subprocess
@@ -391,7 +392,7 @@ import cv2
 import numpy as np
 import os
 
-# Dynamic installation guard ensuring easyocr is fully loaded into active system memory
+# Dynamic installation guard ensuring easyocr is fully loaded into active memory cleanly
 try:
     import easyocr
 except ImportError:
@@ -399,43 +400,46 @@ except ImportError:
     subprocess.run([sys.executable, "-m", "pip", "install", "easyocr", "-q"], check=True)
     import easyocr
 
-# Automated GPU Activation Pass to handle capability matrices safely
 use_gpu_hardware = torch.cuda.is_available()
 if use_gpu_hardware:
-    if torch.cuda.get_device_capability(0)[0] >= 7:
-        print(f"🚀 SUCCESS: Native GPU Engaged -> {torch.cuda.get_device_name(0)}")
-        torch.cuda.empty_cache()
-    else:
-        print("⚠️ GPU compute capability < 7.0 (P100 Fallback Mode). Utilizing optimized CPU tracks...")
-        use_gpu_hardware = False
+    print(f"🚀 SUCCESS: Active Graphics Hardware Found -> {torch.cuda.get_device_name(0)}")
+    torch.cuda.empty_cache()
 else:
-    print("⚠️ WARNING: Defaulting safely to CPU cores...")
+    print("⚠️ WARNING: No GPU detected in this session. Defaulting safely to CPU cores...")
 
-# Load the reader engine instance directly into active memory
 reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
+print("🎬 Core EasyOCR pipeline setup locked and ready for frame loops.")
 
-print("🎬 Core EasyOCR pipeline setup locked and ready for deployment.")
+
 
 # ==========================================
 # PHASE A: PART 2 OF 2 — SUB-PART B (TRUE PER-FRAME CHARACTER SPLIT PAINTER LOOP)
 # ==========================================
 print("🎬 Processing frame-by-frame isolated character overpainting...")
 
-# Recover and re-initialize video sizing scalars inside local sub-cell scope context
 cap_init = cv2.VideoCapture(INPUT_REEL)
 orig_width = int(cap_init.get(cv2.CAP_PROP_FRAME_WIDTH))
 orig_height = int(cap_init.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = cap_init.get(cv2.CAP_PROP_FPS)
 cap_init.release()
 
-# Explode the true dynamic text handle string returned by Gemini into separate individual letter targets
-local_target_string = str(target_watermark_text)
-split_characters_list = list(local_target_string)
+# Explode the true dynamic text handle string returned by Gemini into separate letter targets
+split_characters_list = list(target_watermark_text)
 num_chars = len(split_characters_list)
-print(f"✂️ Safe local character variables synced! Target string: \"{local_target_string}\" ({num_chars} characters)")
+print(f"✂️ Safe local character variables synced! Target string: \"{target_watermark_text}\"")
 
+frame_idx = 0
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
+
+# THE CONTINUOUS VISUAL MEMORY BANKS:
+last_known_x1 = int(orig_width * 0.24)   
+last_known_x2 = int(orig_width * 0.76)   
+last_known_y1 = int(orig_height * 0.920) 
+last_known_y2 = int(orig_height * 0.952)
+
+# History window banks to track text moving motion fields smoothly without jitter
+history_x1, history_x2, history_y1, history_y2 = [], [], [], []
 
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -443,26 +447,15 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
 font_face = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 0.50  # Precise presentation scale matching native text footprint profiles
-font_thickness = 1
 text_color, shadow_color = (255, 255, 255), (15, 15, 15)
-
-# Visual memory anchors prevent tracking drops if text is completely blanked out for a frame
-last_known_x1 = x1_final  
-last_known_x2 = x2_final  
-last_known_y1 = y1_final  
-last_known_y2 = y2_final  
-
 avg_b, avg_g, avg_r = 240, 240, 240
-history_x1, history_x2, history_y1, history_y2 = [], [], [], []
-frame_idx = 0
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret: break
     frame_idx += 1
     
-    # Isolate lower scanning panel area to maximize execution speeds
+    # Crop the frame strictly to the lower panel where text lives to maximize processing speeds
     lower_panel_roi = frame[min_scan_y:max_scan_y, :]
     ocr_results = reader.readtext(lower_panel_roi, decoder='greedy', beamWidth=5, paragraph=False, contrast_ths=0.1)
     
@@ -480,17 +473,17 @@ while cap.isOpened():
             detected_text = str(result[1]).strip().lower()  
             confidence_score = float(result[2])  
             
-            gemini_clue_clean = local_target_string.lower().replace("@", "").replace(".", "")
+            gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
             short_clue_1 = gemini_clue_clean[:3] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             short_clue_2 = gemini_clue_clean[-3:] if len(gemini_clue_clean) >= 3 else gemini_clue_clean
             
-            # Lock tracking bounds dynamically anytime EasyOCR achieves visibility
             if confidence_score > 0.00 and (short_clue_1 in detected_text or short_clue_2 in detected_text or "sand" in detected_text or "tag" in detected_text):
                 pts = np.array(box_points, dtype=np.int32)
-                x1_frame = int(np.min(pts[:, 0])) - 4
-                x2_frame = int(np.max(pts[:, 0])) + 4
-                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
-                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
+                
+                x1_frame = int(np.min(pts[:, 0])) - 6
+                x2_frame = int(np.max(pts[:, 0])) + 6
+                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 4
+                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 4
                 
                 last_known_x1 = x1_frame
                 last_known_x2 = x2_frame
@@ -499,22 +492,11 @@ while cap.isOpened():
                 frame_lock_success = True
                 break
                 
-    # INTENSITY VARIANCE ROW PROFILE SCANNER:
-    # If EasyOCR hits a sand obstruction, this handles layout updates natively without type drops
-    if not frame_lock_success:
-        gray_roi = cv2.cvtColor(lower_panel_roi, cv2.COLOR_BGR2GRAY)
-        row_pixel_sums = np.sum(cv2.inRange(gray_roi, 50, 140), axis=1)
-        active_y_indices = np.where(row_pixel_sums > (orig_width * 0.05))
-        # 🔥 THE TUPLE EXTRACTOR SHIELD: Fixed extraction logic by accessing array inside index tuple directly
-        if isinstance(active_y_indices, tuple) and len(active_y_indices) > 0:
-            target_array = active_y_indices[0]
-            if target_array.size > 0:
-                y1_frame = int(np.min(target_array)) + min_scan_y - 3
-                y2_frame = int(np.max(target_array)) + min_scan_y + 3
-                frame_lock_success = True
-
-    history_x1.append(x1_frame); history_x2.append(x2_frame)
-    history_y1.append(y1_frame); history_y2.append(y2_frame)
+    history_x1.append(x1_frame)
+    history_x2.append(x2_frame)
+    history_y1.append(y1_frame)
+    history_y2.append(y2_frame)
+    
     if len(history_x1) > 8:
         history_x1.pop(0); history_x2.pop(0); history_y1.pop(0); history_y2.pop(0)
         
@@ -528,83 +510,82 @@ while cap.isOpened():
     y1_curr = max(0, min(y1_curr, orig_height - 1))
     y2_curr = max(0, min(y2_curr, orig_height - 1))
     
-    target_lane_w = x2_curr - x1_curr
-    target_lane_h = y2_curr - y1_curr
+    # 1. HIGH-CONTRAST BINARIZATION STEP FOR SHAPE TRACING
+    gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    adaptive_text_mask = cv2.adaptiveThreshold(gray_full, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 9)
     
-    # Generate a razor-sharp vector text mask stencil directly onto an empty memory layer
-    pristine_vector_text_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    # Restrict shape parsing exclusively within EasyOCR's active coordinates envelope box
+    quadrant_vertices = np.array([[x1_curr, y1_curr], [x2_curr, y1_curr], [x2_curr, y2_curr], [x1_curr, y2_curr]], dtype=np.int32)
+    raw_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(raw_mask, [quadrant_vertices], 255)
+    pinpoint_character_strokes = cv2.bitwise_and(adaptive_text_mask, raw_mask)
     
-    # Measure string dimensions to compute absolute horizontal alignments
-    (total_w, total_h), _ = cv2.getTextSize(local_target_string, font_face, font_scale, font_thickness)
+    # 2. 🔥 TRUE CHARACTER-LEVEL COMPONENT ISOLATION MATRICES (Bypasses all math divisions)
+    num_labels, labels_im, stats, centroids = cv2.connectedComponentsWithStats(pinpoint_character_strokes)
     
-    fixed_cx = x1_curr + (target_lane_w // 2)
-    fixed_cy = y1_curr + (target_lane_h // 2)
+    universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
+    char_counter = 0
+    frame_coordinates_log = []
     
-    start_text_x = fixed_cx - (total_w // 2)
-    start_text_y = fixed_cy + (total_h // 2)
-    current_char_x = start_text_x
-    
-    # TRUE DYNAMIC INDEPENDENT CHARACTER PROCESSING TRACK:
-    # Generates, tracks, and treats every single character completely on its own on every frame!
-    for char in split_characters_list:
-        (cw, ch), _ = cv2.getTextSize(char, font_face, font_scale, font_thickness)
+    for i in range(1, num_labels):
+        if char_counter >= num_chars: break
         
-        # 1. Create a tiny isolated single-character trace canvas layer
-        single_char_canvas = np.zeros(frame.shape[:2], dtype=np.uint8)
-        cv2.putText(single_char_canvas, char, (current_char_x, start_text_y), font_face, font_scale, 255, font_thickness, cv2.LINE_AA)
+        comp_w = stats[i, cv2.CC_STAT_WIDTH]
+        comp_h = stats[i, cv2.CC_STAT_HEIGHT]
+        comp_area = stats[i, cv2.CC_STAT_AREA]
+        comp_x = stats[i, cv2.CC_STAT_LEFT]
+        comp_y = stats[i, cv2.CC_STAT_TOP]
         
-        # 2. Extract precise sub-pixel coordinates of this standalone vector letter stroke shape natively
-        char_pixels_y, char_pixels_x = np.where(single_char_canvas == 255)
-        
-        if char_pixels_y.size > 0 and char_pixels_x.size > 0:
-            cx_min, cx_max = np.min(char_pixels_x), np.max(char_pixels_x)
-            cy_min, cy_max = np.min(char_pixels_y), np.max(char_pixels_y)
+        # Filtering thresholds lock onto real font strokes, ignoring background sand noise
+        if comp_w >= 1 and comp_h >= 2 and comp_w < 55 and comp_h < 55 and comp_area > 2:
+            single_char_mask = np.uint8(labels_im == i) * 255
             
-            # Sample background color properties 3px directly outside this specific letter box footprint
-            sample_y1 = max(0, cy_min - 3)
-            sample_y2 = min(orig_height - 1, cy_max + 3)
-            sample_x1 = max(0, cx_min - 3)
-            sample_x2 = min(orig_width - 1, cx_max + 3)
+            # Character Backdrop Neighborhood Sampler: Samples background 2px outside letter boundaries
+            sample_y1 = max(0, comp_y - 2)
+            sample_y2 = min(orig_height - 1, comp_y + comp_h + 2)
+            sample_x1 = max(0, comp_x - 2)
+            sample_width_limit = min(orig_width - 1, comp_x + comp_w + 2)
             
-            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_x2]
+            neighborhood_roi = frame[sample_y1:sample_y2, sample_x1:sample_width_limit]
+            local_text_roi = pinpoint_character_strokes[sample_y1:sample_y2, sample_x1:sample_width_limit]
+            local_bg_mask = cv2.bitwise_not(local_text_roi)
             
-            if neighborhood_roi.size > 0:
-                local_avg_channels = cv2.mean(neighborhood_roi)
-                local_b = int(local_avg_channels[0])
-                local_g = int(local_avg_channels[1])
-                local_r = int(local_avg_channels[2])
+            if neighborhood_roi.size > 0 and local_bg_mask.shape == neighborhood_roi.shape[:2]:
+                local_avg_channels = cv2.mean(neighborhood_roi, mask=local_bg_mask)
+                local_b, local_g, local_r = int(local_avg_channels[0]), int(local_avg_channels[1]), int(local_avg_channels[2])
             else:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
                 
             if local_b == 0 and local_g == 0 and local_r == 0:
                 local_b, local_g, local_r = avg_b, avg_g, avg_r
                 
-            # Expand ONLY the precise text stroke path curves outward by an ultra-tight 2px safety margin
+            # Expand the character stroke mask outward by an ultra-tight 2px to fully swallow drop shadows
             char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            dilated_single_char = cv2.dilate(single_char_canvas, char_kernel, iterations=1)
+            dilated_char_stroke = cv2.dilate(single_char_mask, char_kernel, iterations=1)
             
-            # 3. BITWISE STENCIL OVERPAINT SPLICING:
+            # 3. 🔥 BITWISE STENCIL OVERPAINT SPLICING: Erases ONLY the precise text stroke paths
             solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-            cv2.copyTo(solid_bg_patch, dilated_single_char, frame)
+            cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
             
-            # Merge this character footprint onto our master layout template layer
-            pristine_vector_text_mask = cv2.bitwise_or(pristine_vector_text_mask, dilated_single_char)
-            
-        current_char_x += cw + 1  # Spacing increments to align the next adjacent character perfectly
-        
-    # Smooth out any residual letter boundaries via localized fluid mechanics inpainting
-    if cv2.countNonZero(pristine_vector_text_mask) > 0:
+            universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_char_stroke)
+            frame_coordinates_log.append(f"'{split_characters_list[char_counter]}'@[X:{comp_x},Y:{comp_y}]")
+            char_counter += 1
+
+    # Clean out any remaining character edge outlines via localized inpainting
+    if cv2.countNonZero(universal_erasure_map) > 0:
         dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        inflated_erasure_mask = cv2.dilate(pristine_vector_text_mask, dilation_kernel, iterations=1)
+        inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
         frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=2, flags=cv2.INPAINT_TELEA)
         
     # Live Telemetry Coordinate Reporting
     if frame_idx % 45 == 0:
-        print(f"🎬 Frame {frame_idx:04d} -> EasyOCR-Guided Character Component Shader Active:")
-        print(f"   📍 Tracked Coordinate Box Grid: X=[{x1_curr}:{x2_curr}], Y=[{y1_curr}:{y2_curr}] | Track Status: {frame_lock_success}")
+        print(f"🎬 Frame {frame_idx:04d} -> True Independent Character-Level Isolation Active:")
+        if frame_coordinates_log:
+             print(f"   📍 Active Character Component Grid: {frame_coordinates_log[-1]}")
              
-    # --- ACTION 6: PRESENTATION BRAND OVERLAY ---
-    fixed_cx = x1_curr + (target_lane_w // 2)
+    # --- ACTION 4: LOCKED STATIONARY PRESENTATION OVERLAY ---
+    current_w = x2_curr - x1_curr
+    fixed_cx = x1_curr + (current_w // 2)
     fixed_cy = max(0, y1_curr - 40)
     
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
@@ -619,19 +600,17 @@ while cap.isOpened():
 cap.release()
 video_writer.release()
 
-# --- 7. CONTAINER CLEAN RE-STREAM REMUX ---
-import subprocess
+# --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
-    FINAL_MONETIZED_OUTPUT], check=True, capture_output=True)
+    FINAL_MONETIZED_OUTPUT
+], check=True, capture_output=True)
 
 if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete: Universal dynamic watermark removal pass finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
-
-#THE AUTOMATED FILE SWAP BRIDGE:
-
+# THE AUTOMATED FILE SWAP BRIDGE:
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
