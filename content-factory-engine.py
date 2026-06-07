@@ -512,10 +512,7 @@ while cap.isOpened():
     history_y2.append(y2_frame)
     
     if len(history_x1) > 8:
-        history_x1.pop(0)
-        history_x2.pop(0)
-        history_y1.pop(0)
-        history_y2.pop(0)
+        history_x1.pop(0); history_x2.pop(0); history_y1.pop(0); history_y2.pop(0)
         
     x1_curr = int(np.median(history_x1))
     x2_curr = int(np.median(history_x2))
@@ -542,83 +539,42 @@ while cap.isOpened():
         start_y = int(y1_curr)
         end_y = int(y2_curr)
         
-        sample_left_x = max(0, start_x - 4)
-        sample_right_x = min(orig_width, end_x + 4)
+        # --- MODIFIED: AGGRESSIVE BLOCKED PAINTING OVER EACH CHARACTER TO ELIMINATE ALL LEFTOVERS ---
+        # 1. Expand the character bounding box by a 6-pixel padding to capture fuzzy/blurry edges
+        char_padding = 6
+        pad_start_x = max(0, start_x - char_padding)
+        pad_end_x = min(orig_width, end_x + char_padding)
+        pad_start_y = max(0, start_y - char_padding)
+        pad_end_y = min(orig_height, end_y + char_padding)
         
-        bg_sample_left = frame[start_y:end_y, sample_left_x:start_x]
-        bg_sample_right = frame[start_y:end_y, end_x:sample_right_x]
-        
-        if bg_sample_left.size > 0 and bg_sample_right.size > 0:
-            local_b = int((np.median(bg_sample_left[:, :, 0]) + np.median(bg_sample_right[:, :, 0])) / 2)
-            local_g = int((np.median(bg_sample_left[:, :, 1]) + np.median(bg_sample_right[:, :, 1])) / 2)
-            local_r = int((np.median(bg_sample_left[:, :, 2]) + np.median(bg_sample_right[:, :, 2])) / 2)
-        else:
-            roi_pixels = frame[start_y:end_y, max(0, start_x-5):min(orig_width, end_x+5)]
-            local_b = int(np.median(roi_pixels[:, :, 0])) if roi_pixels.size > 0 else avg_b
-            local_g = int(np.median(roi_pixels[:, :, 1])) if roi_pixels.size > 0 else avg_g
-            local_r = int(np.median(roi_pixels[:, :, 2])) if roi_pixels.size > 0 else avg_r
-            
-        if local_b == 0 and local_g == 0 and local_r == 0:
-            local_b, local_g, local_r = avg_b, avg_g, avg_r
-            
-        # Generate an isolated single-character bounding segment canvas natively
-        single_char_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-        cv2.rectangle(single_char_mask, (start_x, start_y), (end_x, end_y), 255, -1)
+        pad_w = pad_end_x - pad_start_x
+        pad_h = pad_end_y - pad_start_y
 
-                # --- PHASE A: PART 2 OF 2 (FULLY CORRECTED INPAINTING & PRESENTATION ENGINE) ---
+        # 2. Extract a moving 15-pixel context strip from directly above this character box
+        sample_ymin = max(0, pad_start_y - 15)
+        sample_ymax = pad_start_y
         
-        # Ensure coordinates stay within safe image array boundaries
-        start_x = max(0, min(start_x, orig_width - 1))
-        end_x = max(0, min(end_x, orig_width - 1))
-        start_y = max(0, min(start_y, orig_height - 1))
-        end_y = max(0, min(end_y, orig_height - 1))
-        
-        if (end_x > start_x) and (end_y > start_y):
-            # 1. Structural Character Mask Isolation
-            # We target the localized character box to isolate text lines from the background
-            char_roi = frame[start_y:end_y, start_x:end_x]
-            gray_roi_block = cv2.cvtColor(char_roi, cv2.COLOR_BGR2GRAY)
+        # Safe check: if the text hits the absolute top of the frame, sample from below instead
+        if sample_ymin == 0:
+            sample_ymin = pad_end_y
+            sample_ymax = min(orig_height, pad_end_y + 15)
             
-            # Use Otsu's adaptive thresholding within the isolated character patch
-            _, local_thresh = cv2.threshold(gray_roi_block, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        # 3. Grab the live background patch, resize it to match the box size, and paint it onto the frame
+        if (sample_ymax - sample_ymin) > 0 and pad_w > 0 and pad_h > 0:
+            background_sample = frame[sample_ymin:sample_ymax, pad_start_x:pad_end_x]
+            paint_patch = cv2.resize(background_sample, (pad_w, pad_h), interpolation=cv2.INTER_LINEAR)
             
-            # Create an empty full-frame canvas to map back the isolated character strokes
-            precise_letter_strokes = np.zeros(frame.shape[:2], dtype=np.uint8)
-            precise_letter_strokes[start_y:end_y, start_x:end_x] = local_thresh
-            precise_letter_strokes = cv2.bitwise_and(single_char_mask, precise_letter_strokes)
-            
-            # Fallback Safety Check: If thresholding fails to capture enough text content 
-            # (e.g. low contrast against sand), force the complete solid box footprint
-            expected_area = (end_x - start_x) * (end_y - start_y)
-            if cv2.countNonZero(precise_letter_strokes) < (0.10 * expected_area):
-                precise_letter_strokes = single_char_mask.copy()
-        else:
-            precise_letter_strokes = single_char_mask.copy()
+            # Completely overwrite the watermark text block with the dynamic moving background texture
+            frame[pad_start_y:pad_end_y, pad_start_x:pad_end_x] = paint_patch
 
-        # 2. Morphological Stroke Dilation
-        # Expand the character strokes slightly to absorb soft, blurry edge/anti-aliasing pixels
-        char_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (4, 4))
-        dilated_char_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
-        
-        # 3. Dynamic Frame Background Splicing
-        # Generate a solid patch matching the dynamically sampled local background colors
-        solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-        
-        # Overpaint the exact character strokes onto the live frame
-        cv2.copyTo(solid_bg_patch, dilated_char_stroke, frame)
-        
-        # Accumulate the erased strokes into the global frame matrix
-        universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_char_stroke)
+        # 4. Update the erasure map so your localized fluid mechanics inpainter handles the edges seamlessly
+        cv2.rectangle(universal_erasure_map, (pad_start_x, pad_start_y), (pad_end_x, pad_end_y), 255, -1)
         frame_coordinates_log.append(f"'{split_characters_list[idx]}'@[X1:{start_x},X2:{end_x}]")
 
-    # --- ADVANCED FRAME-WIDE EDGES HEALING (OUTSIDE THE CHARACTER LOOP) ---
-    # Wipe out remaining boundary lines or text-compression artifacts seamlessly
+    # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(universal_erasure_map) > 0:
-        # A wider morphological ellipse kernel blends structural seam borders perfectly
-        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)) # Increased to 5x5 to smooth transitions
         inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
-        
-        # Run Telea Fast Marching inpainting across the updated matrix
         frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
         
     # Live Telemetry Coordinate Reporting
@@ -637,33 +593,26 @@ while cap.isOpened():
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color, 2, cv2.LINE_AA)
     
-    # Save the polished, healed frame into the video pipeline buffer
     video_writer.write(frame)
 
-# Safely close hardware streams and release memory allocations
 cap.release()
 video_writer.release()
-cv2.destroyAllWindows()
 
 # --- 5. CONTAINER CLEAN RE-STREAM REMUX ---
-print("📦 Re-muxing video track and preservation of original audio channels...")
 subprocess.run([
     "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL, 
     "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", 
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4): 
-    os.remove(TEMP_HEALED_MP4)
+if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete: Universal GPU deep-learning watermark removal finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
 # THE AUTOMATED FILE SWAP BRIDGE:
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
-if os.path.exists(OLD_ROUTING_TARGET): 
-    os.remove(OLD_ROUTING_TARGET)
+if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
 print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
-
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
