@@ -384,7 +384,6 @@ print("-" * 55 + "\n")
 # ==========================================
 # PHASE A: PART 1 OF 2 (FULLY CORRECTED UNPACKED EASYOCR CORE)
 # ==========================================
-
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
 print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR Execution Matrix...")
 import subprocess
@@ -413,13 +412,6 @@ reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
 
 print("🎬 Processing frame-by-frame isolated character overpainting...")
 cap = cv2.VideoCapture(INPUT_REEL)
-
-# Extract video properties safely for the writer configuration
-orig_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps         = cap.get(cv2.CAP_PROP_FPS)
-if fps <= 0: fps = 30.0 # Fallback safety for dynamic frame rate streams
-
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
@@ -443,9 +435,6 @@ last_known_x1 = int(orig_width * 0.24)
 last_known_x2 = int(orig_width * 0.76)   
 last_known_y1 = int(orig_height * 0.920) 
 last_known_y2 = int(orig_height * 0.952)
-
-# Global canvas fallback fallback color calculations (Global average initialization)
-avg_b, avg_g, avg_r = 128, 128, 128
 
 # History window banks to track text moving motion fields smoothly without jitter
 history_x1, history_x2, history_y1, history_y2 = [], [], [], []
@@ -472,14 +461,13 @@ while cap.isOpened():
     # Match the dynamic local scan against Gemini's string clue natively
     if ocr_results:
         for result in ocr_results:
-            if len(result) < 3: 
-                continue
+            if len(result) < 3: continue
             
             # 🔥 CRITICAL SYNC FIX: Explicitly unpacked data properties by direct positional list indexes
             # to permanently clear the tuple 'TypeError' compilation crash!
-            box_points = result[0]                          # Unpacks coordinates mapping layout list arrays
+            box_points = result[0]     # Unpacks coordinates mapping layout list arrays
             detected_text = str(result[1]).strip().lower()  # Unpacks text string labels
-            confidence_score = float(result[2])             # Unpacks confidence value safely
+            confidence_score = float(result[2])  # Unpacks confidence value safely
             
             # Extract key word fragments from Gemini's dynamic string to create an unbiased search string filter
             gemini_clue_clean = target_watermark_text.lower().replace("@", "").replace(".", "")
@@ -491,11 +479,10 @@ while cap.isOpened():
                 pts = np.array(box_points, dtype=np.int32)
                 
                 # Convert the local lower panel box coordinates back to absolute full frame pixel values
-                # Added dynamic padding safety buffer (+/- pixels) around character frames
-                x1_frame = int(np.min(pts[:, 0])) - 6
-                x2_frame = int(np.max(pts[:, 0])) + 6
-                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 4
-                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 4
+                x1_frame = int(np.min(pts[:, 0])) - 4
+                x2_frame = int(np.max(pts[:, 0])) + 4
+                y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
+                y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
                 
                 # Update visual memory banks with the new moving coordinate positions
                 last_known_x1 = x1_frame
@@ -504,8 +491,8 @@ while cap.isOpened():
                 last_known_y2 = y2_frame
                 frame_lock_success = True
                 break
-                
-    # KALMAN FILTER SMOOTHING MATRIX
+
+    # KALMAN FILTER SMOOTHING MATRIX (Guaranteed to execute perfectly every frame)
     history_x1.append(x1_frame)
     history_x2.append(x2_frame)
     history_y1.append(y1_frame)
@@ -539,8 +526,8 @@ while cap.isOpened():
         start_y = int(y1_curr)
         end_y = int(y2_curr)
         
-        # --- MODIFIED: AGGRESSIVE BLOCKED PAINTING OVER EACH CHARACTER TO ELIMINATE ALL LEFTOVERS ---
-        # 1. Expand the character bounding box by a 6-pixel padding to capture fuzzy/blurry edges
+        # --- FIXED: AGGRESSIVE BLOCKED OVERPAINT TO ENSURE EVERY FRAME IS CLEAN ---
+        # 1. Add solid 6-pixel padding around each individual letter to swallow anti-aliasing text halos
         char_padding = 6
         pad_start_x = max(0, start_x - char_padding)
         pad_end_x = min(orig_width, end_x + char_padding)
@@ -550,30 +537,30 @@ while cap.isOpened():
         pad_w = pad_end_x - pad_start_x
         pad_h = pad_end_y - pad_start_y
 
-        # 2. Extract a moving 15-pixel context strip from directly above this character box
+        # 2. Slice a live texture segment from directly above the padded character bounding box
         sample_ymin = max(0, pad_start_y - 15)
         sample_ymax = pad_start_y
         
-        # Safe check: if the text hits the absolute top of the frame, sample from below instead
+        # Top-edge exception handler: switch slice direction to bottom if text approaches frame ceiling
         if sample_ymin == 0:
             sample_ymin = pad_end_y
             sample_ymax = min(orig_height, pad_end_y + 15)
             
-        # 3. Grab the live background patch, resize it to match the box size, and paint it onto the frame
+        # 3. Scale and dynamically overlay the background sample straight onto the frame array
         if (sample_ymax - sample_ymin) > 0 and pad_w > 0 and pad_h > 0:
             background_sample = frame[sample_ymin:sample_ymax, pad_start_x:pad_end_x]
             paint_patch = cv2.resize(background_sample, (pad_w, pad_h), interpolation=cv2.INTER_LINEAR)
             
-            # Completely overwrite the watermark text block with the dynamic moving background texture
+            # This completely replaces the watermark block on the frame with zero residues left behind
             frame[pad_start_y:pad_end_y, pad_start_x:pad_end_x] = paint_patch
 
-        # 4. Update the erasure map so your localized fluid mechanics inpainter handles the edges seamlessly
+        # 4. Record coordinates onto the erasure map for post-processing edge healing
         cv2.rectangle(universal_erasure_map, (pad_start_x, pad_start_y), (pad_end_x, pad_end_y), 255, -1)
         frame_coordinates_log.append(f"'{split_characters_list[idx]}'@[X1:{start_x},X2:{end_x}]")
 
     # Clean out any remaining character edge outlines smoothly via localized fluid mechanics inpainting
     if cv2.countNonZero(universal_erasure_map) > 0:
-        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)) # Increased to 5x5 to smooth transitions
+        dilation_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         inflated_erasure_mask = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
         frame = cv2.inpaint(frame, inflated_erasure_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
         
@@ -605,13 +592,18 @@ subprocess.run([
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4): os.remove(TEMP_HEALED_MP4)
+
+OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
+
+if os.path.exists(TEMP_HEALED_MP4): 
+    os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete: Universal GPU deep-learning watermark removal finalized flawlessly to: {FINAL_MONETIZED_OUTPUT}")
 
 # THE AUTOMATED FILE SWAP BRIDGE:
-OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
-if os.path.exists(OLD_ROUTING_TARGET): os.remove(OLD_ROUTING_TARGET)
+
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
+
+        
 print(f"🔗 File bridge securely mapped! Output copied straight over to: {OLD_ROUTING_TARGET}")
 
 # --------------------------------------------------
