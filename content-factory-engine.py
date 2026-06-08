@@ -386,9 +386,8 @@ print("-" * 55 + "\n")
 # PHASE A: PART 1 OF 2 (FULLY CORRECTED UNPACKED EASYOCR CORE)
 # ==========================================
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
-
 # ==========================================
-# PHASE A: PART 2 OF 2 — LaMa Inpainting Edition
+# PHASE A: PART 2 OF 2 — LaMa Inpainting v2 (Zero Missed Frames)
 # ==========================================
 
 print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR + LaMa Execution Matrix...")
@@ -436,7 +435,7 @@ def _substrings(text, n=3):
     return {text[i:i+n] for i in range(len(text) - n + 1)} if len(text) >= n else {text}
 
 def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
-    detected    = detected.lower().strip()
+    detected     = detected.lower().strip()
     target_clean = target.lower().replace("@", "").replace(".", "").replace("_", "")
     for chunk in _substrings(target_clean, min_len):
         if chunk in detected:
@@ -447,7 +446,7 @@ def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
     return False
 
 # ── VIDEO I/O ─────────────────────────────────────────────────────────────────
-cap = cv2.VideoCapture(INPUT_REEL)
+cap          = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
 fourcc       = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
@@ -473,10 +472,12 @@ last_known_y2 = int(orig_height * 0.952)
 HISTORY_LEN = 15
 history_x1, history_x2, history_y1, history_y2 = [], [], [], []
 
-# ── LAMA MASK PADDING ─────────────────────────────────────────────────────────
-# Slightly overshoots the box to catch antialiased edges and shadow halos
-MASK_PAD_X = 8
-MASK_PAD_Y = 6
+# ── MASK PADDING (generous — LaMa handles large masks perfectly) ──────────────
+MASK_PAD_X = 20   # FIX 2: was 8 — catches shadow/glow edges outside OCR box
+MASK_PAD_Y = 12   # FIX 2: was 6
+
+# ── PREVIOUS FRAME MASK MEMORY (FIX 3: union with last frame to catch motion lag)
+prev_mx1 = prev_mx2 = prev_my1 = prev_my2 = None
 
 frame_idx = 0
 print("🎬 Starting frame-by-frame processing...")
@@ -504,7 +505,7 @@ while cap.isOpened():
     y2_frame = last_known_y2
     frame_lock_success = False
 
-    # ── FUZZY OCR MATCH ───────────────────────────────────────────────────────
+    # ── FUZZY OCR MATCH — pick highest-confidence hit ─────────────────────────
     if ocr_results:
         best_conf = -1.0
         best_box  = None
@@ -534,7 +535,7 @@ while cap.isOpened():
             last_known_y2 = y2_frame
             frame_lock_success = True
 
-    # ── HISTORY SMOOTHING (always push, even on OCR miss) ────────────────────
+    # ── HISTORY SMOOTHING (always push even on OCR miss) ─────────────────────
     history_x1.append(x1_frame)
     history_x2.append(x2_frame)
     history_y1.append(y1_frame)
@@ -554,15 +555,26 @@ while cap.isOpened():
     y1_curr = max(0, min(y1_curr, orig_height - 1))
     y2_curr = max(0, min(y2_curr, orig_height - 1))
 
-    # ── BUILD LAMA MASK ───────────────────────────────────────────────────────
-    # A clean rectangle with padding — LaMa doesn't need stroke-level precision
-    mx1 = max(0,              x1_curr - MASK_PAD_X)
-    mx2 = min(orig_width - 1, x2_curr + MASK_PAD_X)
-    my1 = max(0,               y1_curr - MASK_PAD_Y)
-    my2 = min(orig_height - 1, y2_curr + MASK_PAD_Y)
+    # ── FIX 1+2: UNION OF SMOOTHED BOX AND LAST_KNOWN BOX WITH LARGE PADDING ─
+    # Takes the outermost boundary of both boxes so neither OCR miss
+    # nor smoothing lag can leave a sliver of watermark uncovered
+    mx1 = max(0,               min(x1_curr, last_known_x1) - MASK_PAD_X)
+    mx2 = min(orig_width  - 1, max(x2_curr, last_known_x2) + MASK_PAD_X)
+    my1 = max(0,               min(y1_curr, last_known_y1) - MASK_PAD_Y)
+    my2 = min(orig_height - 1, max(y2_curr, last_known_y2) + MASK_PAD_Y)
 
+    # ── BUILD LAMA MASK ───────────────────────────────────────────────────────
     lama_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+
+    # Current (unioned + padded) box
     cv2.rectangle(lama_mask, (mx1, my1), (mx2, my2), 255, -1)
+
+    # FIX 3: also paint previous frame's box to cover motion lag between frames
+    if prev_mx1 is not None:
+        cv2.rectangle(lama_mask, (prev_mx1, prev_my1), (prev_mx2, prev_my2), 255, -1)
+
+    # Store this frame's mask coords for next iteration
+    prev_mx1, prev_mx2, prev_my1, prev_my2 = mx1, mx2, my1, my2
 
     # ── LAMA INPAINT ─────────────────────────────────────────────────────────
     frame_pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -574,7 +586,7 @@ while cap.isOpened():
     # ── TELEMETRY ─────────────────────────────────────────────────────────────
     if frame_idx % 45 == 0:
         lock_str = "✅ LOCK" if frame_lock_success else "🔁 MEMORY"
-        print(f"🎬 Frame {frame_idx:04d} | X=[{x1_curr}:{x2_curr}] Y=[{y1_curr}:{y2_curr}] | {lock_str}")
+        print(f"🎬 Frame {frame_idx:04d} | X=[{x1_curr}:{x2_curr}] Y=[{y1_curr}:{y2_curr}] | mask=[{mx1}:{mx2},{my1}:{my2}] | {lock_str}")
 
     # ── OVERLAY ───────────────────────────────────────────────────────────────
     current_w = max(1, x2_curr - x1_curr)
