@@ -386,11 +386,12 @@ print("-" * 55 + "\n")
 # PHASE A: PART 1 OF 2 (FULLY CORRECTED UNPACKED EASYOCR CORE)
 # ==========================================
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
+
 # ==========================================
-# PHASE A: PART 2 OF 2 — LaMa Inpainting v2 (Zero Missed Frames)
+# PHASE A: PART 2 OF 2 — LaMa v3 (Two-Pass: Scan then Erase)
 # ==========================================
 
-print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR + LaMa Execution Matrix...")
+print("🎨 Initializing GPU-Accelerated EasyOCR + LaMa Two-Pass Pipeline...")
 import subprocess
 import sys
 import os
@@ -410,25 +411,24 @@ except ImportError:
 try:
     from simple_lama_inpainting import SimpleLama
 except ImportError:
-    print("📡 Installing LaMa inpainting...")
+    print("📡 Installing LaMa...")
     subprocess.run([sys.executable, "-m", "pip", "install", "simple-lama-inpainting", "-q"], check=True)
     from simple_lama_inpainting import SimpleLama
 
 # ── GPU SETUP ─────────────────────────────────────────────────────────────────
-use_gpu_hardware = torch.cuda.is_available()
-if use_gpu_hardware:
-    print(f"🚀 GPU found: {torch.cuda.get_device_name(0)}")
+use_gpu = torch.cuda.is_available()
+if use_gpu:
+    print(f"🚀 GPU: {torch.cuda.get_device_name(0)}")
     torch.cuda.empty_cache()
 else:
-    print("⚠️ No GPU detected — using CPU (LaMa will be slower)")
+    print("⚠️ No GPU — using CPU")
 
 # ── LOAD MODELS ONCE ──────────────────────────────────────────────────────────
-print("🧠 Loading EasyOCR model...")
-reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
-
-print("🧠 Loading LaMa inpainting model...")
+print("🧠 Loading EasyOCR...")
+reader = easyocr.Reader(['en'], gpu=use_gpu)
+print("🧠 Loading LaMa...")
 simple_lama = SimpleLama()
-print("✅ Both models loaded.")
+print("✅ Both models ready.")
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def _substrings(text, n=3):
@@ -436,7 +436,7 @@ def _substrings(text, n=3):
 
 def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
     detected     = detected.lower().strip()
-    target_clean = target.lower().replace("@", "").replace(".", "").replace("_", "")
+    target_clean = target.lower().replace("@","").replace(".","").replace("_","")
     for chunk in _substrings(target_clean, min_len):
         if chunk in detected:
             return True
@@ -445,50 +445,33 @@ def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
         return True
     return False
 
-# ── VIDEO I/O ─────────────────────────────────────────────────────────────────
-cap          = cv2.VideoCapture(INPUT_REEL)
-TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
-fourcc       = cv2.VideoWriter_fourcc(*'mp4v')
-video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
-
-font_face    = cv2.FONT_HERSHEY_SIMPLEX
-text_color   = (255, 255, 255)
-shadow_color = (15,  15,  15)
-
-split_characters_list = list(target_watermark_text)
-num_chars             = len(split_characters_list)
-print(f"✂️ Target string from Gemini: \"{target_watermark_text}\" ({num_chars} chars)")
-
-# ── SCAN BAND ─────────────────────────────────────────────────────────────────
+# ── VIDEO PROPERTIES ──────────────────────────────────────────────────────────
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
-# ── PERSISTENT MEMORY ─────────────────────────────────────────────────────────
-last_known_x1 = int(orig_width  * 0.24)
-last_known_x2 = int(orig_width  * 0.76)
-last_known_y1 = int(orig_height * 0.920)
-last_known_y2 = int(orig_height * 0.952)
+# Pad applied around the union of all detections — generous so halos are covered
+ENVELOPE_PAD_X = 25
+ENVELOPE_PAD_Y = 15
 
-HISTORY_LEN = 15
-history_x1, history_x2, history_y1, history_y2 = [], [], [], []
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 1 — SCAN EVERY FRAME, COLLECT ALL DETECTIONS, BUILD LOCKED ENVELOPE
+# ══════════════════════════════════════════════════════════════════════════════
+print("\n📡 PHASE 1: Scanning all frames to build locked envelope box...")
 
-# ── MASK PADDING (generous — LaMa handles large masks perfectly) ──────────────
-MASK_PAD_X = 20   # FIX 2: was 8 — catches shadow/glow edges outside OCR box
-MASK_PAD_Y = 12   # FIX 2: was 6
+cap       = cv2.VideoCapture(INPUT_REEL)
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-# ── PREVIOUS FRAME MASK MEMORY (FIX 3: union with last frame to catch motion lag)
-prev_mx1 = prev_mx2 = prev_my1 = prev_my2 = None
-
-frame_idx = 0
-print("🎬 Starting frame-by-frame processing...")
+# Accumulators — we grow these to the outermost detected boundary
+all_x1, all_x2, all_y1, all_y2 = [], [], [], []
+scan_idx = 0
+lock_count = 0
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
         break
-    frame_idx += 1
+    scan_idx += 1
 
-    # ── OCR ON LOWER PANEL ONLY ───────────────────────────────────────────────
     lower_panel = frame[min_scan_y:max_scan_y, :]
     ocr_results = reader.readtext(
         lower_panel,
@@ -499,126 +482,120 @@ while cap.isOpened():
         adjust_contrast=0.6,
     )
 
-    x1_frame = last_known_x1
-    x2_frame = last_known_x2
-    y1_frame = last_known_y1
-    y2_frame = last_known_y2
-    frame_lock_success = False
+    best_conf = -1.0
+    best_box  = None
+    for result in ocr_results:
+        if len(result) < 3:
+            continue
+        box_points    = result[0]
+        detected_text = str(result[1]).strip()
+        confidence    = float(result[2])
+        if confidence > 0.0 and fuzzy_match(detected_text, target_watermark_text):
+            if confidence > best_conf:
+                best_conf = confidence
+                best_box  = box_points
 
-    # ── FUZZY OCR MATCH — pick highest-confidence hit ─────────────────────────
-    if ocr_results:
-        best_conf = -1.0
-        best_box  = None
+    if best_box is not None:
+        pts = np.array(best_box, dtype=np.int32)
+        all_x1.append(int(np.min(pts[:, 0])))
+        all_x2.append(int(np.max(pts[:, 0])))
+        all_y1.append(int(np.min(pts[:, 1])) + min_scan_y)
+        all_y2.append(int(np.max(pts[:, 1])) + min_scan_y)
+        lock_count += 1
 
-        for result in ocr_results:
-            if len(result) < 3:
-                continue
-            box_points    = result[0]
-            detected_text = str(result[1]).strip()
-            confidence    = float(result[2])
+    if scan_idx % 100 == 0:
+        print(f"   Scanned {scan_idx}/{total_frames} frames | Detections so far: {lock_count}")
 
-            if confidence > 0.0 and fuzzy_match(detected_text, target_watermark_text):
-                if confidence > best_conf:
-                    best_conf = confidence
-                    best_box  = box_points
+cap.release()
 
-        if best_box is not None:
-            pts      = np.array(best_box, dtype=np.int32)
-            x1_frame = int(np.min(pts[:, 0])) - 4
-            x2_frame = int(np.max(pts[:, 0])) + 4
-            y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
-            y2_frame = int(np.max(pts[:, 1])) + min_scan_y + 2
+if lock_count == 0:
+    # OCR found nothing at all — fall back to the default position
+    print("⚠️ WARNING: OCR found zero matches across entire video!")
+    print("   Falling back to default position (bottom 5% strip full width).")
+    env_x1 = 0
+    env_x2 = orig_width
+    env_y1 = int(orig_height * 0.91)
+    env_y2 = int(orig_height * 0.96)
+else:
+    # Union of every detection + generous pad = the locked envelope
+    env_x1 = max(0,               min(all_x1) - ENVELOPE_PAD_X)
+    env_x2 = min(orig_width  - 1, max(all_x2) + ENVELOPE_PAD_X)
+    env_y1 = max(0,               min(all_y1) - ENVELOPE_PAD_Y)
+    env_y2 = min(orig_height - 1, max(all_y2) + ENVELOPE_PAD_Y)
 
-            last_known_x1 = x1_frame
-            last_known_x2 = x2_frame
-            last_known_y1 = y1_frame
-            last_known_y2 = y2_frame
-            frame_lock_success = True
+print(f"\n✅ PHASE 1 COMPLETE")
+print(f"   Total frames scanned : {scan_idx}")
+print(f"   Frames with detection: {lock_count} ({100*lock_count/max(scan_idx,1):.1f}%)")
+print(f"   Locked envelope box  : X=[{env_x1}:{env_x2}]  Y=[{env_y1}:{env_y2}]")
+print(f"   Envelope size        : {env_x2-env_x1}px wide × {env_y2-env_y1}px tall")
 
-    # ── HISTORY SMOOTHING (always push even on OCR miss) ─────────────────────
-    history_x1.append(x1_frame)
-    history_x2.append(x2_frame)
-    history_y1.append(y1_frame)
-    history_y2.append(y2_frame)
+# Build the single mask once — it never changes
+LOCKED_MASK = np.zeros((orig_height, orig_width), dtype=np.uint8)
+cv2.rectangle(LOCKED_MASK, (env_x1, env_y1), (env_x2, env_y2), 255, -1)
 
-    if len(history_x1) > HISTORY_LEN:
-        history_x1.pop(0); history_x2.pop(0)
-        history_y1.pop(0); history_y2.pop(0)
+# Pre-convert mask to PIL once
+LOCKED_MASK_PIL = Image.fromarray(LOCKED_MASK)
 
-    x1_curr = int(np.median(history_x1))
-    x2_curr = int(np.median(history_x2))
-    y1_curr = int(np.median(history_y1))
-    y2_curr = int(np.median(history_y2))
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 2 — RE-READ EVERY FRAME, APPLY FIXED MASK, WRITE OUTPUT
+# ══════════════════════════════════════════════════════════════════════════════
+print("\n🎬 PHASE 2: Erasing watermark from every frame with locked box...")
 
-    x1_curr = max(0, min(x1_curr, orig_width  - 1))
-    x2_curr = max(0, min(x2_curr, orig_width  - 1))
-    y1_curr = max(0, min(y1_curr, orig_height - 1))
-    y2_curr = max(0, min(y2_curr, orig_height - 1))
+cap          = cv2.VideoCapture(INPUT_REEL)
+TEMP_HEALED  = "/kaggle/working/inpainted_temp_restored.mp4"
+fourcc       = cv2.VideoWriter_fourcc(*'mp4v')
+video_writer = cv2.VideoWriter(TEMP_HEALED, fourcc, fps, (orig_width, orig_height))
 
-    # ── FIX 1+2: UNION OF SMOOTHED BOX AND LAST_KNOWN BOX WITH LARGE PADDING ─
-    # Takes the outermost boundary of both boxes so neither OCR miss
-    # nor smoothing lag can leave a sliver of watermark uncovered
-    mx1 = max(0,               min(x1_curr, last_known_x1) - MASK_PAD_X)
-    mx2 = min(orig_width  - 1, max(x2_curr, last_known_x2) + MASK_PAD_X)
-    my1 = max(0,               min(y1_curr, last_known_y1) - MASK_PAD_Y)
-    my2 = min(orig_height - 1, max(y2_curr, last_known_y2) + MASK_PAD_Y)
+font_face    = cv2.FONT_HERSHEY_SIMPLEX
+text_color   = (255, 255, 255)
+shadow_color = (15,  15,  15)
 
-    # ── BUILD LAMA MASK ───────────────────────────────────────────────────────
-    lama_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+# Overlay anchor — centred on the locked box, 40px above it
+overlay_cx = env_x1 + (env_x2 - env_x1) // 2
+overlay_cy = max(0, env_y1 - 40)
+(tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
+tx_a = overlay_cx - tw // 2
+ty_a = overlay_cy + th // 2
 
-    # Current (unioned + padded) box
-    cv2.rectangle(lama_mask, (mx1, my1), (mx2, my2), 255, -1)
+frame_idx = 0
 
-    # FIX 3: also paint previous frame's box to cover motion lag between frames
-    if prev_mx1 is not None:
-        cv2.rectangle(lama_mask, (prev_mx1, prev_my1), (prev_mx2, prev_my2), 255, -1)
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+    frame_idx += 1
 
-    # Store this frame's mask coords for next iteration
-    prev_mx1, prev_mx2, prev_my1, prev_my2 = mx1, mx2, my1, my2
-
-    # ── LAMA INPAINT ─────────────────────────────────────────────────────────
+    # Convert to PIL, inpaint with the pre-built locked mask, convert back
     frame_pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    mask_pil   = Image.fromarray(lama_mask)
-
-    result_pil = simple_lama(frame_pil, mask_pil)
+    result_pil = simple_lama(frame_pil, LOCKED_MASK_PIL)
     frame      = cv2.cvtColor(np.array(result_pil), cv2.COLOR_RGB2BGR)
 
-    # ── TELEMETRY ─────────────────────────────────────────────────────────────
-    if frame_idx % 45 == 0:
-        lock_str = "✅ LOCK" if frame_lock_success else "🔁 MEMORY"
-        print(f"🎬 Frame {frame_idx:04d} | X=[{x1_curr}:{x2_curr}] Y=[{y1_curr}:{y2_curr}] | mask=[{mx1}:{mx2},{my1}:{my2}] | {lock_str}")
-
-    # ── OVERLAY ───────────────────────────────────────────────────────────────
-    current_w = max(1, x2_curr - x1_curr)
-    fixed_cx  = x1_curr + (current_w // 2)
-    fixed_cy  = max(0, y1_curr - 40)
-
-    (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
-    tx_a = fixed_cx - tw // 2
-    ty_a = fixed_cy + th // 2
-
+    # Overlay
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color,   2, cv2.LINE_AA)
 
     video_writer.write(frame)
 
+    if frame_idx % 100 == 0:
+        print(f"   Erased {frame_idx}/{total_frames} frames...")
+
 cap.release()
 video_writer.release()
-print(f"✅ Frame loop done. {frame_idx} frames processed.")
+print(f"✅ PHASE 2 COMPLETE — {frame_idx} frames written.")
 
 # ── REMUX AUDIO ───────────────────────────────────────────────────────────────
 print("🔊 Remuxing audio...")
 subprocess.run([
     "ffmpeg", "-y",
-    "-i", TEMP_HEALED_MP4,
+    "-i", TEMP_HEALED,
     "-i", INPUT_REEL,
     "-map", "0:v", "-map", "1:a?",
     "-c:v", "copy", "-c:a", "copy",
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
-if os.path.exists(TEMP_HEALED_MP4):
-    os.remove(TEMP_HEALED_MP4)
+if os.path.exists(TEMP_HEALED):
+    os.remove(TEMP_HEALED)
 print(f"✅ Phase A Complete → {FINAL_MONETIZED_OUTPUT}")
 
 # ── FILE BRIDGE ───────────────────────────────────────────────────────────────
