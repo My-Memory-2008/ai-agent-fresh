@@ -388,10 +388,10 @@ print("-" * 55 + "\n")
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
 
 # ==========================================
-# PHASE A: PART 2 OF 2 — LaMa v3 (Two-Pass: Scan then Erase)
+# PHASE A: PART 2 OF 2 — LaMa v4 (Feathered Mask + Colour Correction)
 # ==========================================
 
-print("🎨 Initializing GPU-Accelerated EasyOCR + LaMa Two-Pass Pipeline...")
+print("🎨 Initializing EasyOCR + LaMa v4 (Feathered Blend + Colour Correction)...")
 import subprocess
 import sys
 import os
@@ -404,14 +404,12 @@ from PIL import Image
 try:
     import easyocr
 except ImportError:
-    print("📡 Installing EasyOCR...")
     subprocess.run([sys.executable, "-m", "pip", "install", "easyocr", "-q"], check=True)
     import easyocr
 
 try:
     from simple_lama_inpainting import SimpleLama
 except ImportError:
-    print("📡 Installing LaMa...")
     subprocess.run([sys.executable, "-m", "pip", "install", "simple-lama-inpainting", "-q"], check=True)
     from simple_lama_inpainting import SimpleLama
 
@@ -423,7 +421,6 @@ if use_gpu:
 else:
     print("⚠️ No GPU — using CPU")
 
-# ── LOAD MODELS ONCE ──────────────────────────────────────────────────────────
 print("🧠 Loading EasyOCR...")
 reader = easyocr.Reader(['en'], gpu=use_gpu)
 print("🧠 Loading LaMa...")
@@ -445,23 +442,109 @@ def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
         return True
     return False
 
+def build_feathered_mask(h, w, x1, y1, x2, y2, feather_px=18):
+    """
+    Returns a float32 mask [0..1] with hard 1.0 in the core and a smooth
+    cosine fall-off over feather_px pixels at every edge.
+    This prevents the hard rectangular boundary from being visible.
+    """
+    mask = np.zeros((h, w), dtype=np.float32)
+    # Hard fill inside box
+    mask[y1:y2, x1:x2] = 1.0
+
+    # Gaussian blur creates the smooth feathered edge
+    ksize = feather_px * 2 + 1   # must be odd
+    mask  = cv2.GaussianBlur(mask, (ksize, ksize), sigmaX=feather_px / 2)
+
+    # Re-normalise so the core stays at 1.0 after blurring
+    core_val = mask[
+        (y1 + y2) // 2,
+        (x1 + x2) // 2
+    ]
+    if core_val > 0:
+        mask = np.clip(mask / core_val, 0.0, 1.0)
+
+    return mask  # shape (H, W), float32 in [0,1]
+
+def colour_correct_patch(original_frame, inpainted_frame, x1, y1, x2, y2,
+                          sample_pad=30):
+    """
+    Samples the BGR median of the border ring OUTSIDE the mask in the
+    original frame, compares it with the same ring in the inpainted frame,
+    and applies a per-channel additive shift to the filled patch so its
+    colours match the surrounding background.
+
+    Returns the inpainted frame with the colour-corrected patch applied.
+    """
+    h, w = original_frame.shape[:2]
+
+    # Sample ring: ENVELOPE_PAD beyond the box on each side, then subtract box
+    sx1 = max(0,   x1 - sample_pad)
+    sx2 = min(w-1, x2 + sample_pad)
+    sy1 = max(0,   y1 - sample_pad)
+    sy2 = min(h-1, y2 + sample_pad)
+
+    # Build ring mask: outer rect minus inner (watermark) rect
+    ring_mask = np.zeros((h, w), dtype=np.uint8)
+    cv2.rectangle(ring_mask, (sx1, sy1), (sx2, sy2), 255, -1)
+    cv2.rectangle(ring_mask, (x1,  y1 ), (x2,  y2 ), 0,   -1)
+
+    if cv2.countNonZero(ring_mask) == 0:
+        return inpainted_frame   # nothing to compare
+
+    # Per-channel median in the ring on ORIGINAL frame (true background colour)
+    orig_ring_b = np.median(original_frame[:, :, 0][ring_mask == 255])
+    orig_ring_g = np.median(original_frame[:, :, 1][ring_mask == 255])
+    orig_ring_r = np.median(original_frame[:, :, 2][ring_mask == 255])
+
+    # Per-channel median in the ring on INPAINTED frame
+    inp_ring_b  = np.median(inpainted_frame[:, :, 0][ring_mask == 255])
+    inp_ring_g  = np.median(inpainted_frame[:, :, 1][ring_mask == 255])
+    inp_ring_r  = np.median(inpainted_frame[:, :, 2][ring_mask == 255])
+
+    # Shift = what we need to ADD to the inpainted patch to match the original bg
+    shift_b = orig_ring_b - inp_ring_b
+    shift_g = orig_ring_g - inp_ring_g
+    shift_r = orig_ring_r - inp_ring_r
+
+    # Apply shift only inside the patch region
+    corrected = inpainted_frame.copy()
+    patch = corrected[y1:y2, x1:x2].astype(np.float32)
+    patch[:, :, 0] = np.clip(patch[:, :, 0] + shift_b, 0, 255)
+    patch[:, :, 1] = np.clip(patch[:, :, 1] + shift_g, 0, 255)
+    patch[:, :, 2] = np.clip(patch[:, :, 2] + shift_r, 0, 255)
+    corrected[y1:y2, x1:x2] = patch.astype(np.uint8)
+
+    return corrected
+
+def blend_patch(original_frame, inpainted_frame, feather_mask_3c):
+    """
+    Alpha-blend original and inpainted using the feathered mask.
+    Inside core  → fully inpainted (watermark gone)
+    Outside core → original pixels (zero change to surroundings)
+    Edge zone    → smooth gradient between the two
+    """
+    orig_f = original_frame.astype(np.float32)
+    inp_f  = inpainted_frame.astype(np.float32)
+    blended = orig_f * (1.0 - feather_mask_3c) + inp_f * feather_mask_3c
+    return np.clip(blended, 0, 255).astype(np.uint8)
+
 # ── VIDEO PROPERTIES ──────────────────────────────────────────────────────────
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
-# Pad applied around the union of all detections — generous so halos are covered
 ENVELOPE_PAD_X = 25
 ENVELOPE_PAD_Y = 15
+FEATHER_PX     = 18   # pixels of smooth edge fade — increase for softer blend
+COLOUR_SAMPLE  = 35   # width of the ring sampled for colour correction
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PHASE 1 — SCAN EVERY FRAME, COLLECT ALL DETECTIONS, BUILD LOCKED ENVELOPE
+# PHASE 1 — SCAN EVERY FRAME, BUILD LOCKED ENVELOPE
 # ══════════════════════════════════════════════════════════════════════════════
-print("\n📡 PHASE 1: Scanning all frames to build locked envelope box...")
+print("\n📡 PHASE 1: Scanning all frames to build locked envelope...")
 
-cap       = cv2.VideoCapture(INPUT_REEL)
+cap          = cv2.VideoCapture(INPUT_REEL)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-# Accumulators — we grow these to the outermost detected boundary
 all_x1, all_x2, all_y1, all_y2 = [], [], [], []
 scan_idx = 0
 lock_count = 0
@@ -504,42 +587,45 @@ while cap.isOpened():
         lock_count += 1
 
     if scan_idx % 100 == 0:
-        print(f"   Scanned {scan_idx}/{total_frames} frames | Detections so far: {lock_count}")
+        print(f"   Scanned {scan_idx}/{total_frames} | Detections: {lock_count}")
 
 cap.release()
 
 if lock_count == 0:
-    # OCR found nothing at all — fall back to the default position
-    print("⚠️ WARNING: OCR found zero matches across entire video!")
-    print("   Falling back to default position (bottom 5% strip full width).")
-    env_x1 = 0
-    env_x2 = orig_width
-    env_y1 = int(orig_height * 0.91)
-    env_y2 = int(orig_height * 0.96)
+    print("⚠️ Zero OCR matches — using default bottom strip.")
+    env_x1, env_x2 = 0, orig_width
+    env_y1, env_y2 = int(orig_height * 0.91), int(orig_height * 0.96)
 else:
-    # Union of every detection + generous pad = the locked envelope
     env_x1 = max(0,               min(all_x1) - ENVELOPE_PAD_X)
     env_x2 = min(orig_width  - 1, max(all_x2) + ENVELOPE_PAD_X)
     env_y1 = max(0,               min(all_y1) - ENVELOPE_PAD_Y)
     env_y2 = min(orig_height - 1, max(all_y2) + ENVELOPE_PAD_Y)
 
 print(f"\n✅ PHASE 1 COMPLETE")
-print(f"   Total frames scanned : {scan_idx}")
-print(f"   Frames with detection: {lock_count} ({100*lock_count/max(scan_idx,1):.1f}%)")
-print(f"   Locked envelope box  : X=[{env_x1}:{env_x2}]  Y=[{env_y1}:{env_y2}]")
-print(f"   Envelope size        : {env_x2-env_x1}px wide × {env_y2-env_y1}px tall")
+print(f"   Frames scanned  : {scan_idx}")
+print(f"   OCR detections  : {lock_count} ({100*lock_count/max(scan_idx,1):.1f}%)")
+print(f"   Locked envelope : X=[{env_x1}:{env_x2}]  Y=[{env_y1}:{env_y2}]")
 
-# Build the single mask once — it never changes
-LOCKED_MASK = np.zeros((orig_height, orig_width), dtype=np.uint8)
-cv2.rectangle(LOCKED_MASK, (env_x1, env_y1), (env_x2, env_y2), 255, -1)
+# ── PRE-BUILD MASK ASSETS (done once, reused every frame) ────────────────────
 
-# Pre-convert mask to PIL once
-LOCKED_MASK_PIL = Image.fromarray(LOCKED_MASK)
+# Hard binary mask for LaMa (must be 0/255 uint8)
+LAMA_MASK = np.zeros((orig_height, orig_width), dtype=np.uint8)
+cv2.rectangle(LAMA_MASK, (env_x1, env_y1), (env_x2, env_y2), 255, -1)
+LAMA_MASK_PIL = Image.fromarray(LAMA_MASK)
+
+# Feathered float mask for blending (shape H×W, values 0..1)
+feather_1c = build_feathered_mask(
+    orig_height, orig_width,
+    env_x1, env_y1, env_x2, env_y2,
+    feather_px=FEATHER_PX
+)
+# Expand to 3 channels for vectorised blend
+FEATHER_3C = np.stack([feather_1c, feather_1c, feather_1c], axis=2)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PHASE 2 — RE-READ EVERY FRAME, APPLY FIXED MASK, WRITE OUTPUT
+# PHASE 2 — ERASE EVERY FRAME WITH FIXED MASK + FEATHER + COLOUR CORRECTION
 # ══════════════════════════════════════════════════════════════════════════════
-print("\n🎬 PHASE 2: Erasing watermark from every frame with locked box...")
+print("\n🎬 PHASE 2: Erasing with feathered blend + colour correction...")
 
 cap          = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED  = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -550,7 +636,7 @@ font_face    = cv2.FONT_HERSHEY_SIMPLEX
 text_color   = (255, 255, 255)
 shadow_color = (15,  15,  15)
 
-# Overlay anchor — centred on the locked box, 40px above it
+# Overlay anchor
 overlay_cx = env_x1 + (env_x2 - env_x1) // 2
 overlay_cy = max(0, env_y1 - 40)
 (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
@@ -565,19 +651,31 @@ while cap.isOpened():
         break
     frame_idx += 1
 
-    # Convert to PIL, inpaint with the pre-built locked mask, convert back
-    frame_pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    result_pil = simple_lama(frame_pil, LOCKED_MASK_PIL)
-    frame      = cv2.cvtColor(np.array(result_pil), cv2.COLOR_RGB2BGR)
+    original_frame = frame.copy()   # keep original for colour sampling + blending
 
-    # Overlay
+    # ── Step 1: LaMa fills the hard mask rectangle ───────────────────────────
+    frame_pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    result_pil = simple_lama(frame_pil, LAMA_MASK_PIL)
+    inpainted  = cv2.cvtColor(np.array(result_pil), cv2.COLOR_RGB2BGR)
+
+    # ── Step 2: Colour-correct the patch to match surrounding background ──────
+    inpainted = colour_correct_patch(
+        original_frame, inpainted,
+        env_x1, env_y1, env_x2, env_y2,
+        sample_pad=COLOUR_SAMPLE
+    )
+
+    # ── Step 3: Feathered blend — smooth transition at every mask edge ────────
+    frame = blend_patch(original_frame, inpainted, FEATHER_3C)
+
+    # ── Overlay ───────────────────────────────────────────────────────────────
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color,   2, cv2.LINE_AA)
 
     video_writer.write(frame)
 
     if frame_idx % 100 == 0:
-        print(f"   Erased {frame_idx}/{total_frames} frames...")
+        print(f"   Processed {frame_idx}/{total_frames} frames...")
 
 cap.release()
 video_writer.release()
@@ -604,7 +702,6 @@ if os.path.exists(OLD_ROUTING_TARGET):
     os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
 print(f"🔗 File bridge mapped → {OLD_ROUTING_TARGET}")
-
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
