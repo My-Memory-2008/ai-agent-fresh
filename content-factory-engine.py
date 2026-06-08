@@ -6,6 +6,7 @@
 # %% [code]
 # %% [code]
 # %% [code]
+# %% [code]
 import subprocess
 import sys
 subprocess.run("apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null", shell=True, check=True)
@@ -385,93 +386,100 @@ print("-" * 55 + "\n")
 # PHASE A: PART 1 OF 2 (FULLY CORRECTED UNPACKED EASYOCR CORE)
 # ==========================================
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
-print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR Execution Matrix...")
-import subprocess, sys, os
-import torch, cv2, numpy as np
 
+# ==========================================
+# PHASE A: PART 2 OF 2 — LaMa Inpainting Edition
+# ==========================================
+
+print("🎨 Initializing GPU-Accelerated Dynamic EasyOCR + LaMa Execution Matrix...")
+import subprocess
+import sys
+import os
+import torch
+import cv2
+import numpy as np
+from PIL import Image
+
+# ── INSTALL DEPENDENCIES ──────────────────────────────────────────────────────
 try:
     import easyocr
 except ImportError:
+    print("📡 Installing EasyOCR...")
     subprocess.run([sys.executable, "-m", "pip", "install", "easyocr", "-q"], check=True)
     import easyocr
 
+try:
+    from simple_lama_inpainting import SimpleLama
+except ImportError:
+    print("📡 Installing LaMa inpainting...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "simple-lama-inpainting", "-q"], check=True)
+    from simple_lama_inpainting import SimpleLama
+
+# ── GPU SETUP ─────────────────────────────────────────────────────────────────
 use_gpu_hardware = torch.cuda.is_available()
 if use_gpu_hardware:
-    print(f"🚀 GPU: {torch.cuda.get_device_name(0)}")
+    print(f"🚀 GPU found: {torch.cuda.get_device_name(0)}")
     torch.cuda.empty_cache()
 else:
-    print("⚠️ No GPU — using CPU")
+    print("⚠️ No GPU detected — using CPU (LaMa will be slower)")
 
+# ── LOAD MODELS ONCE ──────────────────────────────────────────────────────────
+print("🧠 Loading EasyOCR model...")
 reader = easyocr.Reader(['en'], gpu=use_gpu_hardware)
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+print("🧠 Loading LaMa inpainting model...")
+simple_lama = SimpleLama()
+print("✅ Both models loaded.")
+
+# ── HELPERS ───────────────────────────────────────────────────────────────────
 def _substrings(text, n=3):
-    """All n-char substrings of text."""
     return {text[i:i+n] for i in range(len(text) - n + 1)} if len(text) >= n else {text}
 
 def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
-    """
-    True if ANY min_len-char chunk of target appears anywhere in detected.
-    Also accepts if detected contains ≥60 % of target's characters (handles
-    OCR garbling like '4WRAM' for '@AWRAM').
-    """
-    detected = detected.lower().strip()
+    detected    = detected.lower().strip()
     target_clean = target.lower().replace("@", "").replace(".", "").replace("_", "")
-
-    # Substring hit
     for chunk in _substrings(target_clean, min_len):
         if chunk in detected:
             return True
-
-    # Character-overlap ratio hit
     common = sum(1 for c in target_clean if c in detected)
     if len(target_clean) > 0 and common / len(target_clean) >= 0.55:
         return True
-
     return False
 
-def safe_median_color(frame, y1, y2, x1, x2):
-    """Median BGR of a clipped ROI; never returns all-zeros."""
-    h, w = frame.shape[:2]
-    y1, y2 = max(0, y1), min(h, y2)
-    x1, x2 = max(0, x1), min(w, x2)
-    roi = frame[y1:y2, x1:x2]
-    if roi.size == 0:
-        return None
-    b = int(np.median(roi[:, :, 0]))
-    g = int(np.median(roi[:, :, 1]))
-    r = int(np.median(roi[:, :, 2]))
-    if b == 0 and g == 0 and r == 0:
-        return None
-    return b, g, r
-
-# ── video I/O ─────────────────────────────────────────────────────────────────
+# ── VIDEO I/O ─────────────────────────────────────────────────────────────────
 cap = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED_MP4 = "/kaggle/working/inpainted_temp_restored.mp4"
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+fourcc       = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(TEMP_HEALED_MP4, fourcc, fps, (orig_width, orig_height))
 
-font_face = cv2.FONT_HERSHEY_SIMPLEX
-text_color, shadow_color = (255, 255, 255), (15, 15, 15)
+font_face    = cv2.FONT_HERSHEY_SIMPLEX
+text_color   = (255, 255, 255)
+shadow_color = (15,  15,  15)
 
 split_characters_list = list(target_watermark_text)
-num_chars = len(split_characters_list)
+num_chars             = len(split_characters_list)
 print(f"✂️ Target string from Gemini: \"{target_watermark_text}\" ({num_chars} chars)")
 
-# ── scan band ─────────────────────────────────────────────────────────────────
+# ── SCAN BAND ─────────────────────────────────────────────────────────────────
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
-# ── persistent memory ─────────────────────────────────────────────────────────
+# ── PERSISTENT MEMORY ─────────────────────────────────────────────────────────
 last_known_x1 = int(orig_width  * 0.24)
 last_known_x2 = int(orig_width  * 0.76)
 last_known_y1 = int(orig_height * 0.920)
 last_known_y2 = int(orig_height * 0.952)
 
-HISTORY_LEN = 15  # FIX 3: was 8
+HISTORY_LEN = 15
 history_x1, history_x2, history_y1, history_y2 = [], [], [], []
 
+# ── LAMA MASK PADDING ─────────────────────────────────────────────────────────
+# Slightly overshoots the box to catch antialiased edges and shadow halos
+MASK_PAD_X = 8
+MASK_PAD_Y = 6
+
 frame_idx = 0
+print("🎬 Starting frame-by-frame processing...")
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -479,14 +487,14 @@ while cap.isOpened():
         break
     frame_idx += 1
 
-    # ── OCR on lower panel only ──────────────────────────────────────────────
+    # ── OCR ON LOWER PANEL ONLY ───────────────────────────────────────────────
     lower_panel = frame[min_scan_y:max_scan_y, :]
     ocr_results = reader.readtext(
         lower_panel,
         decoder='greedy',
         beamWidth=5,
         paragraph=False,
-        contrast_ths=0.05,   # slightly lower → catches faint/sand-covered text
+        contrast_ths=0.05,
         adjust_contrast=0.6,
     )
 
@@ -496,7 +504,7 @@ while cap.isOpened():
     y2_frame = last_known_y2
     frame_lock_success = False
 
-    # FIX 1 + FIX 4: fuzzy match; always push something into history
+    # ── FUZZY OCR MATCH ───────────────────────────────────────────────────────
     if ocr_results:
         best_conf = -1.0
         best_box  = None
@@ -504,17 +512,17 @@ while cap.isOpened():
         for result in ocr_results:
             if len(result) < 3:
                 continue
-            box_points     = result[0]
-            detected_text  = str(result[1]).strip()
-            confidence     = float(result[2])
+            box_points    = result[0]
+            detected_text = str(result[1]).strip()
+            confidence    = float(result[2])
 
             if confidence > 0.0 and fuzzy_match(detected_text, target_watermark_text):
-                if confidence > best_conf:          # pick highest-confidence match
+                if confidence > best_conf:
                     best_conf = confidence
                     best_box  = box_points
 
         if best_box is not None:
-            pts = np.array(best_box, dtype=np.int32)
+            pts      = np.array(best_box, dtype=np.int32)
             x1_frame = int(np.min(pts[:, 0])) - 4
             x2_frame = int(np.max(pts[:, 0])) + 4
             y1_frame = int(np.min(pts[:, 1])) + min_scan_y - 2
@@ -526,7 +534,7 @@ while cap.isOpened():
             last_known_y2 = y2_frame
             frame_lock_success = True
 
-    # FIX 4: whether or not OCR fired, push current best coords into history
+    # ── HISTORY SMOOTHING (always push, even on OCR miss) ────────────────────
     history_x1.append(x1_frame)
     history_x2.append(x2_frame)
     history_y1.append(y1_frame)
@@ -546,91 +554,37 @@ while cap.isOpened():
     y1_curr = max(0, min(y1_curr, orig_height - 1))
     y2_curr = max(0, min(y2_curr, orig_height - 1))
 
-    # ── FIX 2: adaptive threshold on the CROPPED ROI only ───────────────────
-    roi_crop    = frame[y1_curr:y2_curr, x1_curr:x2_curr]
-    roi_h, roi_w = roi_crop.shape[:2] if roi_crop.size > 0 else (0, 0)
+    # ── BUILD LAMA MASK ───────────────────────────────────────────────────────
+    # A clean rectangle with padding — LaMa doesn't need stroke-level precision
+    mx1 = max(0,              x1_curr - MASK_PAD_X)
+    mx2 = min(orig_width - 1, x2_curr + MASK_PAD_X)
+    my1 = max(0,               y1_curr - MASK_PAD_Y)
+    my2 = min(orig_height - 1, y2_curr + MASK_PAD_Y)
 
-    if roi_h > 0 and roi_w > 0:
-        gray_roi = cv2.cvtColor(roi_crop, cv2.COLOR_BGR2GRAY)
-        block_size = max(3, (roi_h | 1))          # must be odd and ≥ 3
-        if block_size % 2 == 0:
-            block_size += 1
-        adaptive_thresh_roi = cv2.adaptiveThreshold(
-            gray_roi, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV,
-            block_size, 9
-        )
-    else:
-        adaptive_thresh_roi = None
+    lama_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.rectangle(lama_mask, (mx1, my1), (mx2, my2), 255, -1)
 
-    # ── per-character erase ──────────────────────────────────────────────────
-    current_w   = max(1, x2_curr - x1_curr)
-    char_box_w  = float(current_w) / num_chars if num_chars > 0 else 1.0
+    # ── LAMA INPAINT ─────────────────────────────────────────────────────────
+    frame_pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    mask_pil   = Image.fromarray(lama_mask)
 
-    universal_erasure_map = np.zeros(frame.shape[:2], dtype=np.uint8)
+    result_pil = simple_lama(frame_pil, mask_pil)
+    frame      = cv2.cvtColor(np.array(result_pil), cv2.COLOR_RGB2BGR)
 
-    for idx in range(num_chars):
-        start_x = int(x1_curr + idx       * char_box_w)
-        end_x   = int(x1_curr + (idx + 1) * char_box_w)
-        start_y = y1_curr
-        end_y   = y2_curr
-
-        # ── FIX 5: safe background sampling ─────────────────────────────────
-        pad = 5
-        bg_color = (
-            safe_median_color(frame, start_y, end_y, start_x - pad, start_x) or
-            safe_median_color(frame, start_y, end_y, end_x,         end_x + pad) or
-            safe_median_color(frame, start_y, end_y, start_x,       end_x) or
-            (avg_b, avg_g, avg_r)
-        )
-        local_b, local_g, local_r = bg_color
-
-        # ── character-level stroke mask ──────────────────────────────────────
-        single_char_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-        cv2.rectangle(single_char_mask, (start_x, start_y), (end_x, end_y), 255, -1)
-
-        if adaptive_thresh_roi is not None:
-            # Map char position into cropped-ROI coordinates
-            cx1 = max(0, start_x - x1_curr)
-            cx2 = min(roi_w, end_x - x1_curr)
-            char_thresh_patch = np.zeros_like(adaptive_thresh_roi)
-            if cx2 > cx1:
-                char_thresh_patch[:, cx1:cx2] = adaptive_thresh_roi[:, cx1:cx2]
-
-            # Paste back into full-frame canvas at correct position
-            full_thresh = np.zeros(frame.shape[:2], dtype=np.uint8)
-            full_thresh[y1_curr:y2_curr, x1_curr:x2_curr] = char_thresh_patch
-
-            precise_letter_strokes = cv2.bitwise_and(single_char_mask, full_thresh)
-        else:
-            precise_letter_strokes = single_char_mask.copy()
-
-        char_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        dilated_stroke = cv2.dilate(precise_letter_strokes, char_kernel, iterations=1)
-
-        solid_bg_patch = np.full_like(frame, (local_b, local_g, local_r), dtype=np.uint8)
-        cv2.copyTo(solid_bg_patch, dilated_stroke, frame)
-
-        universal_erasure_map = cv2.bitwise_or(universal_erasure_map, dilated_stroke)
-
-    # ── FIX 6: inpaint with larger radius to kill edge halos ────────────────
-    if cv2.countNonZero(universal_erasure_map) > 0:
-        dilation_kernel   = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        inflated_mask     = cv2.dilate(universal_erasure_map, dilation_kernel, iterations=1)
-        frame = cv2.inpaint(frame, inflated_mask, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
-
-    # ── telemetry ────────────────────────────────────────────────────────────
+    # ── TELEMETRY ─────────────────────────────────────────────────────────────
     if frame_idx % 45 == 0:
         lock_str = "✅ LOCK" if frame_lock_success else "🔁 MEMORY"
         print(f"🎬 Frame {frame_idx:04d} | X=[{x1_curr}:{x2_curr}] Y=[{y1_curr}:{y2_curr}] | {lock_str}")
 
-    # ── overlay ──────────────────────────────────────────────────────────────
-    fixed_cx = x1_curr + (current_w // 2)
-    fixed_cy = max(0, y1_curr - 40)
+    # ── OVERLAY ───────────────────────────────────────────────────────────────
+    current_w = max(1, x2_curr - x1_curr)
+    fixed_cx  = x1_curr + (current_w // 2)
+    fixed_cy  = max(0, y1_curr - 40)
+
     (tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
     tx_a = fixed_cx - tw // 2
     ty_a = fixed_cy + th // 2
+
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
     cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color,   2, cv2.LINE_AA)
 
@@ -638,11 +592,16 @@ while cap.isOpened():
 
 cap.release()
 video_writer.release()
+print(f"✅ Frame loop done. {frame_idx} frames processed.")
 
-# ── remux audio ──────────────────────────────────────────────────────────────
+# ── REMUX AUDIO ───────────────────────────────────────────────────────────────
+print("🔊 Remuxing audio...")
 subprocess.run([
-    "ffmpeg", "-y", "-i", TEMP_HEALED_MP4, "-i", INPUT_REEL,
-    "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy",
+    "ffmpeg", "-y",
+    "-i", TEMP_HEALED_MP4,
+    "-i", INPUT_REEL,
+    "-map", "0:v", "-map", "1:a?",
+    "-c:v", "copy", "-c:a", "copy",
     FINAL_MONETIZED_OUTPUT
 ], check=True, capture_output=True)
 
@@ -650,6 +609,7 @@ if os.path.exists(TEMP_HEALED_MP4):
     os.remove(TEMP_HEALED_MP4)
 print(f"✅ Phase A Complete → {FINAL_MONETIZED_OUTPUT}")
 
+# ── FILE BRIDGE ───────────────────────────────────────────────────────────────
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET):
     os.remove(OLD_ROUTING_TARGET)
