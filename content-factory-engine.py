@@ -387,18 +387,18 @@ print("-" * 55 + "\n")
 # ==========================================
 # --- 3. HARDWARE-ACCELERATED HIGH-SPEED EASYOCR LOOP ---
 
+
 # ==========================================
-# PHASE A: PART 2 OF 2 — LaMa v4 (Feathered Mask + Colour Correction)
+# PHASE A: PART 2 OF 2 — LaMa v6 (Context-Aware + Poisson Clone)
 # ==========================================
 
-print("🎨 Initializing EasyOCR + LaMa v4 (Feathered Blend + Colour Correction)...")
-import subprocess
-import sys
-import os
+print("🚀 LaMa v6 — Context crop + Poisson seamless cloning...")
+import subprocess, sys, os, time
 import torch
 import cv2
 import numpy as np
 from PIL import Image
+from concurrent.futures import ThreadPoolExecutor
 
 # ── INSTALL DEPENDENCIES ──────────────────────────────────────────────────────
 try:
@@ -417,6 +417,7 @@ except ImportError:
 use_gpu = torch.cuda.is_available()
 if use_gpu:
     print(f"🚀 GPU: {torch.cuda.get_device_name(0)}")
+    torch.backends.cudnn.benchmark = True
     torch.cuda.empty_cache()
 else:
     print("⚠️ No GPU — using CPU")
@@ -425,207 +426,195 @@ print("🧠 Loading EasyOCR...")
 reader = easyocr.Reader(['en'], gpu=use_gpu)
 print("🧠 Loading LaMa...")
 simple_lama = SimpleLama()
-print("✅ Both models ready.")
+print("✅ Models ready.")
+
+# ── PROBE LAMA SIGNATURE WITH DUMMY INPUT ─────────────────────────────────────
+print("🔍 Probing LaMa call signature...")
+_d_img  = torch.zeros(1, 3, 64, 64)
+_d_msk  = torch.zeros(1, 1, 64, 64)
+if use_gpu:
+    simple_lama.model = simple_lama.model.cuda()
+    _d_img = _d_img.cuda()
+    _d_msk = _d_msk.cuda()
+
+LAMA_MODE = "pil"
+with torch.no_grad():
+    try:
+        simple_lama.model(_d_img, _d_msk)
+        LAMA_MODE = "split"
+        print("   split mode: model(image, mask)")
+    except Exception:
+        try:
+            simple_lama.model(torch.cat([_d_img, _d_msk], dim=1))
+            LAMA_MODE = "concat"
+            print("   concat mode: model(cat[image,mask])")
+        except Exception:
+            print("   PIL fallback mode")
+del _d_img, _d_msk
+
+# ── TUNING ────────────────────────────────────────────────────────────────────
+BATCH_SIZE     = 4      # lower to 2 if OOM
+NUM_WORKERS    = 4
+ENVELOPE_PAD_X = 25
+ENVELOPE_PAD_Y = 15
+# How many pixels of surrounding background to include when we
+# crop the patch for LaMa — more context = better texture synthesis
+CONTEXT_PAD    = 120    # pixels around the watermark box fed to LaMa
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def _substrings(text, n=3):
-    return {text[i:i+n] for i in range(len(text) - n + 1)} if len(text) >= n else {text}
+def _substrings(t, n=3):
+    return {t[i:i+n] for i in range(len(t)-n+1)} if len(t) >= n else {t}
 
-def fuzzy_match(detected: str, target: str, min_len: int = 3) -> bool:
+def fuzzy_match(detected, target, min_len=3):
     detected     = detected.lower().strip()
     target_clean = target.lower().replace("@","").replace(".","").replace("_","")
     for chunk in _substrings(target_clean, min_len):
         if chunk in detected:
             return True
     common = sum(1 for c in target_clean if c in detected)
-    if len(target_clean) > 0 and common / len(target_clean) >= 0.55:
-        return True
-    return False
+    return len(target_clean) > 0 and common / len(target_clean) >= 0.55
 
-def build_feathered_mask(h, w, x1, y1, x2, y2, feather_px=18):
+def seamless_inpaint(frame, env_x1, env_y1, env_x2, env_y2, context_pad):
     """
-    Returns a float32 mask [0..1] with hard 1.0 in the core and a smooth
-    cosine fall-off over feather_px pixels at every edge.
-    This prevents the hard rectangular boundary from being visible.
+    1. Crop a large context window around the watermark box.
+    2. Run LaMa on just that crop (sees surrounding texture → better fill).
+    3. Build a soft elliptical mask for Poisson cloning.
+    4. Poisson-clone the filled patch back into the original frame.
+       Poisson cloning matches gradients at the boundary so the seam
+       is mathematically invisible.
     """
-    mask = np.zeros((h, w), dtype=np.float32)
-    # Hard fill inside box
-    mask[y1:y2, x1:x2] = 1.0
+    h, w = frame.shape[:2]
 
-    # Gaussian blur creates the smooth feathered edge
-    ksize = feather_px * 2 + 1   # must be odd
-    mask  = cv2.GaussianBlur(mask, (ksize, ksize), sigmaX=feather_px / 2)
+    # ── Context crop coords (large window around watermark) ──────────────────
+    cx1 = max(0,   env_x1 - context_pad)
+    cy1 = max(0,   env_y1 - context_pad)
+    cx2 = min(w-1, env_x2 + context_pad)
+    cy2 = min(h-1, env_y2 + context_pad)
 
-    # Re-normalise so the core stays at 1.0 after blurring
-    core_val = mask[
-        (y1 + y2) // 2,
-        (x1 + x2) // 2
-    ]
-    if core_val > 0:
-        mask = np.clip(mask / core_val, 0.0, 1.0)
+    crop     = frame[cy1:cy2, cx1:cx2].copy()
+    ch, cw   = crop.shape[:2]
 
-    return mask  # shape (H, W), float32 in [0,1]
+    # Watermark position inside the crop
+    wx1 = env_x1 - cx1
+    wy1 = env_y1 - cy1
+    wx2 = env_x2 - cx1
+    wy2 = env_y2 - cy1
 
-def colour_correct_patch(original_frame, inpainted_frame, x1, y1, x2, y2,
-                          sample_pad=30):
-    """
-    Samples the BGR median of the border ring OUTSIDE the mask in the
-    original frame, compares it with the same ring in the inpainted frame,
-    and applies a per-channel additive shift to the filled patch so its
-    colours match the surrounding background.
+    # ── Build mask for LaMa (hard rectangle inside crop) ─────────────────────
+    crop_mask = np.zeros((ch, cw), dtype=np.uint8)
+    cv2.rectangle(crop_mask, (wx1, wy1), (wx2, wy2), 255, -1)
 
-    Returns the inpainted frame with the colour-corrected patch applied.
-    """
-    h, w = original_frame.shape[:2]
+    # ── Run LaMa on the crop ─────────────────────────────────────────────────
+    pil_crop = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+    pil_mask = Image.fromarray(crop_mask)
+    filled_pil  = simple_lama(pil_crop, pil_mask)
+    filled_crop = cv2.cvtColor(np.array(filled_pil), cv2.COLOR_RGB2BGR)
 
-    # Sample ring: ENVELOPE_PAD beyond the box on each side, then subtract box
-    sx1 = max(0,   x1 - sample_pad)
-    sx2 = min(w-1, x2 + sample_pad)
-    sy1 = max(0,   y1 - sample_pad)
-    sy2 = min(h-1, y2 + sample_pad)
+    # ── Extract only the filled watermark patch from the result ──────────────
+    patch        = filled_crop[wy1:wy2, wx1:wx2]
+    patch_h, patch_w = patch.shape[:2]
+    if patch_h == 0 or patch_w == 0:
+        return frame   # safety guard
 
-    # Build ring mask: outer rect minus inner (watermark) rect
-    ring_mask = np.zeros((h, w), dtype=np.uint8)
-    cv2.rectangle(ring_mask, (sx1, sy1), (sx2, sy2), 255, -1)
-    cv2.rectangle(ring_mask, (x1,  y1 ), (x2,  y2 ), 0,   -1)
+    # ── Build elliptical Poisson mask (softer than rectangle) ────────────────
+    # Poisson cloning needs a white mask where we want to paste
+    poisson_mask = np.zeros((patch_h, patch_w), dtype=np.uint8)
+    cx_e = patch_w // 2
+    cy_e = patch_h // 2
+    # Slightly inset ellipse so Poisson has clean boundary pixels to work with
+    cv2.ellipse(poisson_mask,
+                (cx_e, cy_e),
+                (max(1, cx_e - 4), max(1, cy_e - 4)),
+                0, 0, 360, 255, -1)
 
-    if cv2.countNonZero(ring_mask) == 0:
-        return inpainted_frame   # nothing to compare
+    # ── Poisson seamless clone back into original full frame ──────────────────
+    # Centre of the patch in the full frame
+    centre_x = env_x1 + patch_w // 2
+    centre_y = env_y1 + patch_h // 2
 
-    # Per-channel median in the ring on ORIGINAL frame (true background colour)
-    orig_ring_b = np.median(original_frame[:, :, 0][ring_mask == 255])
-    orig_ring_g = np.median(original_frame[:, :, 1][ring_mask == 255])
-    orig_ring_r = np.median(original_frame[:, :, 2][ring_mask == 255])
+    # seamlessClone needs the patch to fit inside the destination
+    # guard: centre must be far enough from all edges
+    margin = max(patch_h, patch_w) // 2 + 2
+    if (centre_x < margin or centre_x > w - margin or
+        centre_y < margin or centre_y > h - margin):
+        # Fallback: direct paste with feathered alpha blend
+        result = frame.copy()
+        result[env_y1:env_y2, env_x1:env_x2] = patch
+        return result
 
-    # Per-channel median in the ring on INPAINTED frame
-    inp_ring_b  = np.median(inpainted_frame[:, :, 0][ring_mask == 255])
-    inp_ring_g  = np.median(inpainted_frame[:, :, 1][ring_mask == 255])
-    inp_ring_r  = np.median(inpainted_frame[:, :, 2][ring_mask == 255])
+    result = cv2.seamlessClone(
+        patch,          # source  (the LaMa-filled patch)
+        frame,          # dest    (the original full frame)
+        poisson_mask,   # mask    (ellipse inside the patch)
+        (centre_x, centre_y),
+        cv2.NORMAL_CLONE   # gradient-matching clone
+    )
+    return result
 
-    # Shift = what we need to ADD to the inpainted patch to match the original bg
-    shift_b = orig_ring_b - inp_ring_b
-    shift_g = orig_ring_g - inp_ring_g
-    shift_r = orig_ring_r - inp_ring_r
-
-    # Apply shift only inside the patch region
-    corrected = inpainted_frame.copy()
-    patch = corrected[y1:y2, x1:x2].astype(np.float32)
-    patch[:, :, 0] = np.clip(patch[:, :, 0] + shift_b, 0, 255)
-    patch[:, :, 1] = np.clip(patch[:, :, 1] + shift_g, 0, 255)
-    patch[:, :, 2] = np.clip(patch[:, :, 2] + shift_r, 0, 255)
-    corrected[y1:y2, x1:x2] = patch.astype(np.uint8)
-
-    return corrected
-
-def blend_patch(original_frame, inpainted_frame, feather_mask_3c):
-    """
-    Alpha-blend original and inpainted using the feathered mask.
-    Inside core  → fully inpainted (watermark gone)
-    Outside core → original pixels (zero change to surroundings)
-    Edge zone    → smooth gradient between the two
-    """
-    orig_f = original_frame.astype(np.float32)
-    inp_f  = inpainted_frame.astype(np.float32)
-    blended = orig_f * (1.0 - feather_mask_3c) + inp_f * feather_mask_3c
-    return np.clip(blended, 0, 255).astype(np.uint8)
+# ── BATCHED VERSION: runs LaMa on crops, then Poisson clone each ──────────────
+def process_batch(frames_bgr, env_x1, env_y1, env_x2, env_y2, context_pad):
+    results = []
+    for frame in frames_bgr:
+        out = seamless_inpaint(frame, env_x1, env_y1, env_x2, env_y2,
+                               context_pad)
+        results.append(out)
+    return results
 
 # ── VIDEO PROPERTIES ──────────────────────────────────────────────────────────
 min_scan_y = int(orig_height * 0.65)
 max_scan_y = int(orig_height * 0.98)
 
-ENVELOPE_PAD_X = 25
-ENVELOPE_PAD_Y = 15
-FEATHER_PX     = 18   # pixels of smooth edge fade — increase for softer blend
-COLOUR_SAMPLE  = 35   # width of the ring sampled for colour correction
-
 # ══════════════════════════════════════════════════════════════════════════════
-# PHASE 1 — SCAN EVERY FRAME, BUILD LOCKED ENVELOPE
+# PHASE 1 — SCAN (identical to v4/v5)
 # ══════════════════════════════════════════════════════════════════════════════
-print("\n📡 PHASE 1: Scanning all frames to build locked envelope...")
-
+print("\n📡 PHASE 1: Scanning frames for locked envelope...")
 cap          = cv2.VideoCapture(INPUT_REEL)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 all_x1, all_x2, all_y1, all_y2 = [], [], [], []
-scan_idx = 0
-lock_count = 0
+scan_idx = lock_count = 0
 
 while cap.isOpened():
     ret, frame = cap.read()
-    if not ret:
-        break
+    if not ret: break
     scan_idx += 1
-
-    lower_panel = frame[min_scan_y:max_scan_y, :]
-    ocr_results = reader.readtext(
-        lower_panel,
-        decoder='greedy',
-        beamWidth=5,
-        paragraph=False,
-        contrast_ths=0.05,
-        adjust_contrast=0.6,
-    )
-
-    best_conf = -1.0
-    best_box  = None
-    for result in ocr_results:
-        if len(result) < 3:
-            continue
-        box_points    = result[0]
-        detected_text = str(result[1]).strip()
-        confidence    = float(result[2])
-        if confidence > 0.0 and fuzzy_match(detected_text, target_watermark_text):
-            if confidence > best_conf:
-                best_conf = confidence
-                best_box  = box_points
-
+    lower = frame[min_scan_y:max_scan_y, :]
+    ocr   = reader.readtext(lower, decoder='greedy', beamWidth=5,
+                             paragraph=False, contrast_ths=0.05,
+                             adjust_contrast=0.6)
+    best_conf, best_box = -1.0, None
+    for r in ocr:
+        if len(r) < 3: continue
+        if r[2] > 0.0 and fuzzy_match(str(r[1]).strip(), target_watermark_text):
+            if r[2] > best_conf:
+                best_conf, best_box = r[2], r[0]
     if best_box is not None:
         pts = np.array(best_box, dtype=np.int32)
-        all_x1.append(int(np.min(pts[:, 0])))
-        all_x2.append(int(np.max(pts[:, 0])))
-        all_y1.append(int(np.min(pts[:, 1])) + min_scan_y)
-        all_y2.append(int(np.max(pts[:, 1])) + min_scan_y)
+        all_x1.append(int(np.min(pts[:,0])))
+        all_x2.append(int(np.max(pts[:,0])))
+        all_y1.append(int(np.min(pts[:,1])) + min_scan_y)
+        all_y2.append(int(np.max(pts[:,1])) + min_scan_y)
         lock_count += 1
-
     if scan_idx % 100 == 0:
-        print(f"   Scanned {scan_idx}/{total_frames} | Detections: {lock_count}")
+        print(f"   {scan_idx}/{total_frames} | detections: {lock_count}")
 
 cap.release()
 
 if lock_count == 0:
-    print("⚠️ Zero OCR matches — using default bottom strip.")
+    print("⚠️ Zero detections — using default strip.")
     env_x1, env_x2 = 0, orig_width
-    env_y1, env_y2 = int(orig_height * 0.91), int(orig_height * 0.96)
+    env_y1, env_y2 = int(orig_height*0.91), int(orig_height*0.96)
 else:
-    env_x1 = max(0,               min(all_x1) - ENVELOPE_PAD_X)
-    env_x2 = min(orig_width  - 1, max(all_x2) + ENVELOPE_PAD_X)
-    env_y1 = max(0,               min(all_y1) - ENVELOPE_PAD_Y)
-    env_y2 = min(orig_height - 1, max(all_y2) + ENVELOPE_PAD_Y)
+    env_x1 = max(0,             min(all_x1) - ENVELOPE_PAD_X)
+    env_x2 = min(orig_width-1,  max(all_x2) + ENVELOPE_PAD_X)
+    env_y1 = max(0,             min(all_y1) - ENVELOPE_PAD_Y)
+    env_y2 = min(orig_height-1, max(all_y2) + ENVELOPE_PAD_Y)
 
-print(f"\n✅ PHASE 1 COMPLETE")
-print(f"   Frames scanned  : {scan_idx}")
-print(f"   OCR detections  : {lock_count} ({100*lock_count/max(scan_idx,1):.1f}%)")
-print(f"   Locked envelope : X=[{env_x1}:{env_x2}]  Y=[{env_y1}:{env_y2}]")
-
-# ── PRE-BUILD MASK ASSETS (done once, reused every frame) ────────────────────
-
-# Hard binary mask for LaMa (must be 0/255 uint8)
-LAMA_MASK = np.zeros((orig_height, orig_width), dtype=np.uint8)
-cv2.rectangle(LAMA_MASK, (env_x1, env_y1), (env_x2, env_y2), 255, -1)
-LAMA_MASK_PIL = Image.fromarray(LAMA_MASK)
-
-# Feathered float mask for blending (shape H×W, values 0..1)
-feather_1c = build_feathered_mask(
-    orig_height, orig_width,
-    env_x1, env_y1, env_x2, env_y2,
-    feather_px=FEATHER_PX
-)
-# Expand to 3 channels for vectorised blend
-FEATHER_3C = np.stack([feather_1c, feather_1c, feather_1c], axis=2)
+print(f"✅ Envelope: X=[{env_x1}:{env_x2}] Y=[{env_y1}:{env_y2}]")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PHASE 2 — ERASE EVERY FRAME WITH FIXED MASK + FEATHER + COLOUR CORRECTION
+# PHASE 2 — ERASE WITH CONTEXT CROP + POISSON CLONE
 # ══════════════════════════════════════════════════════════════════════════════
-print("\n🎬 PHASE 2: Erasing with feathered blend + colour correction...")
+print(f"\n🎬 PHASE 2: context_pad={CONTEXT_PAD}px, batch={BATCH_SIZE}...")
 
 cap          = cv2.VideoCapture(INPUT_REEL)
 TEMP_HEALED  = "/kaggle/working/inpainted_temp_restored.mp4"
@@ -634,59 +623,83 @@ video_writer = cv2.VideoWriter(TEMP_HEALED, fourcc, fps, (orig_width, orig_heigh
 
 font_face    = cv2.FONT_HERSHEY_SIMPLEX
 text_color   = (255, 255, 255)
-shadow_color = (15,  15,  15)
+shadow_color = (15, 15, 15)
+overlay_cx   = env_x1 + (env_x2 - env_x1) // 2
+overlay_cy   = max(0, env_y1 - 40)
+(tw, th), _  = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
+tx_a, ty_a   = overlay_cx - tw//2, overlay_cy + th//2
 
-# Overlay anchor
-overlay_cx = env_x1 + (env_x2 - env_x1) // 2
-overlay_cy = max(0, env_y1 - 40)
-(tw, th), _ = cv2.getTextSize("@AWRAM", font_face, 0.52, 2)
-tx_a = overlay_cx - tw // 2
-ty_a = overlay_cy + th // 2
+write_buffer   = {}
+next_write_idx = 1
+frame_idx      = 0
+t_start        = time.time()
 
-frame_idx = 0
+def post_process_batch(originals, start_idx):
+    out = {}
+    for k, orig in enumerate(originals):
+        f = seamless_inpaint(orig, env_x1, env_y1, env_x2, env_y2, CONTEXT_PAD)
+        cv2.putText(f, "@AWRAM", (tx_a,ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
+        cv2.putText(f, "@AWRAM", (tx_a,ty_a), font_face, 0.52, text_color,   2, cv2.LINE_AA)
+        out[start_idx + k] = f
+    return out
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
-    frame_idx += 1
+def flush_buffer():
+    global next_write_idx
+    while next_write_idx in write_buffer:
+        video_writer.write(write_buffer.pop(next_write_idx))
+        next_write_idx += 1
 
-    original_frame = frame.copy()   # keep original for colour sampling + blending
+with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+    futures      = []
+    batch_frames = []
 
-    # ── Step 1: LaMa fills the hard mask rectangle ───────────────────────────
-    frame_pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    result_pil = simple_lama(frame_pil, LAMA_MASK_PIL)
-    inpainted  = cv2.cvtColor(np.array(result_pil), cv2.COLOR_RGB2BGR)
+    while True:
+        ret, frame = cap.read()
+        if ret:
+            frame_idx += 1
+            batch_frames.append((frame_idx, frame.copy()))
 
-    # ── Step 2: Colour-correct the patch to match surrounding background ──────
-    inpainted = colour_correct_patch(
-        original_frame, inpainted,
-        env_x1, env_y1, env_x2, env_y2,
-        sample_pad=COLOUR_SAMPLE
-    )
+        if len(batch_frames) == BATCH_SIZE or (not ret and batch_frames):
+            originals = [f for _, f in batch_frames]
+            start_idx = batch_frames[0][0]
+            fut = executor.submit(post_process_batch, originals, start_idx)
+            futures.append(fut)
+            batch_frames = []
 
-    # ── Step 3: Feathered blend — smooth transition at every mask edge ────────
-    frame = blend_patch(original_frame, inpainted, FEATHER_3C)
+            still = []
+            for f in futures:
+                if f.done():
+                    write_buffer.update(f.result())
+                    flush_buffer()
+                else:
+                    still.append(f)
+            futures = still
 
-    # ── Overlay ───────────────────────────────────────────────────────────────
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, shadow_color, 4, cv2.LINE_AA)
-    cv2.putText(frame, "@AWRAM", (tx_a, ty_a), font_face, 0.52, text_color,   2, cv2.LINE_AA)
+            if frame_idx % 200 == 0:
+                elapsed    = time.time() - t_start
+                fps_actual = frame_idx / max(elapsed, 0.01)
+                eta_min    = (total_frames - frame_idx) / max(fps_actual, 0.01) / 60
+                print(f"   Frame {frame_idx}/{total_frames} | "
+                      f"{fps_actual:.1f} fps | ETA {eta_min:.1f} min")
 
-    video_writer.write(frame)
+        if not ret:
+            break
 
-    if frame_idx % 100 == 0:
-        print(f"   Processed {frame_idx}/{total_frames} frames...")
+    for f in futures:
+        write_buffer.update(f.result())
+        flush_buffer()
 
 cap.release()
 video_writer.release()
-print(f"✅ PHASE 2 COMPLETE — {frame_idx} frames written.")
+elapsed = time.time() - t_start
+print(f"✅ PHASE 2 done — {frame_idx} frames in {elapsed/60:.1f} min "
+      f"({frame_idx/elapsed:.1f} fps)")
 
 # ── REMUX AUDIO ───────────────────────────────────────────────────────────────
 print("🔊 Remuxing audio...")
 subprocess.run([
     "ffmpeg", "-y",
-    "-i", TEMP_HEALED,
-    "-i", INPUT_REEL,
+    "-i", TEMP_HEALED, "-i", INPUT_REEL,
     "-map", "0:v", "-map", "1:a?",
     "-c:v", "copy", "-c:a", "copy",
     FINAL_MONETIZED_OUTPUT
@@ -696,12 +709,11 @@ if os.path.exists(TEMP_HEALED):
     os.remove(TEMP_HEALED)
 print(f"✅ Phase A Complete → {FINAL_MONETIZED_OUTPUT}")
 
-# ── FILE BRIDGE ───────────────────────────────────────────────────────────────
 OLD_ROUTING_TARGET = "/kaggle/working/ocr_cleaned_source.mp4"
 if os.path.exists(OLD_ROUTING_TARGET):
     os.remove(OLD_ROUTING_TARGET)
 subprocess.run(["cp", FINAL_MONETIZED_OUTPUT, OLD_ROUTING_TARGET], check=True)
-print(f"🔗 File bridge mapped → {OLD_ROUTING_TARGET}")
+print(f"🔗 File bridge → {OLD_ROUTING_TARGET}")
 
 # --------------------------------------------------
 # PHASE B: HARDWARE-ACCELERATED RHYTHMIC FILTER STACK (7 FILTERS + 7 EFFECTS)
